@@ -158,9 +158,11 @@ Health check: pendiente de confirmar en CM-103
 
 \- `main` es estable y solo recibe promociones `develop → main` mediante Merge commit.
 
-\- `develop` integra ramas `CA-<numero>-<descripcion-kebab-case>` mediante Squash.
+\- `develop` integra ramas `<tipo>/CM-NNN-<descripcion-kebab-case>` mediante Squash.
 
-\- Todo cambio ordinario entra mediante PR y revisión distinta del autor; la rama `CA-\*` se elimina después.
+\- Todo cambio ordinario entra mediante PR y revisión distinta del autor.
+
+Tipos admitidos: `feat`, `fix`, `test`, `docs`, `refactor`, `perf`, `build`, `ci` y `chore`.
 
 
 
