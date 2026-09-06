@@ -17,14 +17,65 @@ Este repositorio contiene el microservicio de cuentas dentro de una arquitectura
 
 Las contraseñas y credenciales de autenticación permanecen en Firebase. Nunca se almacenan en este servicio.
 
+## Estructura de carpetas (Estilo DDD)
+
+Cuentas sigue el patrón de capas con Domain-Driven Design. Las carpetas están predefinidas para garantizar cohesión alta y acoplamiento bajo. Crear subcarpetas solo si existe evidencia de un motivo de cambio distinto.
+
+```text
+tech.cameia.cuentas
+├── presentation
+│   ├── controller          // adaptadores de entrada HTTP
+│   ├── dto                 // request/response del contrato público
+│   └── advice              // manejo de errores HTTP
+├── application
+│   ├── service             // casos de uso (orquestación, transacción)
+│   └── command             // objetos de entrada de los casos de uso
+├── domain
+│   ├── model               // agregados, entidades, objetos de valor, enums
+│   ├── service             // servicios de dominio
+│   ├── policy              // políticas de dominio
+│   ├── port                // interfaces que el dominio define y NO implementa
+│   ├── event               // eventos de dominio
+│   └── exception           // excepciones de negocio
+└── infrastructure
+    ├── persistence
+    │   ├── entity          // modelo JPA — NO es el modelo de dominio
+    │   ├── repository      // Spring Data + adaptadores de los puertos
+    │   └── mapper          // dominio <-> entity
+    ├── messaging
+    │   ├── consumer        // @RabbitListener
+    │   ├── publisher       // RabbitTemplate
+    │   └── payload         // contratos de mensaje versionados
+    ├── client              // WebClient hacia sistemas externos
+    ├── ia                  // adaptadores de LLM (solo si se requiere)
+    └── config              // configuración de Spring
+```
+
+**Regla de dependencias:** `domain` no importa nada de `presentation`, `application` ni `infrastructure`. `application` depende de `domain` a través de puertos. `infrastructure` implementa los puertos que `domain` define. Esta regla se valida automáticamente con la prueba ArchUnit `LayeredArchitectureTest`; toda nueva clase debe pasarla.
+
 ## Límites de entrada y confianza
 
-El servicio solo debe aceptar peticiones del API Gateway. Las peticiones directas deben rechazarse. La autenticación entre gateway y servicio requiere un mecanismo de firma; el estándar, los headers y el canon del mensaje están pendientes y bloquean la implementación de esta frontera. Consultar [docs/AMBIGUIDADES.md](docs/AMBIGUIDADES.md).
+El servicio solo debe aceptar peticiones autenticadas del API Gateway. La estrategia tiene dos capas, ambas documentadas en [docs/AMBIGUIDADES.md](docs/AMBIGUIDADES.md):
 
-El gateway no debe reenviar el JWT completo como contrato de negocio. Cuentas recibe únicamente los datos necesarios:
+### Capa 1: IAM + OIDC en Cloud Run (base obligatoria)
+- El microservicio se despliega con `--no-allow-unauthenticated`.
+- Solo la cuenta de servicio del API Gateway tiene rol de invocador (binding de IAM).
+- El Gateway obtiene un token OIDC del metadata server de Cloud Run y lo agrega a cada petición saliente en el header `Authorization: Bearer <token>`.
+- Cloud Run valida el token antes de enrutar la petición al microservicio.
+- No implica cambios en la lógica de negocio: es configuración de infraestructura.
 
-- Obligatorios: `firebase_uid`, `email`, `roles`, `request_id`.
-- Opcionales: `display_name`, `correlation_id`, `issued_at`.
+### Capa 2: VPC e ingress interno (solo para contextos sensibles como Cuentas)
+- Se agrega encima de la Capa 1 para microservicios donde se procesan pagos o permisos críticos.
+- El microservicio queda con `ingress: internal`, sin ruta pública desde internet.
+- El Gateway accede al microservicio por un conector privado dentro de la VPC.
+- El Gateway sigue siendo público, como punto de entrada único para React.
+
+**Contrato de entrada:**
+
+Cuentas recibe del Gateway únicamente los datos necesarios para la autorización de negocio, nunca el JWT completo:
+
+- **Obligatorios:** `firebase_uid`, `email`, `roles`, `request_id`.
+- **Opcionales:** `display_name`, `correlation_id`, `issued_at`.
 
 No agregar campos derivados del JWT sin justificar su necesidad y documentar su contrato. No confiar en headers enviados directamente por clientes externos.
 
@@ -32,10 +83,11 @@ No agregar campos derivados del JWT sin justificar su necesidad y documentar su 
 
 - No registrar JWT, secretos, contraseñas, tokens de Firebase ni información sensible de pago.
 - Guardar secretos de Firebase y Wompi únicamente en el gestor de secretos o variables de entorno aprobadas; nunca en Git.
-- Verificar autenticidad, timestamp y tolerancia de replay de peticiones del gateway cuando el contrato sea aprobado.
-- Verificar firma e idempotencia de webhooks de Wompi antes de cambiar una suscripción o entitlement.
+- La autenticidad de peticiones del Gateway se garantiza mediante IAM y tokens OIDC (Capa 1). No es necesario firmar el payload en la aplicación.
+- Verificar firma SHA-256 e idempotencia de webhooks de Wompi antes de cambiar una suscripción o entitlement. Wompi se conecta al API Gateway (no directo a Cuentas); el Gateway reenvía el evento íntegro vía red privada.
 - Aplicar autorización por operación y no asumir que `roles` equivale automáticamente a permisos de negocio.
 - Exponer solo los endpoints de Actuator necesarios para salud, información y métricas.
+- Cada integración externa (Firebase, Wompi, etc.) requiere pruebas de autenticidad, reintentos, manejo de errores e idempotencia antes de considerarla completa.
 
 ## Metodología Spec-Driven Development
 
@@ -47,11 +99,13 @@ El repositorio sigue Spec-Driven Development clásico. Las especificaciones vivi
 4. Añadir pruebas que demuestren los escenarios de la spec.
 5. Actualizar la documentación si cambian contratos, configuración, datos, eventos o comandos.
 
-No crear carpetas o especificaciones ficticias para aparentar que una decisión está tomada. Las preguntas abiertas se mantienen en [docs/AMBIGUIDADES.md](docs/AMBIGUIDADES.md).
+No crear carpetas o especificaciones ficticias para aparentar que una decisión está tomada.
 
 ## Restricción de ambigüedades
 
-Si una petición contiene una ambigüedad que puede afectar seguridad, contrato, datos, pagos, permisos, arquitectura o comportamiento observable, el agente debe detenerse antes de editar. Debe formular preguntas concretas y registrar la resolución en `docs/AMBIGUIDADES.md`.
+Si una petición contiene una ambigüedad que puede afectar seguridad, contrato, datos, pagos, permisos, arquitectura o comportamiento observable, el agente debe detenerse antes de editar. Debe formular preguntas concretas y resolverlas ahí mismo con máximo 6 preguntas.
+
+Toda ambigüedad cuya resolución tenga impacto en la arquitectura, sea de alto impacto en seguridad, o comprometa una buena práctica (por ejemplo, omitir pruebas unitarias) debe quedar registrada en [docs/AMBIGUIDADES.md](docs/AMBIGUIDADES.md) con la pregunta, la decisión adoptada, el impacto y la especificación relacionada. Ambigüedades menores, sin ese impacto, pueden resolverse en la conversación sin dejar constancia formal allí.
 
 No asumir defaults silenciosos en decisiones críticas. Una tarea puede continuar solo si las partes ambiguas son irrelevantes para el cambio o si ya existe una decisión documentada y aprobada.
 
@@ -66,20 +120,52 @@ Se prohíben cambios cuyo diff total agregado y eliminado supere 1000 líneas po
 
 No usar este límite para ocultar cambios relacionados en commits separados: cada incremento debe ser revisable y funcional.
 
+## Reglas de nombrado
+
+- Clases e interfaces: `PascalCase`.
+- Métodos, campos y variables: `camelCase`.
+- Constantes: `UPPER_SNAKE_CASE`.
+- Paquetes: `lowercase`, sin guiones bajos, sin plurales inventados.
+- **`CONFIRMADO`** Sin abreviaturas: `configuracion`, no `config`; `sesion`, no `ses`; `perfilProfesional`, no `pp`. Los identificadores cortos de los diagramas (`ctrl_ses`, `app_eval`) son etiquetas del dibujo, no nombres de clase.
+
+## Convenciones de idioma
+
+**Regla fundamental:** El compilador lee código en inglés; las personas leen documentación en español.
+
+| Elemento | Idioma | Ejemplo |
+|---|---|---|
+| Paquetes, clases, métodos, variables | **Inglés** | `Account`, `createSubscription()`, `firebaseUid` |
+| Constantes | **Inglés** `UPPER_SNAKE` | `MAX_RETRY_ATTEMPTS`, `WEBHOOK_TIMEOUT_MS` |
+| Nombres de tablas/columnas | **Español** `snake_case` | `cuenta`, `fecha_creacion`, `id_firebase` |
+| **Comentarios de código (Javadoc)** | **Español** | Ver sección "Documentación de código" |
+| **Descripciones OpenAPI** | **Español** | Ver sección "Documentación de código" |
+| Mensajes de log | **Español**, sin datos sensibles | `logger.info("Suscripción creada para usuario")` |
+| Excepciones (mensaje) | **Español** | `throw new SubscriptionNotFoundException("Suscripción no encontrada")` |
+| Commits y PRs | **Español** | `git commit -m "CM-105: Implementar renovación automática"` |
+
+**Justificación:** El código convive con compiladores, intérpretes y dependencias internacionales; el inglés es el estándar. La documentación la lee el equipo en un contexto donde el español es natural.
+
+## Documentación de código
+
+### Javadoc en español
+
+Todo método público en `domain`, `application` y los adaptadores de `infrastructure` lleva Javadoc en español con descripción clara de qué hace, parámetros, retorno y excepciones.
+
+### OpenAPI/Swagger en español
+
+Cada endpoint expone su contrato mediante OpenAPI 3.0. Usar `springdoc-openapi-starter-webmvc-ui` con anotaciones `@Operation`, `@ApiResponse` y `@Tag` en los controladores. Los DTOs llevan `@Schema` describiendo cada campo en español.
+
+**Acceso a documentación:**
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- JSON OpenAPI: `http://localhost:8080/v3/api-docs`
+
 ## Convenciones técnicas
 
+**Stack base:**
 - Java 21, Spring Boot 4.1.1 y Maven Wrapper.
-- Preferir inyección por constructor y dependencias `final`.
-- Preferir visibilidad package-private en componentes Spring cuando no sea necesaria la pública.
-- Usar `@ConfigurationProperties` tipadas y validadas para configuración.
-- Definir límites transaccionales pequeños; usar `readOnly = true` para consultas.
-- Mantener `spring.jpa.open-in-view=false`.
-- Separar web y persistencia con DTOs/records y validación Jakarta; no exponer entidades.
-- Usar comandos específicos para operaciones de negocio.
-- Centralizar errores con `@RestControllerAdvice` y respuestas consistentes, preferiblemente Problem Details.
-- Usar APIs versionadas y respuestas JSON con objeto raíz consistente.
-- Usar SLF4J; nunca `System.out.println()` para logging.
-- Usar Testcontainers en pruebas de integración y puertos aleatorios.
+- Sigue las indicaciones de [guidelines.md](guidelines.md).
+- Usa Javadoc en español; código y método/clase en inglés (ver sección "Convenciones de idioma").
+- Documenta endpoints públicos con OpenAPI/Swagger.
 
 ## Verificación de cambios
 
@@ -88,6 +174,14 @@ Antes de terminar una tarea, ejecutar el comando Maven más estrecho que valide 
 ```powershell
 ./mvnw.cmd test
 ```
+
+**Checklist de documentación:**
+- ☐ Todo método público tiene Javadoc en español.
+- ☐ Cada endpoint está anotado con `@Operation` y `@ApiResponse` en español.
+- ☐ Los DTOs tienen `@Schema` describiendo cada campo en español.
+- ☐ No hay JWT, secretos ni tokens de Firebase en logs, Javadoc ni ejemplos de OpenAPI.
+- ☐ El código (clases, métodos, variables) está completamente en inglés.
+- ☐ `LayeredArchitectureTest` (ArchUnit) pasa: ninguna clase nueva rompe la regla de dependencias entre capas.
 
 No declarar implementada una integración externa sin pruebas de autenticidad, errores, reintentos e idempotencia cuando aplique.
 
