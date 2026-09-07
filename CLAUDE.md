@@ -89,6 +89,10 @@ No agregar campos derivados del JWT sin justificar su necesidad y documentar su 
 - Exponer solo los endpoints de Actuator necesarios para salud.
 - Cada integración externa (Firebase, Wompi, etc.) requiere pruebas de autenticidad, reintentos, manejo de errores e idempotencia antes de considerarla completa.
 
+## Constitución
+
+Los principios no negociables del proyecto (stack, calidad, tests y límites) están consolidados en [docs/constitution.md](docs/constitution.md). Toda spec y todo PR los cumple; en caso de conflicto, esa lista prevalece sobre el resto de este documento.
+
 ## Metodología Spec-Driven Development
 
 El repositorio sigue Spec-Driven Development clásico. Las especificaciones vivirán bajo `docs/specs/`, organizadas por funcionalidad. Antes de implementar una capacidad nueva:
