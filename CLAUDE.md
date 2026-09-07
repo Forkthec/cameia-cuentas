@@ -84,9 +84,9 @@ No agregar campos derivados del JWT sin justificar su necesidad y documentar su 
 - No registrar JWT, secretos, contraseñas, tokens de Firebase ni información sensible de pago.
 - Guardar secretos de Firebase y Wompi únicamente en el gestor de secretos o variables de entorno aprobadas; nunca en Git.
 - La autenticidad de peticiones del Gateway se garantiza mediante IAM y tokens OIDC (Capa 1). No es necesario firmar el payload en la aplicación.
-- Verificar firma SHA-256 e idempotencia de webhooks de Wompi antes de cambiar una suscripción o entitlement. Wompi se conecta al API Gateway (no directo a Cuentas); el Gateway reenvía el evento íntegro vía red privada.
-- Aplicar autorización por operación y no asumir que `roles` equivale automáticamente a permisos de negocio.
-- Exponer solo los endpoints de Actuator necesarios para salud, información y métricas.
+- Verificar firma SHA-256 e idempotencia de webhooks de Wompi antes de cambiar una suscripción o entitlement. Wompi se conecta directo a Cuentas.
+- Aplicar autorización por endpoint provado y no asumir que `roles` equivale automáticamente a permisos de negocio.
+- Exponer solo los endpoints de Actuator necesarios para salud.
 - Cada integración externa (Firebase, Wompi, etc.) requiere pruebas de autenticidad, reintentos, manejo de errores e idempotencia antes de considerarla completa.
 
 ## Metodología Spec-Driven Development
@@ -151,12 +151,11 @@ No usar este límite para ocultar cambios relacionados en commits separados: cad
 
 Todo método público en `domain`, `application` y los adaptadores de `infrastructure` lleva Javadoc en español con descripción clara de qué hace, parámetros, retorno y excepciones.
 
-### OpenAPI/Swagger en español
+### OpenAPI en español
 
-Cada endpoint expone su contrato mediante OpenAPI 3.0. Usar `springdoc-openapi-starter-webmvc-ui` con anotaciones `@Operation`, `@ApiResponse` y `@Tag` en los controladores. Los DTOs llevan `@Schema` describiendo cada campo en español.
+Cada endpoint expone su contrato mediante OpenAPI 3.0.
 
 **Acceso a documentación:**
-- Swagger UI: `http://localhost:8080/swagger-ui.html`
 - JSON OpenAPI: `http://localhost:8080/v3/api-docs`
 
 ## Convenciones técnicas
@@ -165,25 +164,18 @@ Cada endpoint expone su contrato mediante OpenAPI 3.0. Usar `springdoc-openapi-s
 - Java 21, Spring Boot 4.1.1 y Maven Wrapper.
 - Sigue las indicaciones de [guidelines.md](guidelines.md).
 - Usa Javadoc en español; código y método/clase en inglés (ver sección "Convenciones de idioma").
-- Documenta endpoints públicos con OpenAPI/Swagger.
+- Usa JUnit 5 para pruebas unitarias.
 
-## Verificación de cambios
+## Verificación de cambios de codigo
 
-Antes de terminar una tarea, ejecutar el comando Maven más estrecho que valide el cambio y, cuando corresponda, la suite completa. Como mínimo, comprobar compilación y pruebas con:
-
+1. Pruebas Unitarias
 ```powershell
 ./mvnw.cmd test
 ```
-
-**Checklist de documentación:**
-- ☐ Todo método público tiene Javadoc en español.
-- ☐ Cada endpoint está anotado con `@Operation` y `@ApiResponse` en español.
-- ☐ Los DTOs tienen `@Schema` describiendo cada campo en español.
-- ☐ No hay JWT, secretos ni tokens de Firebase en logs, Javadoc ni ejemplos de OpenAPI.
-- ☐ El código (clases, métodos, variables) está completamente en inglés.
-- ☐ `LayeredArchitectureTest` (ArchUnit) pasa: ninguna clase nueva rompe la regla de dependencias entre capas.
-
-No declarar implementada una integración externa sin pruebas de autenticidad, errores, reintentos e idempotencia cuando aplique.
+2. Limpieza y construccion del projecto
+```powershell
+./mvnw.cmd clean package
+```
 
 ## Flujo de contribución
 
