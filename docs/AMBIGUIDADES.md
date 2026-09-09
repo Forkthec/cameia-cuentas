@@ -66,6 +66,20 @@ Este documento es el registro de decisiones que pueden bloquear diseño o implem
 - Decisión: Requiere aprobación de arquitectura y debe constar en la spec de la funcionalidad afectada.
 - Especificación: la documentará la primera funcionalidad que cree un endpoint de Cuentas.
 
+### A-004: Sonda de salud y frontera de confianza
+
+- Estado: `Resuelta`
+- Responsable: Juan David Vela Coronado
+- Fecha: 2026-09-09
+- Tema: seguridad de la frontera y operación del contenedor
+- Pregunta: ¿La sonda de salud exige el contrato de entrada del Gateway y debe verificar PostgreSQL?
+- Decisión adoptada:
+  - `GET /health` es el único endpoint exento del contrato `firebase_uid, email, roles, request_id`, porque no lee ni modifica datos de la cuenta. La protección de red sigue siendo la de A-001.
+  - La sonda no consulta la base de datos ni integraciones externas. Verificarlas aquí haría que una caída de PostgreSQL reiniciara la aplicación en lugar de dejarla reportar el fallo.
+  - No se agrega Spring Boot Actuator: el `HEALTHCHECK` del contenedor apunta a `/health`, evitando exponer endpoints de gestión antes de tener una spec de observabilidad.
+- Impacto en código: `presentation.controller.HealthController`, `presentation.dto.HealthResponse`, `Dockerfile` y `docker-compose.yml`.
+- Especificación afectada: [docs/specs/endpoint-salud.md](specs/endpoint-salud.md).
+
 ## Decisiones confirmadas
 
 - Idioma operativo de este documento: español.
@@ -75,5 +89,6 @@ Este documento es el registro de decisiones que pueden bloquear diseño o implem
 - El límite de 1000 líneas se mide sobre el diff total agregado y eliminado por solicitud.
 - **Seguridad resuelta (A-001):** IAM + OIDC de Cloud Run como base; VPC + ingress internal para Cuentas como capa adicional.
 - **Wompi resuelta (A-002):** webhook apunta al Gateway; validación de firma SHA-256; reenvío vía red privada al microservicio.
+- **Salud resuelta (A-004):** `/health` exento del contrato del Gateway, sin verificar dependencias externas y sin Actuator.
 - **Arquitectura confirmada:** Estilo DDD con `domain`, `application`, `infrastructure`, `presentation`. Las reglas de dependencia se verifican con la prueba ArchUnit `LayeredArchitectureTest` (`tech.cameia.cuentas.architecture`).
 - **Paquete base:** `tech.cameia.cuentas` (groupId de Maven: `tech.cameia`).

@@ -37,7 +37,7 @@ flowchart LR
 |---|---|
 | Lenguaje | Java 21 |
 | Framework | Spring Boot 4.1.1 |
-| Build | Maven; wrapper pendiente de confirmar |
+| Build | Maven Wrapper 3.9.16 |
 | Persistencia | PostgreSQL 16, base/rol propios |
 | Integraciones | Firebase Admin, Wompi y RabbitMQ según alcance |
 | Ejecución objetivo | Contenedor OCI en Cloud Run |
@@ -55,13 +55,38 @@ flowchart LR
 
 ## Ejecución local
 
-```text
-Instalación: pendiente de confirmar en CM-103
-Pruebas: pendiente de confirmar en CM-103
-Build: pendiente de confirmar en CM-103
-Inicio: pendiente de confirmar en CM-103
-Health check: pendiente de confirmar en CM-103
+Copie `.env.example` a `.env` y defina al menos `DB_PASSWORD`.
+
+### Con Docker (aplicación y base de datos)
+
+```powershell
+docker compose up --build -d   # levanta cuentas + PostgreSQL 16
+docker compose ps              # el servicio cuentas debe quedar en estado healthy
+docker compose down            # detener; agregue -v para borrar los datos
 ```
+
+La base de datos se publica en el puerto `DB_PORT_HOST` (5433 por defecto) para no
+chocar con un PostgreSQL instalado localmente en el 5432. Dentro de la red de Compose
+la aplicación sigue conectándose a `db:5432`, así que cambiar esa variable no afecta
+la configuración de la aplicación.
+
+### Sin Docker
+
+Requiere un PostgreSQL 16 accesible en `DB_HOST:DB_PORT`.
+
+```powershell
+./mvnw.cmd test            # pruebas
+./mvnw.cmd clean package   # build
+./mvnw.cmd spring-boot:run # inicio
+```
+
+### Verificación
+
+| Recurso | URL |
+|---|---|
+| Health check | `http://localhost:8081/health` → `{"status":"UP"}` |
+| Documento OpenAPI | `http://localhost:8081/v3/api-docs` |
+| Referencia navegable (Scalar) | `http://localhost:8081/scalar` |
 
 
 
