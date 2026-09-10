@@ -86,7 +86,7 @@ Requiere un PostgreSQL 16 accesible en `DB_HOST:DB_PORT`.
 |---|---|
 | Health check | `http://localhost:8081/health` → `{"status":"UP"}` |
 | Documento OpenAPI | `http://localhost:8081/v3/api-docs` |
-| Referencia navegable (Scalar) | `http://localhost:8081/scalar` |
+| Referencia navegable (Swagger UI) | `http://localhost:8081/swagger-ui.html` |
 
 
 

@@ -68,13 +68,8 @@
 		</dependency>
 		<dependency>
 			<groupId>org.springdoc</groupId>
-			<artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
 			<version>3.1.1</version>
-		</dependency>
-		<dependency>
-			<groupId>com.scalar.maven</groupId>
-			<artifactId>scalar-webmvc</artifactId>
-			<version>0.6.67</version>
 		</dependency>
 		<dependency>
 			<groupId>com.github.therapi</groupId>
@@ -105,7 +100,7 @@
 									<groupId>org.projectlombok</groupId>
 									<artifactId>lombok</artifactId>
 								</path>
-								<!-- Genera el Javadoc en tiempo de ejecucion que springdoc publica en Scalar. -->
+								<!-- Genera el Javadoc en tiempo de ejecucion que springdoc publica en Swagger UI. -->
 								<path>
 									<groupId>com.github.therapi</groupId>
 									<artifactId>therapi-runtime-javadoc-scribe</artifactId>
@@ -126,7 +121,7 @@
 									<groupId>org.projectlombok</groupId>
 									<artifactId>lombok</artifactId>
 								</path>
-								<!-- Genera el Javadoc en tiempo de ejecucion que springdoc publica en Scalar. -->
+								<!-- Genera el Javadoc en tiempo de ejecucion que springdoc publica en Swagger UI. -->
 								<path>
 									<groupId>com.github.therapi</groupId>
 									<artifactId>therapi-runtime-javadoc-scribe</artifactId>

@@ -10,12 +10,12 @@
 El microservicio ya se despliega como contenedor OCI. Antes de que exista cualquier
 endpoint de negocio, la plataforma y Docker necesitan una señal para saber si el
 proceso está vivo. `HealthController` cubría esa necesidad devolviendo un `Map` sin
-contrato declarado, sin pruebas y sin aparecer documentado en Scalar.
+contrato declarado, sin pruebas y sin aparecer documentado en Swagger UI.
 
 ## Alcance
 
 - `GET /health` con un DTO propio como respuesta.
-- Javadoc en español que springdoc publica en `/v3/api-docs` y Scalar muestra en `/scalar`.
+- Javadoc en español que springdoc publica en `/v3/api-docs` y Swagger UI muestra en `/swagger-ui.html`.
 - Pruebas unitarias del contrato HTTP.
 - `Dockerfile` multietapa y `docker-compose.yml` con base de datos propia.
 
