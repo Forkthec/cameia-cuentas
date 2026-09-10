@@ -88,11 +88,19 @@ Requiere un PostgreSQL 16 accesible en `DB_HOST:DB_PORT`.
 | Documento OpenAPI | `http://localhost:8081/v3/api-docs` |
 | Referencia navegable (Swagger UI) | `http://localhost:8081/swagger-ui.html` |
 
+La documentación solo se publica donde `API_DOCUMENTATION_ENABLED` valga `true`. La
+variable viene en `.env.example`, así que basta copiarla a `.env`; `docker compose` la
+pasa al contenedor con `true` por defecto. El perfil `prod` la deja apagada de forma
+rígida, así que en producción tanto Swagger UI como `/v3/api-docs` responden `404`
+aunque la variable diga lo contrario.
+Ver [docs/specs/documentacion-api.md](docs/specs/documentacion-api.md).
+
 
 
 ## Configuración y seguridad
 
 - No guardar credenciales Firebase/Wompi, secretos ni `.env` en Git.
+- No encender `API_DOCUMENTATION_ENABLED` en entornos productivos: expone el contrato completo de la API.
 - Validar firma e idempotencia de webhooks cuando entren en alcance.
 - No registrar tokens o información de pago sensible.
 - Usar una base y un rol independientes de los demás microservicios.

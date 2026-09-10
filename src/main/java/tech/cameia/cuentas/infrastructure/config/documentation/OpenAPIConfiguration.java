@@ -12,10 +12,15 @@ import io.swagger.v3.oas.models.info.Info;
  * <p>Define los metadatos generales (título, versión y descripción) que springdoc
  * publica como documento OpenAPI en {@code /v3/api-docs}. La interfaz de referencia
  * navegable la sirve Swagger UI en {@code /swagger-ui.html}, que consume ese mismo
- * documento. Las
- * descripciones de cada endpoint y de cada modelo se derivan automáticamente del
- * Javadoc del código gracias a therapi-runtime-javadoc.
+ * documento. Las descripciones de cada endpoint y de cada modelo se derivan
+ * automáticamente del Javadoc del código gracias a therapi-runtime-javadoc.
  * </p>
+ *
+ * <p>La publicación depende de la variable {@code API_DOCUMENTATION_ENABLED}, apagada
+ * por defecto. El perfil {@code local} la enciende y el perfil {@code prod} la fija en
+ * {@code false}, de modo que producción no expone ni la interfaz ni el documento
+ * OpenAPI. Este bean se construye igual en todos los perfiles; cuando springdoc está
+ * apagado, sus metadatos simplemente no se sirven por HTTP.</p>
  */
 @Configuration 
 public class OpenAPIConfiguration {

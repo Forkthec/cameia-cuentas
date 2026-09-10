@@ -80,6 +80,23 @@ Este documento es el registro de decisiones que pueden bloquear diseño o implem
 - Impacto en código: `presentation.controller.HealthController`, `presentation.dto.HealthResponse`, `Dockerfile` y `docker-compose.yml`.
 - Especificación afectada: [docs/specs/endpoint-salud.md](specs/endpoint-salud.md).
 
+### A-005: Exposición de la documentación de la API
+
+- Estado: `Resuelta`
+- Responsable: Juan David Vela Coronado
+- Fecha: 2026-09-10
+- Tema: seguridad de la frontera y superficie expuesta
+- Pregunta: ¿La documentación de la API debe publicarse en producción, y el interruptor cubre solo la interfaz o también el documento OpenAPI?
+- Decisión adoptada:
+  - La interfaz navegable pasa de Scalar a Swagger UI, servida en `/swagger-ui.html`. Scalar exigía importar a mano una autoconfiguración de Spring Boot 3; springdoc autoconfigura Swagger UI sin código propio.
+  - Un único interruptor, `API_DOCUMENTATION_ENABLED`, gobierna a la vez la interfaz y el JSON de `/v3/api-docs`. Apagar solo la interfaz no protege nada: con el documento OpenAPI se reconstruye el contrato completo.
+  - El default es `false` en `application.properties`. Un entorno que no declare nada no publica el contrato.
+  - En desarrollo se enciende con `API_DOCUMENTATION_ENABLED=true`: la variable viene en `.env.example` y `docker-compose.yml` la pasa al contenedor con `true` por defecto. No se usa `application-local.properties`, que está en `.gitignore` y no representa al repositorio.
+  - El perfil `prod` fija ambos valores en `false` de forma literal. Ninguna variable de entorno puede encenderlos, ni siquiera `API_DOCUMENTATION_ENABLED=true`.
+- Justificación: Cuentas administra pagos, suscripciones y permisos, así que el documento OpenAPI enumera justo las rutas que interesarían a un atacante. La protección de red de A-001 es configuración de despliegue y no debe ser la única barrera. `guidelines.md` prefiere variables de entorno sobre perfiles, por eso el mecanismo primario es la variable y el perfil `prod` solo agrega la segunda barrera.
+- Impacto en código: `application.properties`, `application-prod.properties`, `infrastructure.config.documentation.OpenAPIConfiguration`, `.env.example` y `docker-compose.yml`. Se elimina `ScalarConfiguration`.
+- Especificación afectada: [docs/specs/documentacion-api.md](specs/documentacion-api.md).
+
 ## Decisiones confirmadas
 
 - Idioma operativo de este documento: español.
@@ -90,5 +107,6 @@ Este documento es el registro de decisiones que pueden bloquear diseño o implem
 - **Seguridad resuelta (A-001):** IAM + OIDC de Cloud Run como base; VPC + ingress internal para Cuentas como capa adicional.
 - **Wompi resuelta (A-002):** webhook apunta al Gateway; validación de firma SHA-256; reenvío vía red privada al microservicio.
 - **Salud resuelta (A-004):** `/health` exento del contrato del Gateway, sin verificar dependencias externas y sin Actuator.
+- **Documentación resuelta (A-005):** Swagger UI en `/swagger-ui.html`; `API_DOCUMENTATION_ENABLED` apagada por defecto y fijada en `false` en el perfil `prod`, tanto para la interfaz como para `/v3/api-docs`. La configuración versionada no depende de `application-local.properties`, que está en `.gitignore`.
 - **Arquitectura confirmada:** Estilo DDD con `domain`, `application`, `infrastructure`, `presentation`. Las reglas de dependencia se verifican con la prueba ArchUnit `LayeredArchitectureTest` (`tech.cameia.cuentas.architecture`).
 - **Paquete base:** `tech.cameia.cuentas` (groupId de Maven: `tech.cameia`).

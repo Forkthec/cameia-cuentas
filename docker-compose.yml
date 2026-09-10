@@ -41,6 +41,9 @@ services:
     environment:
       SERVER_PORT: ${SERVER_PORT:-8081}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      # Documentación de la API. Solo tiene efecto fuera del perfil prod, que la
+      # deja apagada de forma rígida.
+      API_DOCUMENTATION_ENABLED: ${API_DOCUMENTATION_ENABLED:-true}
       # DB_HOST y DB_PORT apuntan al nombre de servicio y al puerto interno de la
       # red de Compose, no al puerto publicado en el host.
       DB_HOST: db
