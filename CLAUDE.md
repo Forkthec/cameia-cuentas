@@ -160,7 +160,10 @@ Todo método público en `domain`, `application` y los adaptadores de `infrastru
 Cada endpoint expone su contrato mediante OpenAPI 3.0.
 
 **Acceso a documentación:**
-- JSON OpenAPI: `http://localhost:8080/v3/api-docs`
+- JSON OpenAPI: `http://localhost:8081/v3/api-docs`
+- Swagger UI: `http://localhost:8081/swagger-ui.html`
+
+Ambos recursos dependen de `API_DOCUMENTATION_ENABLED`, apagada por defecto. En desarrollo se enciende con la variable (viene en `.env.example`); el perfil `prod` la fija en `false` y no admite que una variable de entorno la encienda (ver A-005 y [docs/specs/documentacion-api.md](docs/specs/documentacion-api.md)).
 
 ## Convenciones técnicas
 

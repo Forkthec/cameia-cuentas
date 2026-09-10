@@ -1,0 +1,59 @@
+# Entorno local completo del microservicio de Cuentas: aplicación y su propia base
+# de datos PostgreSQL. Las variables se leen del archivo .env de la raíz; los
+# valores por defecto de este archivo permiten levantar el entorno sin editarlo,
+# salvo DB_PASSWORD, que es obligatoria.
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: cameia-cuentas-db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-DB-cuentas}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD en el archivo .env}
+    ports:
+      # DB_PORT_HOST es el puerto publicado en la máquina del desarrollador y existe
+      # para no chocar con un PostgreSQL local que ya ocupe el 5432. Por dentro el
+      # contenedor sigue escuchando en 5432, así que cambiarlo no afecta a la
+      # aplicación: solo cambia por dónde se conecta un cliente externo como DBeaver.
+      - "${DB_PORT_HOST:-5433}:5432"
+    volumes:
+      - cuentas-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-DB-cuentas}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  cuentas:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cameia/cuentas:local
+    container_name: cameia-cuentas
+    depends_on:
+      db:
+        # La aplicación no arranca hasta que PostgreSQL acepta conexiones; de lo
+        # contrario Hibernate falla al validar el esquema.
+        condition: service_healthy
+    environment:
+      SERVER_PORT: ${SERVER_PORT:-8081}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      # Documentación de la API. Solo tiene efecto fuera del perfil prod, que la
+      # deja apagada de forma rígida.
+      API_DOCUMENTATION_ENABLED: ${API_DOCUMENTATION_ENABLED:-true}
+      # DB_HOST y DB_PORT apuntan al nombre de servicio y al puerto interno de la
+      # red de Compose, no al puerto publicado en el host.
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-DB-cuentas}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD en el archivo .env}
+    ports:
+      - "${SERVER_PORT:-8081}:${SERVER_PORT:-8081}"
+    restart: unless-stopped
+
+volumes:
+  cuentas-db-data:

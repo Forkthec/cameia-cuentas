@@ -37,7 +37,7 @@ flowchart LR
 |---|---|
 | Lenguaje | Java 21 |
 | Framework | Spring Boot 4.1.1 |
-| Build | Maven; wrapper pendiente de confirmar |
+| Build | Maven Wrapper 3.9.16 |
 | Persistencia | PostgreSQL 16, base/rol propios |
 | Integraciones | Firebase Admin, Wompi y RabbitMQ según alcance |
 | Ejecución objetivo | Contenedor OCI en Cloud Run |
@@ -55,19 +55,52 @@ flowchart LR
 
 ## Ejecución local
 
-```text
-Instalación: pendiente de confirmar en CM-103
-Pruebas: pendiente de confirmar en CM-103
-Build: pendiente de confirmar en CM-103
-Inicio: pendiente de confirmar en CM-103
-Health check: pendiente de confirmar en CM-103
+Copie `.env.example` a `.env` y defina al menos `DB_PASSWORD`.
+
+### Con Docker (aplicación y base de datos)
+
+```powershell
+docker compose up --build -d   # levanta cuentas + PostgreSQL 16
+docker compose ps              # el servicio cuentas debe quedar en estado healthy
+docker compose down            # detener; agregue -v para borrar los datos
 ```
+
+La base de datos se publica en el puerto `DB_PORT_HOST` (5433 por defecto) para no
+chocar con un PostgreSQL instalado localmente en el 5432. Dentro de la red de Compose
+la aplicación sigue conectándose a `db:5432`, así que cambiar esa variable no afecta
+la configuración de la aplicación.
+
+### Sin Docker
+
+Requiere un PostgreSQL 16 accesible en `DB_HOST:DB_PORT`.
+
+```powershell
+./mvnw.cmd test            # pruebas
+./mvnw.cmd clean package   # build
+./mvnw.cmd spring-boot:run # inicio
+```
+
+### Verificación
+
+| Recurso | URL |
+|---|---|
+| Health check | `http://localhost:8081/health` → `{"status":"UP"}` |
+| Documento OpenAPI | `http://localhost:8081/v3/api-docs` |
+| Referencia navegable (Swagger UI) | `http://localhost:8081/swagger-ui.html` |
+
+La documentación solo se publica donde `API_DOCUMENTATION_ENABLED` valga `true`. La
+variable viene en `.env.example`, así que basta copiarla a `.env`; `docker compose` la
+pasa al contenedor con `true` por defecto. El perfil `prod` la deja apagada de forma
+rígida, así que en producción tanto Swagger UI como `/v3/api-docs` responden `404`
+aunque la variable diga lo contrario.
+Ver [docs/specs/documentacion-api.md](docs/specs/documentacion-api.md).
 
 
 
 ## Configuración y seguridad
 
 - No guardar credenciales Firebase/Wompi, secretos ni `.env` en Git.
+- No encender `API_DOCUMENTATION_ENABLED` en entornos productivos: expone el contrato completo de la API.
 - Validar firma e idempotencia de webhooks cuando entren en alcance.
 - No registrar tokens o información de pago sensible.
 - Usar una base y un rol independientes de los demás microservicios.
