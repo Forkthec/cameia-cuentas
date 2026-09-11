@@ -56,4 +56,4 @@ build/
 .vscode/
 
 .DS_Store
-Thumbs.db
+Thumbs.db__pycache__/
