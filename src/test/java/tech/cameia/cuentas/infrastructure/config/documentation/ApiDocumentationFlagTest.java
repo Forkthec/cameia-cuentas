@@ -42,8 +42,11 @@ class ApiDocumentationFlagTest {
 
 	/**
 	 * Arma un resolutor con la configuración base y, opcionalmente, la del perfil y la
-	 * variable de entorno, respetando la precedencia de Spring Boot.
-	 *
+	 * variable de entorno, respetando la precedencia de Spring Boot. Basicamente el resolutor devuelve
+	 * un orden que se debe seguir, a la hora de realizar las pruebas, para que se tenga en cuenta las variables
+	 * de entorno que se tienen en la maquina que va a ejecutar las pruebas, de tal manera que el orden de mayor a menor que podria quedar
+	 * seria algo así: {@code application-prod.properties --> .env --> application.properties}
+	 * 
 	 * @param perfil nombre del perfil cuyo archivo se superpone, o {@code null} para un
 	 *               entorno que no declara archivo propio
 	 * @param valorVariable valor de {@code API_DOCUMENTATION_ENABLED}, o {@code null} si

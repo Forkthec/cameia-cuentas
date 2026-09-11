@@ -19,7 +19,6 @@ out/
 
 application-local.yml
 application-local.yaml
-application-local.properties
 
 HELP.md
 target/
