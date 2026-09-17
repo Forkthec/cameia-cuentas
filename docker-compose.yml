@@ -54,6 +54,18 @@ services:
     ports:
       - "${SERVER_PORT:-8081}:${SERVER_PORT:-8081}"
     restart: unless-stopped
+    # Red externa compartida entre varios microservicios en el entorno local: permite
+    # que otro servicio alcance a este por nombre, en vez de por IP, al levantarlos
+    # juntos para probar integración. Solo la app se conecta a ella; la base de datos
+    # se queda en la red por defecto de este archivo.
+    networks:
+      - default
+      - cameia-net
 
 volumes:
   cuentas-db-data:
+
+networks:
+  # Creada una sola vez fuera de este archivo: docker network create cameia-net.
+  cameia-net:
+    external: true
