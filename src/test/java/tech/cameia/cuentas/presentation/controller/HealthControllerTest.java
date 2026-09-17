@@ -19,7 +19,7 @@ import tech.cameia.cuentas.presentation.dto.HealthResponse;
 
 /**
  * Prueba unitaria del endpoint de salud descrito en
- * {@code docs/specs/endpoint-salud.md}.
+ * {@code specs/CM-103-EndpointSalud/spec.md}.
  *
  * <p>Usa {@code standaloneSetup} en lugar de {@code @WebMvcTest} porque el endpoint no
  * tiene colaboradores: no necesita contexto de Spring, base de datos ni configuración

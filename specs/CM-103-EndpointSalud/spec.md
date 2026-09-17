@@ -3,7 +3,7 @@
 - Estado: `Aprobada`
 - Responsable: Juan David Vela Coronado
 - Fecha: 2026-09-09
-- Ambigüedades relacionadas: [A-001](../AMBIGUIDADES.md) (frontera de confianza), [A-003](../AMBIGUIDADES.md) (versionado, aún pendiente)
+- Decisiones relacionadas: frontera de confianza ([CLAUDE.md § Límites de entrada y confianza](../../CLAUDE.md)), versionado aún pendiente ([CLAUDE.md § Preguntas abiertas](../../CLAUDE.md))
 
 ## Contexto
 
@@ -20,7 +20,7 @@ contrato declarado, sin pruebas y sin aparecer documentado en Swagger UI.
 - `Dockerfile` multietapa y `docker-compose.yml` con base de datos propia.
 
 Fuera de alcance: verificar PostgreSQL, Firebase, Wompi o RabbitMQ; Spring Boot
-Actuator; versionado de la ruta, que depende de A-003.
+Actuator; versionado de la ruta, que sigue como pregunta abierta en `CLAUDE.md`.
 
 ## Requisitos
 

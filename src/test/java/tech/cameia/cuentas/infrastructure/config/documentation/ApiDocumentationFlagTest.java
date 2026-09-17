@@ -14,7 +14,7 @@ import org.springframework.core.io.support.ResourcePropertySource;
 
 /**
  * Prueba del interruptor de documentación descrito en
- * {@code docs/specs/documentacion-api.md}.
+ * {@code specs/CM-103-DocumentacionApi/spec.md}.
  *
  * <p>Resuelve las propiedades de los archivos versionados aplicando el mismo orden de
  * precedencia que usa Spring Boot: la variable de entorno gana sobre
