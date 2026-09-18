@@ -246,8 +246,15 @@ El sistema debe admitir contraseñas de hasta 64 caracteres, con espacios y cara
 y no debe truncarlas ni exigir combinaciones obligatorias de mayúsculas, dígitos o símbolos.
 ```
 
-> OWASP ASVS: la longitud es la defensa real; las reglas de composición empujan a contraseñas
-> predecibles. `CU-TBD-03` queda resuelta con esta regla.
+```
+Cuando la contraseña figura en la lista de contraseñas conocidas del sistema,
+el sistema debe rechazar el registro aunque cumpla la longitud exigida.
+```
+
+> OWASP ASVS: la longitud es la defensa real y las reglas de composición empujan a contraseñas
+> predecibles, pero la longitud sola no basta: `123456789012` tiene doce caracteres y encabeza
+> cualquier lista de filtraciones. Por eso ASVS pide además comprobar la contraseña contra un
+> conjunto de valores conocidos. `CU-TBD-03` queda resuelta con estas reglas.
 
 #### REQ-CU-12 — Formato de los errores
 

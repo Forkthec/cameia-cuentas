@@ -27,15 +27,15 @@
 
 ## Bloque 2 — Dominio
 
-- [ ] **T-09** `AccountStatus` con los cuatro estados y `Pronoun` con sus tres valores.
-- [ ] **T-10** Objetos de valor `EmailAddress`, `PhoneNumber` (E.164), `BirthDate` y `RawPassword`, este último sin exponerse en `toString()`.
-- [ ] **T-11** `AgePolicy` con las cinco reglas de CA-1.1.3 y la edad calculada en UTC (`REQ-CU-08` a `REQ-CU-10`).
-- [ ] **T-12** `AgePolicyTest`: cumple 18 hoy, los cumple mañana, fecha futura, más de 110 años y fecha inválida.
-- [ ] **T-13** `PasswordPolicy` según OWASP ASVS y `PasswordPolicyTest` con los límites 11, 12, 64 y 65 caracteres (`REQ-CU-11b`).
-- [ ] **T-14** Agregado `Account`: fábrica que nace `PENDING_VERIFICATION` y `activate()` con las transiciones válidas (`REQ-CU-04`, `REQ-CU-13`, `REQ-CU-14`).
-- [ ] **T-15** `AccountTest`: estado inicial, activación, activación repetida y rechazo desde `DISABLED` y `ANONYMIZED`.
-- [ ] **T-16** Excepciones de dominio con sus mensajes en español y `InvalidBirthDateException` con su motivo.
-- [ ] **T-17** Puertos `AccountRepository` y `FirebaseUserDirectory`.
+- [x] **T-09** `AccountStatus` con los cuatro estados y `Pronoun` con sus tres valores.
+- [x] **T-10** Objetos de valor `EmailAddress`, `PhoneNumber` (E.164), `BirthDate` y `RawPassword`, este último sin exponerse en `toString()`.
+- [x] **T-11** `AgePolicy` con las cinco reglas de CA-1.1.3 y la edad calculada en UTC (`REQ-CU-08` a `REQ-CU-10`).
+- [x] **T-12** `AgePolicyTest`: cumple 18 hoy, los cumple mañana, fecha futura, más de 110 años y fecha inválida.
+- [x] **T-13** `PasswordPolicy` según OWASP ASVS y `PasswordPolicyTest` con los límites 11, 12, 64 y 65 caracteres (`REQ-CU-11b`). Incluye la lista de contraseñas conocidas que cumplen la longitud, con sus tres pruebas.
+- [x] **T-14** Agregado `Account`: fábrica que nace `PENDING_VERIFICATION` y `activate()` con las transiciones válidas (`REQ-CU-04`, `REQ-CU-13`, `REQ-CU-14`).
+- [x] **T-15** `AccountTest`: estado inicial, activación, activación repetida y rechazo desde `DISABLED` y `ANONYMIZED`.
+- [~] **T-16** Excepciones de dominio con sus mensajes en español y `InvalidBirthDateException` con su motivo. Hechas `BusinessException`, `InvalidBirthDateException` y `WeakPasswordException`. Faltan `EmailAlreadyRegisteredException`, `EmailNotVerifiedException` y `AccountNotFoundException`: llegan con el bloque que las usa, para no dejar clases sin uso.
+- [ ] **T-17** Puertos `AccountRepository` y `FirebaseUserDirectory`. Aplazado al siguiente lote por el límite de 1000 líneas por solicitud.
 
 ## Bloque 3 — Persistencia
 
@@ -82,6 +82,11 @@
 ---
 
 ## Estado
+
+**Bloque 2 casi completo el 18/09/2026.** Hechos T-09 a T-15: enums, objetos de valor, políticas
+de edad y de contraseña, excepciones y el agregado `Account`, con sus pruebas. `./mvnw.cmd test`:
+51 pruebas, 0 fallos, 0 saltadas. Quedan T-16 en parte y T-17 completo, aplazados por el límite de
+tamaño de cambio; entran con el bloque que los usa.
 
 **Bloques 0 y 1 completos el 17/09/2026.** `./mvnw.cmd test`: 17 pruebas, 0 fallos, 0 saltadas, con
 Docker disponible. `docker compose up --build` deja el contenedor `healthy` contra la ruta nueva.

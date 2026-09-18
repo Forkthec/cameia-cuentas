@@ -147,7 +147,13 @@ Los objetos de valor validan en su construcción: `PhoneNumber` exige E.164, `Em
 Devuelve un motivo distinto por caso, porque cada uno tiene su mensaje (`REQ-CU-08` a `REQ-CU-11`).
 
 `PasswordPolicy` aplica OWASP ASVS: 12 caracteres mínimo, 64 admitidos, sin reglas de composición y
-sin recortar la entrada (`REQ-CU-11b`).
+sin recortar la entrada. Además rechaza las contraseñas de una lista de valores conocidos que sí
+cumplen la longitud, comparando sin distinguir mayúsculas ni espacios alrededor (`REQ-CU-11b`).
+
+La lista vive como constante en la política, con unas decenas de entradas. Es un piso, no la
+comprobación completa que describe ASVS: contrastar contra el corpus de contraseñas filtradas exige
+consultar un servicio externo, y eso es una integración con su propia spec, sus reintentos y su
+decisión sobre qué hacer cuando el servicio no responde.
 
 ### 3.2 Puertos
 
