@@ -29,6 +29,7 @@
 	<properties>
 		<java.version>21</java.version>
 		<therapi-javadoc.version>0.15.0</therapi-javadoc.version>
+		<firebase-admin.version>9.10.0</firebase-admin.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -38,6 +39,30 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<!-- Bean Validation para la sintaxis del cuerpo de las peticiones (CM-14). -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<!--
+			Migraciones versionadas del esquema. Hibernate no genera esquemas, restricciones
+			compuestas ni objetos propios de PostgreSQL, y el perfil prod valida en lugar de
+			crear: el esquema lo instala Flyway en todos los entornos (CM-14, CU-7).
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-flyway</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
+		</dependency>
+		<!-- Firebase Admin SDK: credenciales y custom claims viven en Firebase (CM-14, CU-9). -->
+		<dependency>
+			<groupId>com.google.firebase</groupId>
+			<artifactId>firebase-admin</artifactId>
+			<version>${firebase-admin.version}</version>
 		</dependency>
 
 		<dependency>
@@ -64,6 +89,26 @@
 			<groupId>com.tngtech.archunit</groupId>
 			<artifactId>archunit-junit5</artifactId>
 			<version>1.5.0</version>
+			<scope>test</scope>
+		</dependency>
+		<!--
+			Pruebas de integracion contra PostgreSQL real con puerto aleatorio, como exige el
+			principio 9 de la constitucion. Verifican las migraciones y las restricciones que
+			solo existen en la base.
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-testcontainers</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-junit-jupiter</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

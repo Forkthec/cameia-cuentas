@@ -48,7 +48,7 @@ class HealthControllerTest {
 
 	@Test
 	void serializaElEstadoComoJsonEnLaRutaDeSalud() throws Exception {
-		mockMvc.perform(get("/health"))
+		mockMvc.perform(get("/api/v1/users/health"))
 				.andExpect(status().isOk())
 				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
 				.andExpect(jsonPath("$.status").value("UP"));
@@ -56,7 +56,7 @@ class HealthControllerTest {
 
 	@Test
 	void noExponeCamposAdicionalesEnLaRespuesta() throws Exception {
-		String cuerpo = mockMvc.perform(get("/health"))
+		String cuerpo = mockMvc.perform(get("/api/v1/users/health"))
 				.andExpect(status().isOk())
 				.andReturn()
 				.getResponse()
@@ -67,7 +67,7 @@ class HealthControllerTest {
 
 	@Test
 	void rechazaMetodosDistintosDeGet() throws Exception {
-		mockMvc.perform(post("/health"))
+		mockMvc.perform(post("/api/v1/users/health"))
 				.andExpect(status().isMethodNotAllowed());
 	}
 }

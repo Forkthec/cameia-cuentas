@@ -12,18 +12,18 @@
 > No depende de nada de CM-14 y se hace primero. Motivo en [plan.md](plan.md) §0 y en
 > [CONTRATO-GATEWAY-CM-14.md](../../CONTRATO-GATEWAY-CM-14.md) §3.
 
-- [ ] **T-00** Mover la sonda de `GET /health` a `GET /api/v1/users/health` en `HealthController` y ajustar `HealthControllerTest` (mismo cuerpo, mismos códigos, `POST` sigue dando `405`).
-- [ ] **T-01** Actualizar el `HEALTHCHECK` del `Dockerfile`, y el de `docker-compose.yml` si lo declara, a la ruta nueva. Verificar con `docker compose up --build` y `docker ps` mostrando `healthy`.
-- [ ] **T-02** Actualizar [CM-103-EndpointSalud/spec.md](../CM-103-EndpointSalud/spec.md), el `README.md` y la §3 del contrato del Gateway con la ruta nueva.
+- [x] **T-00** Mover la sonda de `GET /health` a `GET /api/v1/users/health` en `HealthController` y ajustar `HealthControllerTest` (mismo cuerpo, mismos códigos, `POST` sigue dando `405`).
+- [x] **T-01** Actualizar el `HEALTHCHECK` del `Dockerfile`, y el de `docker-compose.yml` si lo declara, a la ruta nueva. Verificar con `docker compose up --build` y `docker ps` mostrando `healthy`. Verificado el 17/09/2026: `docker ps` muestra `cameia-cuentas Up (healthy)`, `GET /api/v1/users/health` responde `200` con `{"status":"UP"}` y la ruta vieja `/health` responde `404`. `docker-compose.yml` no declara `healthcheck` para la aplicación, así que solo cambió el `Dockerfile`.
+- [x] **T-02** Actualizar [CM-103-EndpointSalud/spec.md](../CM-103-EndpointSalud/spec.md), el `README.md` y la §3 del contrato del Gateway con la ruta nueva.
 
 ## Bloque 1 — Cimientos: dependencias, esquema y configuración
 
-- [ ] **T-03** Declarar en `pom.xml` `firebase-admin`, `flyway-core`, `flyway-database-postgresql` y `spring-boot-starter-validation`. `./mvnw.cmd clean package` en verde.
-- [ ] **T-04** Declarar `testcontainers:postgresql` y `spring-boot-testcontainers` en alcance `test`.
-- [ ] **T-05** Escribir `V1__esquema_inicial_cuenta.sql` con el esquema `microcuentas` y la tabla `cuenta`: columnas del DDL, sin extensiones ni triggers (`REQ-CU-15`).
-- [ ] **T-06** Agregar a esa migración las restricciones de `REQ-CU-16` y `ck_cuenta_estado` con `PENDING_VERIFICATION` incluido y como `DEFAULT` (CU-1).
-- [ ] **T-07** Pasar `ddl-auto` a `validate` en `application.properties`, quitar el `create` de `application-local.properties` y declarar el esquema por defecto y las propiedades de Flyway.
-- [ ] **T-08** Prueba de integración mínima: Testcontainers levanta PostgreSQL 16, Flyway aplica `V1` y el contexto arranca con `validate`.
+- [x] **T-03** Declarar en `pom.xml` `firebase-admin`, `spring-boot-starter-flyway`, `flyway-database-postgresql` y `spring-boot-starter-validation`. `./mvnw.cmd clean package` en verde.
+- [x] **T-04** Declarar `spring-boot-testcontainers`, `testcontainers-postgresql` y `testcontainers-junit-jupiter` en alcance `test`.
+- [x] **T-05** Escribir `V1__esquema_inicial_cuenta.sql` con el esquema `microcuentas` y la tabla `cuenta`: columnas del DDL, sin extensiones ni triggers (`REQ-CU-15`).
+- [x] **T-06** Agregar a esa migración las restricciones de `REQ-CU-16` y `ck_cuenta_estado` con `PENDING_VERIFICATION` incluido y como `DEFAULT` (CU-1).
+- [x] **T-07** Pasar `ddl-auto` a `validate` en `application.properties`, quitar el `create` de `application-local.properties` y declarar el esquema por defecto y las propiedades de Flyway.
+- [x] **T-08** Prueba de integración mínima: Testcontainers levanta PostgreSQL 16, Flyway aplica `V1` y el contexto arranca con `validate`. Escrita como `CuentaSchemaMigrationTest`, con cinco casos que también cubren `REQ-CU-16`. Verde con Docker arriba; se omite sin Docker (`disabledWithoutDocker`) para que `./mvnw.cmd test` siga siendo ejecutable sin contenedores.
 
 ## Bloque 2 — Dominio
 
@@ -80,6 +80,23 @@
 - [ ] **T-44** Rellenar la bitácora de IA del día y entregar `CONTRATO-GATEWAY-CM-14.md` al responsable del Gateway.
 
 ---
+
+## Estado
+
+**Bloques 0 y 1 completos el 17/09/2026.** `./mvnw.cmd test`: 17 pruebas, 0 fallos, 0 saltadas, con
+Docker disponible. `docker compose up --build` deja el contenedor `healthy` contra la ruta nueva.
+
+Un hallazgo del camino, ya corregido y anotado en [plan.md](plan.md) §1: en Spring Boot 4 la
+autoconfiguración de Flyway vive en el módulo `spring-boot-flyway`. Con solo `flyway-core` en el
+classpath, Flyway **no se ejecutaba y no avisaba de nada**; la primera versión de estas tareas pasó
+las pruebas únicamente porque la base local ya tenía las tablas creadas por el `ddl-auto=create`
+anterior. Lo delató `CuentaSchemaMigrationTest` sobre una base vacía, que es justo para lo que
+está.
+
+Queda un aviso inofensivo en cada arranque: `schema "microcuentas" already exists, skipping`,
+porque `spring.flyway.create-schemas=true` crea el esquema antes de que corra el `CREATE SCHEMA IF
+NOT EXISTS` de `V1`. No se toca la migración ya aplicada solo por eso: editarla cambiaría su suma
+de verificación y rompería el arranque en las bases que ya la tienen.
 
 ## Orden y dependencias
 

@@ -59,24 +59,20 @@ responde `403` si es `false`. Para que eso funcione, el Gateway tiene que cumpli
 
 ---
 
-## 3. Punto a resolver: la ruta de health de Cuentas
+## 3. Resuelto en Cuentas: la ruta de la sonda de salud
 
 El spec del Gateway declara `GET /api/v1/users/health` en su lista de desarrollo, y su
-`application.yml` enruta con `Path=/api/v1/users/**` **sin `StripPrefix` ni `RewritePath`**. Es
-decir, la petición llega a Cuentas con la ruta completa.
+`application.yml` enruta con `Path=/api/v1/users/**` **sin `StripPrefix` ni `RewritePath`**: la
+petición llega a Cuentas con la ruta completa.
 
-Cuentas hoy expone su sonda en `GET /health`, según
-[specs/CM-103-EndpointSalud/spec.md](specs/CM-103-EndpointSalud/spec.md), y su `HEALTHCHECK` de
-Docker apunta ahí. Tal como está, `GET /api/v1/users/health` a través del Gateway responde `404`.
+Cuentas exponía su sonda en `GET /health`, así que esa llamada respondía `404`. **Ya está
+corregido del lado de Cuentas:** la sonda se movió a `GET /api/v1/users/health` (T-00 de CM-14) y
+la spec [CM-103-EndpointSalud](specs/CM-103-EndpointSalud/spec.md) quedó actualizada. No se dejó
+alias en `/health`.
 
-Opciones, por orden de menor impacto:
-
-1. El Gateway agrega una ruta propia para los health con `RewritePath` hacia `/health`.
-2. Cuentas expone además `GET /api/v1/users/health`, lo que exige una spec pequeña y deja dos rutas
-   para lo mismo.
-
-No bloquea CM-14, pero sí hace que la lista de desarrollo del Gateway no sirva para Cuentas hasta
-que se resuelva.
+El Gateway no necesita hacer nada: su lista de desarrollo ya apunta a la ruta correcta y no hay que
+agregar `RewritePath`. Solo conviene comprobarlo de extremo a extremo cuando ambos servicios estén
+arriba.
 
 ---
 

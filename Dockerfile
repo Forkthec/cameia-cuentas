@@ -49,6 +49,6 @@ EXPOSE 8081
 # start-period de 60s: el arranque de Spring Boot con JPA no cuenta como fallo.
 # wget viene incluido en busybox, así que no se instala nada extra en la imagen.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD wget --quiet --output-document=- "http://127.0.0.1:${SERVER_PORT}/health" > /dev/null || exit 1
+    CMD wget --quiet --output-document=- "http://127.0.0.1:${SERVER_PORT}/api/v1/users/health" > /dev/null || exit 1
 
 ENTRYPOINT ["java", "-jar", "/app/cuentas.jar"]

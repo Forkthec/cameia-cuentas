@@ -35,9 +35,9 @@ desde el Gateway antes de que exista el primer endpoint de negocio.
 | Dependencia | Para qué | Nota |
 |---|---|---|
 | `com.google.firebase:firebase-admin` | Crear la credencial, escribir el claim y borrar en la compensación | Ya generada por Juan Vela; solo falta declararla |
-| `org.flywaydb:flyway-core` y `flyway-database-postgresql` | Migraciones versionadas (CU-7) | Spring Boot las autoconfigura al detectarlas |
+| `spring-boot-starter-flyway` y `org.flywaydb:flyway-database-postgresql` | Migraciones versionadas (CU-7) | **Ojo:** en Spring Boot 4 la autoconfiguración de Flyway vive en el módulo `spring-boot-flyway`, que trae ese starter. Con solo `flyway-core` en el classpath, Flyway **no se ejecuta** y no avisa de nada |
 | `spring-boot-starter-validation` | Bean Validation para la sintaxis del cuerpo | |
-| `org.testcontainers:postgresql` y `spring-boot-testcontainers` (test) | Pruebas de integración con PostgreSQL real y puerto aleatorio | Lo exige el principio 9 de la constitución |
+| `spring-boot-testcontainers`, `testcontainers-postgresql` y `testcontainers-junit-jupiter` (test) | Pruebas de integración con PostgreSQL real y puerto aleatorio | Lo exige el principio 9 de la constitución. Spring Boot 4 trae Testcontainers 2.0, donde los artefactos se llaman `testcontainers-*` y `PostgreSQLContainer` cambió al paquete `org.testcontainers.postgresql` y dejó de ser genérico |
 
 Firebase Admin **no** entra en el dominio: solo lo importa su adaptador de infraestructura (CU-9).
 
@@ -78,6 +78,28 @@ en lugar del trigger `trg_cuenta_incrementar_version`.
 
 Flyway corre antes de que Hibernate valide, así que un desajuste entre entidad y tabla rompe el
 arranque y no una petición en producción (`REQ-CU-15`).
+
+### 2.3 Cómo se cambia el esquema a partir de ahora
+
+La entidad JPA no genera nada: con `validate`, Hibernate solo compara. Todo cambio de esquema sigue
+estos pasos, dentro de un mismo commit:
+
+1. Escribir una migración nueva: `V2__<que_hace>.sql`, `V3__...` y así. **Nunca se edita una ya
+   aplicada:** Flyway guarda su suma de verificación en `microcuentas.flyway_schema_history` y un
+   archivo modificado rompe el arranque en toda base que ya lo tenga. Un error en una migración
+   aplicada se corrige con la siguiente.
+2. Ajustar la entidad.
+3. Arrancar o correr las pruebas. Flyway aplica lo que falte y Hibernate valida: si falta la
+   columna, la aplicación no arranca y el mensaje dice cuál.
+
+En la base local, mientras nadie más dependa de ella, `docker compose down -v` borra el volumen y
+todo se reconstruye desde `V1`.
+
+El script DDL del Drive queda como una foto del modelo, no como la fuente de verdad. Esa es la
+carpeta `src/main/resources/db/migration`, que se revisa por PR y es la que se ejecuta. Cuando el
+equipo necesite el DDL actualizado como entregable, se genera con
+`pg_dump --schema-only -n microcuentas` sobre una base con las migraciones aplicadas, en vez de
+editarlo a mano.
 
 ---
 

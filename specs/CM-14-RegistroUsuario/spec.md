@@ -14,8 +14,9 @@
 > HASTA QUE LA SPEC DE PLANES LO RESPALDE.**
 
 - **Fuentes:**
-  `criterios_de_aceptacion.md` (CA-1.1.1 a CA-1.1.3),
-  `30082026_v1_DDL_MicroCuentas.sql` v1.0 del 30/08/2026,
+  criterios de aceptación del módulo de Registro, CA-1.1.1 a CA-1.1.3, consultados en la
+  documentación oficial del Drive del grupo,
+  script DDL de MicroCuentas v1.0 del 30/08/2026, del mismo Drive,
   `cameia-gateway/specs/CM-14-Registro-usuario/spec.md` (C-1, C-5, C-6, C-10 y `REQ-REG-05` a `REQ-REG-10`),
   campos del prototipo PRT-01.01 entregados por Juan Vela el 17/09/2026,
   `CLAUDE.md` (límites de entrada, reglas de seguridad, capas DDD) y `docs/constitution.md`.
