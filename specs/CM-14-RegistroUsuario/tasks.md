@@ -47,16 +47,16 @@
 ## Bloque 4 — Firebase
 
 - [x] **T-22** `FirebaseConfiguration`: inicializa el SDK en el arranque, falla rápido si las credenciales son inválidas y no crea beans con `cuentas.firebase.enabled=false`.
-- [x] **T-23** `FirebaseUserDirectoryAdapter` con `createUser`, `assignFreePlanClaim`, `deleteUser` e `isEmailVerified`, traduciendo `EMAIL_EXISTS` a `EmailAlreadyRegisteredException` (`REQ-CU-02`, `REQ-CU-03`, `REQ-CU-07`). **Sin prueba automatizada todavía:** falta una con `FirebaseAuth` simulado que fije la traducción de `EMAIL_EXISTS`. Va al inicio del siguiente lote.
+- [x] **T-23** `FirebaseUserDirectoryAdapter` con `createUser`, `assignFreePlanClaim`, `deleteUser` e `isEmailVerified`, traduciendo `EMAIL_EXISTS` a `EmailAlreadyRegisteredException` (`REQ-CU-02`, `REQ-CU-03`, `REQ-CU-07`). `FirebaseUserDirectoryAdapterTest` fija la traducción con el cliente del SDK simulado.
 - [x] **T-24** Doble en memoria del puerto para las pruebas, capaz de simular correo existente y fallo del borrado (`REQ-NF-CU-01`).
 
 ## Bloque 5 — Casos de uso
 
-- [ ] **T-25** `RegisterUserCommand` y `RegisterUserService` con el orden de [plan.md](plan.md) §3.3, sin transacción sobre la llamada a Firebase.
-- [ ] **T-26** Compensación con `deleteUser` cuando falla el claim o la escritura de la fila, y log del `firebaseUid` si el borrado también falla (`REQ-CU-06`).
-- [ ] **T-27** `RegisterUserServiceTest`: camino feliz, correo existente, fallo de PostgreSQL con compensación y fallo de la compensación.
-- [ ] **T-28** `ActivateAccountCommand` y `ActivateAccountService`: activa con el correo verificado, `403` si no lo está y respuesta de éxito si ya estaba activa (`REQ-CU-13`).
-- [ ] **T-29** `ActivateAccountServiceTest` con esos tres escenarios y el caso de cuenta inexistente.
+- [x] **T-25** `RegisterUserCommand` y `RegisterUserService` con el orden de [plan.md](plan.md) §3.3, sin transacción sobre la llamada a Firebase.
+- [x] **T-26** Compensación con `deleteUser` cuando falla el claim o la escritura de la fila, y log del `firebaseUid` si el borrado también falla (`REQ-CU-06`).
+- [x] **T-27** `RegisterUserServiceTest`: camino feliz, correo existente, fallo de PostgreSQL con compensación y fallo de la compensación.
+- [x] **T-28** `ActivateAccountCommand` y `ActivateAccountService`: activa con el correo verificado, `403` si no lo está y respuesta de éxito si ya estaba activa (`REQ-CU-13`).
+- [x] **T-29** `ActivateAccountServiceTest` con esos tres escenarios y el caso de cuenta inexistente.
 
 ## Bloque 6 — Presentación
 
@@ -102,6 +102,20 @@ Queda un aviso inofensivo en cada arranque: `schema "microcuentas" already exist
 porque `spring.flyway.create-schemas=true` crea el esquema antes de que corra el `CREATE SCHEMA IF
 NOT EXISTS` de `V1`. No se toca la migración ya aplicada solo por eso: editarla cambiaría su suma
 de verificación y rompería el arranque en las bases que ya la tienen.
+
+## Estado del bloque 5
+
+Hecho el 18/09/2026, junto con la prueba pendiente del adaptador de Firebase.
+`./mvnw.cmd test`: 80 pruebas, 0 fallos, 0 saltadas.
+
+`ActivateAccountServiceTest` encontró un fallo real antes de que llegara a ningún endpoint:
+el servicio salía en silencio ante cualquier estado distinto de `PENDING_VERIFICATION`, así que
+una cuenta `DISABLED` respondía como si se hubiera activado. Ahora solo corta cuando ya está
+`ACTIVE` y el resto lo decide el agregado, que rechaza las bloqueadas y las anonimizadas.
+
+Las políticas del dominio se publican como beans desde `DomainPolicyConfiguration`, en
+infraestructura: `domain` no lleva anotaciones de Spring, para que las reglas se puedan instanciar
+y probar con `new`.
 
 ## Estado del 18/09/2026
 

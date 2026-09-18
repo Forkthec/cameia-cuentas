@@ -103,6 +103,12 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         this.fallarAlBorrar = true;
     }
 
+    /** Desactiva los fallos provocados, conservando lo que haya en el directorio. */
+    public void dejarDeFallar() {
+        this.fallarAlEscribirElPlan = false;
+        this.fallarAlBorrar = false;
+    }
+
     /** Vacía el directorio y desactiva los fallos provocados. */
     public void limpiar() {
         correosPorUid.clear();
