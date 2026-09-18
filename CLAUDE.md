@@ -128,12 +128,16 @@ No asumir defaults silenciosos en decisiones críticas. Una tarea puede continua
 
 ## Límite de tamaño de cambios
 
-Se prohíben cambios cuyo diff total agregado y eliminado supere 1000 líneas por solicitud. Antes de editar, estimar el tamaño. Si se supera el umbral:
+**El objetivo es que la persona que desarrolla lea y entienda cada línea que entra al repositorio.** El umbral de 1000 líneas de diff agregado y eliminado por solicitud es la herramienta para lograrlo, no la meta: existe porque un cambio más grande deja de revisarse de verdad y se aprueba por cansancio.
+
+Antes de editar, estimar el tamaño. Si una solicitud se acerca al umbral:
 
 - Detener la implementación.
-- Informar al usuario que debe revisar cada cambio.
+- Informar al usuario del tamaño estimado y de lo que abarca.
 - Recomendar dividir la petición en incrementos pequeños, por responsabilidad o por spec.
 - Proponer un orden de modularización y esperar confirmación.
+
+El umbral se mide por solicitud, no por commit. Un commit puede reunir varias solicitudes ya revisadas, siempre que el usuario haya leído y entendido lo que contiene; lo que no se admite es entregar de una vez un volumen que nadie alcanzó a revisar.
 
 No usar este límite para ocultar cambios relacionados en commits separados: cada incremento debe ser revisable y funcional.
 

@@ -72,7 +72,7 @@ public class PasswordPolicy {
         }
         if (esConocida(value)) {
             throw new WeakPasswordException(
-                    "La contraseña es demasiado común y aparece en listas de contraseñas filtradas; elige otra");
+                    "La contraseña es demasiado común brother, cambiala si no quieres que te terminen robando la cuenta");
         }
     }
 

@@ -16,6 +16,7 @@ out/
 .env
 .env.*
 !.env.example
+/firebase/*
 
 application-local.yml
 application-local.yaml

@@ -34,21 +34,21 @@
 - [x] **T-13** `PasswordPolicy` según OWASP ASVS y `PasswordPolicyTest` con los límites 11, 12, 64 y 65 caracteres (`REQ-CU-11b`). Incluye la lista de contraseñas conocidas que cumplen la longitud, con sus tres pruebas.
 - [x] **T-14** Agregado `Account`: fábrica que nace `PENDING_VERIFICATION` y `activate()` con las transiciones válidas (`REQ-CU-04`, `REQ-CU-13`, `REQ-CU-14`).
 - [x] **T-15** `AccountTest`: estado inicial, activación, activación repetida y rechazo desde `DISABLED` y `ANONYMIZED`.
-- [~] **T-16** Excepciones de dominio con sus mensajes en español y `InvalidBirthDateException` con su motivo. Hechas `BusinessException`, `InvalidBirthDateException` y `WeakPasswordException`. Faltan `EmailAlreadyRegisteredException`, `EmailNotVerifiedException` y `AccountNotFoundException`: llegan con el bloque que las usa, para no dejar clases sin uso.
-- [ ] **T-17** Puertos `AccountRepository` y `FirebaseUserDirectory`. Aplazado al siguiente lote por el límite de 1000 líneas por solicitud.
+- [x] **T-16** Excepciones de dominio con sus mensajes en español y `InvalidBirthDateException` con su motivo. Hechas `BusinessException`, `InvalidBirthDateException` y `WeakPasswordException`. `EmailAlreadyRegisteredException` llegó con el puerto de Firebase. `EmailNotVerifiedException` y `AccountNotFoundException` van con el bloque 5, que es donde se lanzan.
+- [x] **T-17** Puertos `AccountRepository` y `FirebaseUserDirectory`.
 
 ## Bloque 3 — Persistencia
 
-- [ ] **T-18** `AccountEntity` mapeada a `microcuentas.cuenta`, con columnas en español y `@Version`.
-- [ ] **T-19** `AccountMapper` entre `Account` y `AccountEntity`, con prueba de ida y vuelta.
-- [ ] **T-20** `AccountJpaRepository` y `AccountRepositoryAdapter` que implementa el puerto.
-- [ ] **T-21** Prueba de integración del adaptador: guardar y recuperar por `firebase_uid`, y el `firebase_uid` duplicado rechazado por la base (`REQ-CU-16`).
+- [x] **T-18** `AccountEntity` mapeada a `microcuentas.cuenta`, con columnas en español y `@Version`.
+- [x] **T-19** `AccountMapper` entre `Account` y `AccountEntity`. La ida y vuelta se prueba dentro de `AccountRepositoryAdapterTest`, contra la base real: una prueba unitaria del mapeador sola no detectaría un nombre de columna equivocado.
+- [x] **T-20** `AccountJpaRepository` y `AccountRepositoryAdapter` que implementa el puerto.
+- [x] **T-21** Prueba de integración del adaptador: guardar y recuperar por `firebase_uid`, y el `firebase_uid` duplicado rechazado por la base (`REQ-CU-16`).
 
 ## Bloque 4 — Firebase
 
-- [ ] **T-22** `FirebaseConfiguration`: inicializa el SDK en el arranque, falla rápido si las credenciales son inválidas y no crea beans con `cuentas.firebase.enabled=false`.
-- [ ] **T-23** `FirebaseUserDirectoryAdapter` con `createUser`, `assignFreePlanClaim`, `deleteUser` e `isEmailVerified`, traduciendo `EMAIL_EXISTS` a `EmailAlreadyRegisteredException` (`REQ-CU-02`, `REQ-CU-03`, `REQ-CU-07`).
-- [ ] **T-24** Doble en memoria del puerto para las pruebas, capaz de simular correo existente y fallo del borrado (`REQ-NF-CU-01`).
+- [x] **T-22** `FirebaseConfiguration`: inicializa el SDK en el arranque, falla rápido si las credenciales son inválidas y no crea beans con `cuentas.firebase.enabled=false`.
+- [x] **T-23** `FirebaseUserDirectoryAdapter` con `createUser`, `assignFreePlanClaim`, `deleteUser` e `isEmailVerified`, traduciendo `EMAIL_EXISTS` a `EmailAlreadyRegisteredException` (`REQ-CU-02`, `REQ-CU-03`, `REQ-CU-07`). **Sin prueba automatizada todavía:** falta una con `FirebaseAuth` simulado que fije la traducción de `EMAIL_EXISTS`. Va al inicio del siguiente lote.
+- [x] **T-24** Doble en memoria del puerto para las pruebas, capaz de simular correo existente y fallo del borrado (`REQ-NF-CU-01`).
 
 ## Bloque 5 — Casos de uso
 
@@ -75,7 +75,7 @@
 - [ ] **T-39** `LayeredArchitectureTest` en verde y, si hace falta, una regla nueva: el dominio no importa `com.google.firebase` ni `jakarta.persistence`.
 - [ ] **T-40** Revisar el diff buscando contraseñas, correos o cuerpos en logs y mensajes de error (`REQ-NF-CU-03`, CU-10).
 - [ ] **T-41** Actualizar `CLAUDE.md`: contrato de error RFC 7807 y la excepción del registro al contrato de entrada del Gateway.
-- [ ] **T-42** Actualizar `.env.example` y `docker-compose.yml` con las variables de Firebase.
+- [x] **T-42** Actualizar `.env.example` y `docker-compose.yml` con las variables de Firebase. `FIREBASE_PROJECT_ID`, `FIREBASE_KEY_PATH` y `FIREBASE_ENABLED`; en Compose el JSON se monta de solo lectura en `/run/secrets/` y `docker compose config` lo confirma. El `README.md` dice qué hace falta antes de levantar la aplicación.
 - [ ] **T-43** `./mvnw.cmd test` y `./mvnw.cmd clean package` en verde, y marcar el DoD de la spec con el nombre de la prueba o el comando que lo respalda.
 - [ ] **T-44** Rellenar la bitácora de IA del día y entregar `CONTRATO-GATEWAY-CM-14.md` al responsable del Gateway.
 
@@ -102,6 +102,22 @@ Queda un aviso inofensivo en cada arranque: `schema "microcuentas" already exist
 porque `spring.flyway.create-schemas=true` crea el esquema antes de que corra el `CREATE SCHEMA IF
 NOT EXISTS` de `V1`. No se toca la migración ya aplicada solo por eso: editarla cambiaría su suma
 de verificación y rompería el arranque en las bases que ya la tienen.
+
+## Estado del 18/09/2026
+
+Bloques 2, 3 y 4 hechos. `./mvnw.cmd clean test`: 60 pruebas, 0 fallos, 0 saltadas, con Docker
+arriba.
+
+Dos cosas que aparecieron al implementar y no estaban en el plan:
+
+- **`V2__ajustar_version_inicial_cuenta.sql`.** El DDL exigía `version >= 1`, pensado para el
+  disparador que lo incrementaba; JPA siembra `@Version` en 0, así que ninguna cuenta se podía
+  insertar. La migración relaja el mínimo a 0. Es el primer uso real del flujo descrito en
+  [plan.md](plan.md) §2.3: no se tocó `V1`, ya aplicada.
+- **Firebase se apaga en las pruebas desde Surefire**, con `FIREBASE_ENABLED=false`. El primer
+  intento fue un `application.properties` en `src/test/resources`, y resultó que ese archivo
+  **reemplaza** al principal en el classpath en vez de complementarlo: la suite se quedó sin base
+  de datos y sin la configuración de springdoc.
 
 ## Orden y dependencias
 

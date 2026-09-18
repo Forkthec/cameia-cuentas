@@ -55,7 +55,12 @@ flowchart LR
 
 ## Ejecución local
 
-Copie `.env.example` a `.env` y defina al menos `DB_PASSWORD`.
+Copie `.env.example` a `.env` y defina `DB_PASSWORD`, `FIREBASE_PROJECT_ID` y
+`FIREBASE_KEY_PATH`. Este último apunta al JSON de la cuenta de servicio de Firebase, que
+no está en el repositorio: pídaselo a quien administra el proyecto. Sin esas credenciales
+la aplicación no arranca, porque no podría completar ningún registro; para levantarla de
+todos modos, por ejemplo solo para revisar la documentación de la API, use
+`FIREBASE_ENABLED=false`.
 
 ### Con Docker (aplicación y base de datos)
 

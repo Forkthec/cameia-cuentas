@@ -51,6 +51,16 @@ services:
       DB_NAME: ${DB_NAME:-DB-cuentas}
       DB_USERNAME: ${DB_USERNAME:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD en el archivo .env}
+      # Firebase custodia las credenciales de los usuarios. La ruta es la del archivo
+      # dentro del contenedor, no la del host: el volumen de abajo monta ahí el JSON que
+      # indica FIREBASE_KEY_PATH en el .env.
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-true}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:?Defina FIREBASE_PROJECT_ID en el archivo .env}
+      FIREBASE_KEY_PATH: /run/secrets/firebase-service-account.json
+    volumes:
+      # Solo lectura, y con /dev/null como valor de respaldo: si el .env no declara la
+      # ruta, la aplicación falla al arrancar en vez de quedar a medias sin credenciales.
+      - ${FIREBASE_KEY_PATH:-/dev/null}:/run/secrets/firebase-service-account.json:ro
     ports:
       - "${SERVER_PORT:-8081}:${SERVER_PORT:-8081}"
     restart: unless-stopped

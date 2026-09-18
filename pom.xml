@@ -131,6 +131,22 @@
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<!--
+						La suite corre sin credenciales de Firebase (REQ-NF-CU-01 de
+						specs/CM-14-RegistroUsuario). Se apaga aqui y no en un
+						application.properties de pruebas: ese archivo reemplazaria al principal
+						en el classpath y dejaria la suite sin base de datos ni configuracion de
+						springdoc.
+					-->
+					<systemPropertyVariables>
+						<FIREBASE_ENABLED>false</FIREBASE_ENABLED>
+					</systemPropertyVariables>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
 				<executions>
 					<execution>
