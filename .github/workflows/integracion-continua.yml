@@ -57,23 +57,26 @@ jobs:
       - name: Permiso de ejecución para mvnw
         run: chmod +x mvnw
 
-      # "mvnw verify" compila y corre las pruebas. DB_PASSWORD no tiene valor por
-      # defecto en application.properties a propósito (nunca queda una contraseña
-      # hardcodeada) — se la pasa aquí, y solo existe dentro de este job.
-      - name: Build + pruebas (mvnw verify)
+      # "mvnw verify" compila, corre las pruebas y, en la fase "verify", genera el
+      # reporte de cobertura de JaCoCo (ya configurado en pom.xml). DB_PASSWORD no
+      # tiene valor por defecto en application.properties a propósito (nunca queda
+      # una contraseña hardcodeada) — se la pasa aquí, y solo existe dentro de este job.
+      - name: Build + pruebas + cobertura (mvnw verify)
         env:
           DB_NAME: DB-cuentas
           DB_USERNAME: postgres
           DB_PASSWORD: cameia_ci
         run: ./mvnw -B -ntp verify
 
-      # Publica el reporte de pruebas como artefacto, aunque el paso anterior haya
-      # fallado — permite revisar qué se alcanzó a ejecutar sin repetir la corrida.
-      - name: Publicar reporte de pruebas
+      # Publica pruebas y reporte de cobertura como artefacto, aunque un paso anterior
+      # haya fallado — permite revisar qué se alcanzó a ejecutar sin repetir la corrida.
+      - name: Publicar reportes (pruebas + cobertura)
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: cameia-cuentas-reporte-pruebas
-          path: target/surefire-reports/
+          name: cameia-cuentas-reportes
+          path: |
+            target/surefire-reports/
+            target/site/jacoco/
           retention-days: 14
           if-no-files-found: warn
