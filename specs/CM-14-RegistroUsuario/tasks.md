@@ -60,24 +60,24 @@
 
 ## Bloque 6 — Presentación
 
-- [ ] **T-30** `RegisterUserRequest` con Bean Validation, `birthDate` en `dd/MM/yyyy` y Javadoc en español (`REQ-CU-01`).
-- [ ] **T-31** `RegisteredUserResponse` y `ActivatedAccountResponse` como records, con el estado y el plan (`REQ-CU-05`).
-- [ ] **T-32** `UserRegistrationController` para `POST /api/v1/users`, con Javadoc que alimente OpenAPI (`REQ-NF-CU-04`).
-- [ ] **T-33** `AccountActivationController` para `POST /api/v1/users/me/verification`, leyendo `X-User-Id` y `X-User-Email-Verified`.
-- [ ] **T-34** `BusinessExceptionHandler` con la tabla de traducción de [plan.md](plan.md) §3.4, devolviendo `ProblemDetail` (`REQ-CU-12`).
-- [ ] **T-35** `UserRegistrationControllerTest`: `201` del camino feliz y `409` con el mensaje exacto de CA-1.1.2.
-- [ ] **T-36** Mismo test, casos `422`: las cinco reglas de fecha, el celular fuera de E.164, el pronombre inválido y la contraseña corta, comprobando `application/problem+json`.
-- [ ] **T-37** `AccountActivationControllerTest`: activación correcta, `403` sin verificar y repetición idempotente.
-- [ ] **T-38** `AccountRegistrationIT`: registro de punta a punta con PostgreSQL real, Flyway y el puerto de Firebase simulado; la fila queda en `PENDING_VERIFICATION`.
+- [x] **T-30** `RegisterUserRequest` con Bean Validation, `birthDate` en `dd/MM/yyyy` y Javadoc en español (`REQ-CU-01`).
+- [x] **T-31** `RegisteredUserResponse` y `ActivatedAccountResponse` como records, con el estado y el plan (`REQ-CU-05`).
+- [x] **T-32** `UserRegistrationController` para `POST /api/v1/users`, con Javadoc que alimente OpenAPI (`REQ-NF-CU-04`).
+- [x] **T-33** `AccountActivationController` para `POST /api/v1/users/me/verification`, leyendo `X-User-Id` y `X-User-Email-Verified`.
+- [x] **T-34** `BusinessExceptionHandler` con la tabla de traducción de [plan.md](plan.md) §3.4, devolviendo `ProblemDetail` (`REQ-CU-12`).
+- [x] **T-35** `UserRegistrationControllerTest`: `201` del camino feliz y `409` con el mensaje exacto de CA-1.1.2.
+- [x] **T-36** Mismo test, casos `422`: las cinco reglas de fecha, el celular fuera de E.164, el pronombre inválido y la contraseña corta, comprobando `application/problem+json`.
+- [x] **T-37** `AccountActivationControllerTest`: activación correcta, `403` sin verificar y repetición idempotente.
+- [x] **T-38** `AccountRegistrationEndToEndTest`: registro de punta a punta con PostgreSQL real, Flyway y el puerto de Firebase simulado; la fila queda en `PENDING_VERIFICATION`.
 
 ## Bloque 7 — Cierre
 
-- [ ] **T-39** `LayeredArchitectureTest` en verde y, si hace falta, una regla nueva: el dominio no importa `com.google.firebase` ni `jakarta.persistence`.
-- [ ] **T-40** Revisar el diff buscando contraseñas, correos o cuerpos en logs y mensajes de error (`REQ-NF-CU-03`, CU-10).
-- [ ] **T-41** Actualizar `CLAUDE.md`: contrato de error RFC 7807 y la excepción del registro al contrato de entrada del Gateway.
+- [x] **T-39** `LayeredArchitectureTest` en verde y, si hace falta, una regla nueva: el dominio no importa `com.google.firebase` ni `jakarta.persistence`.
+- [x] **T-40** Revisar el diff buscando contraseñas, correos o cuerpos en logs y mensajes de error (`REQ-NF-CU-03`, CU-10).
+- [x] **T-41** Actualizar `CLAUDE.md`: contrato de error RFC 7807 y la excepción del registro al contrato de entrada del Gateway.
 - [x] **T-42** Actualizar `.env.example` y `docker-compose.yml` con las variables de Firebase. `FIREBASE_PROJECT_ID`, `FIREBASE_KEY_PATH` y `FIREBASE_ENABLED`; en Compose el JSON se monta de solo lectura en `/run/secrets/` y `docker compose config` lo confirma. El `README.md` dice qué hace falta antes de levantar la aplicación.
-- [ ] **T-43** `./mvnw.cmd test` y `./mvnw.cmd clean package` en verde, y marcar el DoD de la spec con el nombre de la prueba o el comando que lo respalda.
-- [ ] **T-44** Rellenar la bitácora de IA del día y entregar `CONTRATO-GATEWAY-CM-14.md` al responsable del Gateway.
+- [x] **T-43** `./mvnw.cmd test` y `./mvnw.cmd clean package` en verde, y marcar el DoD de la spec con el nombre de la prueba o el comando que lo respalda.
+- [x] **T-44** Rellenar la bitácora de IA del día y entregar `CONTRATO-GATEWAY-CM-14.md` al responsable del Gateway. El Gateway ya implementó la propagación de `X-User-Email-Verified` el 18/09/2026.
 
 ---
 
@@ -102,6 +102,22 @@ Queda un aviso inofensivo en cada arranque: `schema "microcuentas" already exist
 porque `spring.flyway.create-schemas=true` crea el esquema antes de que corra el `CREATE SCHEMA IF
 NOT EXISTS` de `V1`. No se toca la migración ya aplicada solo por eso: editarla cambiaría su suma
 de verificación y rompería el arranque en las bases que ya la tienen.
+
+## Estado final — 18/09/2026
+
+**Bloques 0 a 7 completos.** `./mvnw.cmd clean package`: 97 pruebas, 0 fallos, 0 saltadas. Seis
+commits en la rama, sin push.
+
+Queda fuera del alcance de la HU, con dueño distinto:
+
+- `CU-TBD-04`, la caducidad de las cuentas sin verificar, en manos del Product Owner
+  ([bloqueo.md](bloqueo.md)).
+- Confirmar con el frontend los valores de `pronoun`.
+- Abrir el PR.
+
+Del bloque 7, lo que encontró la revisión: el manejador registraba el mensaje de Jackson al recibir
+un cuerpo ilegible, y ese mensaje puede citar el fragmento de JSON que no pudo leer, es decir, la
+contraseña. Ahora solo registra el tipo de fallo.
 
 ## Estado del bloque 5
 

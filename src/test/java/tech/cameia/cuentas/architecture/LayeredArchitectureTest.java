@@ -50,6 +50,23 @@ class LayeredArchitectureTest {
     }
 
     @Test
+    void elDominioNoConoceLaTecnologiaQueLoRodea() {
+        // El dominio define puertos; quien habla con Firebase, con JPA o con Spring es la
+        // infraestructura. Si esta regla se rompe, las reglas de negocio dejan de poder
+        // probarse sin levantar medio sistema.
+        ArchRule regla = noClasses()
+                .that().resideInAPackage(BASE_PACKAGE + ".domain..")
+                .should().dependOnClassesThat()
+                .resideInAnyPackage(
+                        "com.google.firebase..",
+                        "jakarta.persistence..",
+                        "org.springframework..")
+                .allowEmptyShould(true);
+
+        regla.check(classes);
+    }
+
+    @Test
     void laAplicacionNoDependeDeInfraestructuraNiDePresentacion() {
         // allowEmptyShould(true): application aún no tiene clases (carpetas con .gitkeep).
         ArchRule regla = noClasses()

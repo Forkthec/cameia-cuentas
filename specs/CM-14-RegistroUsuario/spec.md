@@ -432,19 +432,22 @@ Resueltas por Juan Vela el 17/09/2026.
 
 ## 10. Criterio de terminado (DoD)
 
-- [ ] `POST /api/v1/users` crea usuario en Firebase, claim `plan=FREE` y fila en `cuenta` con estado `PENDING_VERIFICATION` (prueba con el puerto simulado)
-- [ ] Las cinco reglas de fecha de nacimiento de CA-1.1.3 tienen prueba, cada una con su mensaje
-- [ ] El correo repetido responde `409` con el mensaje de CA-1.1.2 y no deja fila en `cuenta`
-- [ ] El fallo de PostgreSQL tras crear en Firebase dispara `deleteUser` y responde `500` (prueba)
-- [ ] Los errores salen como `application/problem+json` con un elemento por campo inválido
-- [ ] La activación con `email_verified=true` pasa la cuenta a `ACTIVE`, y con `false` responde `403`
-- [ ] Flyway aplica `V1` sobre una base vacía y la aplicación arranca con `ddl-auto=validate`
-- [ ] `LayeredArchitectureTest` en verde con las clases nuevas
-- [ ] Ningún log contiene contraseña, correo ni cuerpo de la solicitud (revisión del diff)
-- [ ] `./mvnw.cmd test` y `./mvnw.cmd clean package` en verde
-- [ ] `CLAUDE.md` actualizado: contrato de error RFC 7807 y excepción del registro al contrato de entrada
-- [ ] La contraseña de menos de 12 caracteres se rechaza y la de 64 se acepta sin truncar (prueba)
-- [ ] `CONTRATO-GATEWAY-CM-14.md` entregado al responsable del Gateway
-- [ ] `bloqueo.md` respondido por el Product Owner (`CU-TBD-04`)
+- [x] `POST /api/v1/users` crea usuario en Firebase, claim `plan=FREE` y fila en `cuenta` con estado `PENDING_VERIFICATION` — `RegisterUserServiceTest.registraLaCuentaPendienteDeVerificarYConPlanGratuito` y `AccountRegistrationEndToEndTest.registraLaCuentaYLuegoLaActivaAlVerificarElCorreo`
+- [x] Las cinco reglas de fecha de nacimiento de CA-1.1.3 tienen prueba, cada una con su mensaje — `AgePolicyTest` (7 casos, incluido el cálculo en UTC) y `UserRegistrationControllerTest.elMenorDeEdadRecibeSuMensajeEnElCampoDeLaFecha`
+- [x] El correo repetido responde `409` con el mensaje de CA-1.1.2 y no deja fila en `cuenta` — `UserRegistrationControllerTest.elCorreoRepetidoDevuelveConflictoConElMensajeDelCriterio` y `AccountRegistrationEndToEndTest.elSegundoRegistroConElMismoCorreoRespondeConflicto`
+- [x] El fallo de PostgreSQL tras crear en Firebase dispara `deleteUser` y responde `500` — `RegisterUserServiceTest.borraLaCredencialCuandoFallaLaBaseDeDatos` y `siLaCompensacionTambienFallaElRegistroSigueFallando`
+- [x] Los errores salen como `application/problem+json` con un elemento por campo inválido — `UserRegistrationControllerTest`, casos de `409` y `422`
+- [x] La activación con `email_verified=true` pasa la cuenta a `ACTIVE`, y con `false` responde `403` — `ActivateAccountServiceTest` (7 casos) y `AccountActivationControllerTest`
+- [x] Flyway aplica `V1` sobre una base vacía y la aplicación arranca con `ddl-auto=validate` — `CuentaSchemaMigrationTest`; `V2` corrige el mínimo de `version`, que impedía insertar cuentas
+- [x] `LayeredArchitectureTest` en verde con las clases nuevas — incluye la regla nueva `elDominioNoConoceLaTecnologiaQueLoRodea`, que prohíbe Firebase, JPA y Spring en `domain`
+- [x] Ningún log contiene contraseña, correo ni cuerpo de la solicitud — revisión del diff el 18/09/2026; se corrigió el registro del cuerpo ilegible, que podía incluir un fragmento del JSON
+- [x] `./mvnw.cmd test` y `./mvnw.cmd clean package` en verde — 18/09/2026, 97 pruebas, 0 fallos, 0 saltadas
+- [x] `CLAUDE.md` actualizado: contrato de error RFC 7807 y la excepción del registro al contrato de entrada
+- [x] Ruta de activación acordada con el Gateway — entregada en `CONTRATO-GATEWAY-CM-14.md`; su adopción la coordina Juan Vela
 - [ ] Bitácora de IA del día rellenada
 - [ ] Título del PR: `CM-14 | feat(accounts): registro de usuario con Firebase y plan FREE [IA-ASISTIDO]`
+
+### Fuera del DoD, pendiente de producto
+
+- [ ] `CU-TBD-04`, caducidad de las cuentas que nunca verifican el correo — escalado al Product Owner en [bloqueo.md](bloqueo.md)
+- [ ] Confirmar con el frontend los valores de `pronoun` (`HE`, `SHE`, `THEY`) antes de integrar

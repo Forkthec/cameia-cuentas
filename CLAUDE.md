@@ -79,6 +79,20 @@ Cuentas recibe del Gateway únicamente los datos necesarios para la autorizació
 
 No agregar campos derivados del JWT sin justificar su necesidad y documentar su contrato. No confiar en headers enviados directamente por clientes externos.
 
+**Excepciones al contrato de entrada.** Solo dos rutas no lo exigen, y cada una por una razón concreta:
+
+- `GET /api/v1/users/health`: no lee ni modifica datos de la cuenta.
+- `POST /api/v1/users` (registro): quien la llama todavía no tiene cuenta, así que no hay identidad que propagar. El Gateway la trata como ruta pública y borra los `X-User-*` y el `Authorization` que envíe el cliente.
+
+Una ruta nueva no se suma a esta lista sin una spec que lo justifique.
+
+**Contrato de respuesta** (decidido en CM-14, 2026-09-17):
+
+- La versión va en la ruta: `/api/v1/...`, como ya la declara el Gateway.
+- Los nombres JSON van en `camelCase`.
+- Los errores se devuelven como **Problem Details, RFC 7807**, con `Content-Type: application/problem+json`, y los de validación agregan una lista `errors` con un elemento por campo rechazado.
+- Los mensajes de las excepciones de negocio llegan al usuario tal cual, porque le dicen qué corregir. Un fallo técnico se registra completo en el log y al cliente solo le llega un texto genérico.
+
 ## Reglas de seguridad
 
 - No registrar JWT, secretos, contraseñas, tokens de Firebase ni información sensible de pago.
@@ -121,10 +135,6 @@ Si una petición contiene una ambigüedad que puede afectar seguridad, contrato,
 La trazabilidad de esas decisiones no vive en un registro aparte: la decisión técnica queda en la spec afectada y el prompt con la decisión humana queda en la bitácora de IA (ver "Bitácora de IA por spec").
 
 No asumir defaults silenciosos en decisiones críticas. Una tarea puede continuar solo si las partes ambiguas son irrelevantes para el cambio o si ya existe una decisión documentada y aprobada.
-
-### Preguntas abiertas
-
-- **Contrato de respuesta y versionado de API (pendiente desde 2026-09-04).** ¿Qué estrategia de versionado (path, header o query parameter), nombres JSON y formato de error se adopta para los endpoints que consume el Gateway? Base propuesta: versionado nativo de Spring Boot, JSON en `camelCase` y Problem Details (RFC 7807). Requiere aprobación de arquitectura y la resuelve la spec del primer endpoint de negocio de Cuentas.
 
 ## Límite de tamaño de cambios
 

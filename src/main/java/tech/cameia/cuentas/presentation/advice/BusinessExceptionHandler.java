@@ -128,7 +128,9 @@ class BusinessExceptionHandler {
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ProblemDetail cuerpoIlegible(HttpMessageNotReadableException error) {
-        logger.warn("Cuerpo de la petición ilegible: {}", error.getMessage());
+        // Solo el tipo de fallo. El mensaje de Jackson suele citar el fragmento de JSON que
+        // no pudo leer, y en el registro ese fragmento puede ser la contraseña.
+        logger.warn("Cuerpo de la petición ilegible: {}", error.getClass().getSimpleName());
         return problema(HttpStatus.UNPROCESSABLE_ENTITY, "Datos no válidos",
                 "Revisa el formato de los datos enviados. La fecha de nacimiento usa el formato DD/MM/AAAA");
     }
