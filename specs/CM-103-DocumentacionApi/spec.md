@@ -3,7 +3,7 @@
 - Estado: `Aprobada`
 - Responsable: Juan David Vela Coronado
 - Fecha: 2026-09-10
-- Ambigüedades relacionadas: [A-001](../AMBIGUIDADES.md) (frontera de confianza), [A-005](../AMBIGUIDADES.md) (interruptor de documentación)
+- Decisiones relacionadas: frontera de confianza ([CLAUDE.md § Límites de entrada y confianza](../../CLAUDE.md)), versionado aún pendiente ([CLAUDE.md § Preguntas abiertas](../../CLAUDE.md)). El interruptor de documentación se decide en esta spec.
 
 ## Contexto
 
@@ -14,7 +14,7 @@ propio en Spring Boot 4.
 
 Publicar ese contrato en producción es un problema aparte. Cuentas administra pagos,
 suscripciones y permisos, así que el documento OpenAPI describe exactamente las rutas
-que un atacante querría enumerar. La red ya lo protege (A-001), pero esa protección es
+que un atacante querría enumerar. La red ya lo protege (IAM + OIDC y VPC interna), pero esa protección es
 configuración de despliegue y no debe ser la única barrera.
 
 ## Alcance
@@ -26,7 +26,7 @@ configuración de despliegue y no debe ser la única barrera.
 - Pruebas del valor que resuelve cada entorno.
 
 Fuera de alcance: autenticación propia de la ruta de documentación, publicación del
-contrato hacia el API Gateway y versionado del documento, que depende de A-003.
+contrato hacia el API Gateway y versionado del documento, que sigue como pregunta abierta en `CLAUDE.md`.
 
 ## Requisitos
 

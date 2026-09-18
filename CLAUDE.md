@@ -55,7 +55,7 @@ tech.cameia.cuentas
 
 ## Límites de entrada y confianza
 
-El servicio solo debe aceptar peticiones autenticadas del API Gateway. La estrategia tiene dos capas, ambas documentadas en [docs/AMBIGUIDADES.md](docs/AMBIGUIDADES.md):
+El servicio solo debe aceptar peticiones autenticadas del API Gateway. La estrategia tiene dos capas (decidida el 2026-09-04):
 
 ### Capa 1: IAM + OIDC en Cloud Run (base obligatoria)
 - El microservicio se despliega con `--no-allow-unauthenticated`.
@@ -84,7 +84,8 @@ No agregar campos derivados del JWT sin justificar su necesidad y documentar su 
 - No registrar JWT, secretos, contraseñas, tokens de Firebase ni información sensible de pago.
 - Guardar secretos de Firebase y Wompi únicamente en el gestor de secretos o variables de entorno aprobadas; nunca en Git.
 - La autenticidad de peticiones del Gateway se garantiza mediante IAM y tokens OIDC (Capa 1). No es necesario firmar el payload en la aplicación.
-- Verificar firma SHA-256 e idempotencia de webhooks de Wompi antes de cambiar una suscripción o entitlement. Wompi se conecta directo a Cuentas.
+- Verificar firma SHA-256 e idempotencia de webhooks de Wompi antes de cambiar una suscripción o entitlement.
+- Wompi no se conecta directo a Cuentas: su webhook apunta al API Gateway (`POST /webhooks/wompi`), que lo reenvía íntegro por red privada con token OIDC. Wompi autentica con su checksum SHA-256, no con un JWT de Firebase. Así se mantiene un único punto de ingreso externo (decidido el 2026-09-04).
 - Aplicar autorización por endpoint provado y no asumir que `roles` equivale automáticamente a permisos de negocio.
 - Exponer solo los endpoints de Actuator necesarios para salud.
 - Cada integración externa (Firebase, Wompi, etc.) requiere pruebas de autenticidad, reintentos, manejo de errores e idempotencia antes de considerarla completa.
@@ -95,23 +96,35 @@ Los principios no negociables del proyecto (stack, calidad, tests y límites) es
 
 ## Metodología Spec-Driven Development
 
-El repositorio sigue Spec-Driven Development clásico. Las especificaciones vivirán bajo `docs/specs/`, organizadas por funcionalidad. Antes de implementar una capacidad nueva:
+El repositorio sigue Spec-Driven Development clásico. Las especificaciones viven bajo `specs/`, organizadas por funcionalidad según la estructura descrita más abajo. Antes de implementar una capacidad nueva:
 
 1. Crear o actualizar la spec con contexto, alcance, requisitos, reglas, casos de éxito y casos de error.
-2. Registrar las decisiones y contratos relevantes.
+2. Registrar las decisiones y contratos relevantes en la spec; los prompts que las motivaron van a la bitácora de IA.
 3. Implementar únicamente lo respaldado por una spec aprobada.
 4. Añadir pruebas que demuestren los escenarios de la spec.
 5. Actualizar la documentación si cambian contratos, configuración, datos, eventos o comandos.
 
 No crear carpetas o especificaciones ficticias para aparentar que una decisión está tomada.
 
+Estructura y organizacion:
+- Los specs viven en una carpeta que esta en la raiz llamada specs
+- dentro de la carpeta specs viven specs especificos que siguen el nombrado CM-NNN-Descripcion (por ejemplo `CM-14-RegistroUsuario`)
+- cada spec especifico tiene tres artefactos [spec.md], [plan.md] y [tasks.md]
+    - spec.md representa el alcance del spec con el contexto y a veces diagramas que hagan entender mejor el spec. Contiene  requisitos funcionales a abordar, CADA REQUISITO DEBE SEGUIR LA NOTACION EARS, Requisitos no funcionales y lo que queda fuera del alcance
+    - plan.md contiene el plan tecnico de como se va a abordar el spec
+    - tasks.md contiene las tareas divididas por bloques en donde cada tarea se puede hacer en 30 minutos o menos
+
 ## Restricción de ambigüedades
 
 Si una petición contiene una ambigüedad que puede afectar seguridad, contrato, datos, pagos, permisos, arquitectura o comportamiento observable, el agente debe detenerse antes de editar. Debe formular preguntas concretas y resolverlas ahí mismo con máximo 6 preguntas.
 
-Toda ambigüedad cuya resolución tenga impacto en la arquitectura, sea de alto impacto en seguridad, o comprometa una buena práctica (por ejemplo, omitir pruebas unitarias) debe quedar registrada en [docs/AMBIGUIDADES.md](docs/AMBIGUIDADES.md) con la pregunta, la decisión adoptada, el impacto y la especificación relacionada. Ambigüedades menores, sin ese impacto, pueden resolverse en la conversación sin dejar constancia formal allí.
+La trazabilidad de esas decisiones no vive en un registro aparte: la decisión técnica queda en la spec afectada y el prompt con la decisión humana queda en la bitácora de IA (ver "Bitácora de IA por spec").
 
 No asumir defaults silenciosos en decisiones críticas. Una tarea puede continuar solo si las partes ambiguas son irrelevantes para el cambio o si ya existe una decisión documentada y aprobada.
+
+### Preguntas abiertas
+
+- **Contrato de respuesta y versionado de API (pendiente desde 2026-09-04).** ¿Qué estrategia de versionado (path, header o query parameter), nombres JSON y formato de error se adopta para los endpoints que consume el Gateway? Base propuesta: versionado nativo de Spring Boot, JSON en `camelCase` y Problem Details (RFC 7807). Requiere aprobación de arquitectura y la resuelve la spec del primer endpoint de negocio de Cuentas.
 
 ## Límite de tamaño de cambios
 
@@ -163,7 +176,7 @@ Cada endpoint expone su contrato mediante OpenAPI 3.0.
 - JSON OpenAPI: `http://localhost:8081/v3/api-docs`
 - Swagger UI: `http://localhost:8081/swagger-ui.html`
 
-Ambos recursos dependen de `API_DOCUMENTATION_ENABLED`, apagada por defecto. En desarrollo se enciende con la variable (viene en `.env.example`); el perfil `prod` la fija en `false` y no admite que una variable de entorno la encienda (ver A-005 y [docs/specs/documentacion-api.md](docs/specs/documentacion-api.md)).
+Ambos recursos dependen de `API_DOCUMENTATION_ENABLED`, apagada por defecto. En desarrollo se enciende con la variable (viene en `.env.example`); el perfil `prod` la fija en `false` y no admite que una variable de entorno la encienda (ver [specs/CM-103-DocumentacionApi/spec.md](specs/CM-103-DocumentacionApi/spec.md)).
 
 ## Convenciones técnicas
 
@@ -187,7 +200,35 @@ Ambos recursos dependen de `API_DOCUMENTATION_ENABLED`, apagada por defecto. En 
 ## Flujo de contribución
 
 - Usar ramas `CM-<numero>-<descripcion-kebab-case>`.
+- `NNN` y `<numero>` son el número de la clave Jira sin ceros a la izquierda: `CM-14`, no `CM-014`.
+- Todo commit incluye la clave Jira; no hay commits sin `CM-NNN`.
 - Todo cambio ordinario entra mediante PR y revisión de una persona distinta del autor.
 - Mantener `main` estable y promover cambios desde `develop` mediante Merge commit.
 - Integrar ramas de trabajo en `develop` mediante Squash.
 - Actualizar la spec y este documento en el mismo PR cuando cambien reglas o contratos.
+
+## Bitácora de IA por spec — OBLIGATORIA
+
+Se llena el mismo día del trabajo, en `..\..\Entregables\<ddMMyyyy>_BitacoraIA_Codigo_E2.md` (relativo a la raíz del repositorio), hoja **`Bitacora_Codigo_Vela`**. El archivo del día es compartido con los demás repositorios: cameia-cuentas agrega su propia sección sin tocar las de otros.
+
+Incluye los siguientes ítems:
+- Prompts más importantes en la toma de decisiones con criterio humano: prompt, qué propuso la IA y la decisión humana con su porqué.
+- Resumen de lo que se hizo.
+
+## Título de PR — formato obligatorio
+
+```text
+CM-NNN | tipo(scope): resultado [IA-ASISTIDO]
+```
+
+El `[IA-ASISTIDO]` va **siempre al final**, nunca al inicio.
+
+## Título y plantilla de commit
+
+```text
+CM-NNN | tipo(scope): resultado [IA-ASISTIDO]
+
+Descripción de un párrafo.
+
+Comentario del modelo usado.
+```

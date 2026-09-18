@@ -56,3 +56,6 @@ build/
 
 .DS_Store
 Thumbs.db
+
+# Cache de scripts Python locales (.github/scripts/pr_policy.py)
+__pycache__/

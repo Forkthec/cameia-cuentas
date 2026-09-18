@@ -93,7 +93,7 @@ variable viene en `.env.example`, así que basta copiarla a `.env`; `docker comp
 pasa al contenedor con `true` por defecto. El perfil `prod` la deja apagada de forma
 rígida, así que en producción tanto Swagger UI como `/v3/api-docs` responden `404`
 aunque la variable diga lo contrario.
-Ver [docs/specs/documentacion-api.md](docs/specs/documentacion-api.md).
+Ver [specs/CM-103-DocumentacionApi/spec.md](specs/CM-103-DocumentacionApi/spec.md).
 
 
 
