@@ -92,6 +92,13 @@ jobs:
       # valida nada) y bloquea springdoc de forma rigida. Hallazgo verificado el
       # 18-sep-2026 al revisar el mismo problema en cameia-gateway.
       #
+      # FIREBASE_PROJECT_ID: identificador del proyecto de Firebase que custodia las
+      # credenciales de los usuarios. Es obligatorio: FirebaseConfiguration crea el SDK
+      # al arrancar y, sin este valor, el contenedor nunca llega a escuchar en el puerto
+      # y Cloud Run marca la revision como fallida (el trafico sigue en la anterior).
+      # Firebase y Cloud Run comparten proyecto de GCP, por eso se toma de GCP_PROJECT_ID.
+      # Las pruebas de CI no lo detectan: corren con FIREBASE_ENABLED=false.
+      #
       # Sin --allow-unauthenticated: la identidad que ejecuta este despliegue no tiene
       # permiso para cambiar quien puede invocar el servicio, y no se le da ese permiso
       # solo para esto -- mantiene acotado el radio de lo que esa identidad puede hacer
@@ -111,7 +118,7 @@ jobs:
             --network="${{ env.VPC_NETWORK }}" \
             --subnet="${{ env.VPC_SUBNET }}" \
             --vpc-egress=all-traffic \
-            --set-env-vars="SPRING_PROFILES_ACTIVE=prod,DB_HOST=10.20.0.3,DB_PORT=5432,DB_NAME=cameia_cuentas,DB_USERNAME=cameia_cuentas" \
+            --set-env-vars="SPRING_PROFILES_ACTIVE=prod,DB_HOST=10.20.0.3,DB_PORT=5432,DB_NAME=cameia_cuentas,DB_USERNAME=cameia_cuentas,FIREBASE_PROJECT_ID=${{ vars.GCP_PROJECT_ID }}" \
             --set-secrets="DB_PASSWORD=cloudsql-staging-cuentas-password:latest"
 
       - name: URL del servicio desplegado
