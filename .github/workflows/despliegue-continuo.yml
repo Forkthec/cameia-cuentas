@@ -99,6 +99,13 @@ jobs:
       # Firebase y Cloud Run comparten proyecto de GCP, por eso se toma de GCP_PROJECT_ID.
       # Las pruebas de CI no lo detectan: corren con FIREBASE_ENABLED=false.
       #
+      # --service-account: identidad de ejecucion dedicada y exclusiva de este servicio, no
+      # la cuenta de Compute Engine que comparten otros servicios. Solo tiene lo que este
+      # servicio necesita: administrar usuarios en Firebase Auth (roles/firebaseauth.admin)
+      # y leer el secreto de su propia base. Asi ningun otro servicio hereda esos permisos.
+      # La cuenta y sus permisos se gestionan fuera de este repositorio; la identidad que
+      # ejecuta este despliegue necesita roles/iam.serviceAccountUser sobre ella.
+      #
       # Sin --allow-unauthenticated: la identidad que ejecuta este despliegue no tiene
       # permiso para cambiar quien puede invocar el servicio, y no se le da ese permiso
       # solo para esto -- mantiene acotado el radio de lo que esa identidad puede hacer
@@ -114,7 +121,7 @@ jobs:
             --ingress=internal \
             --min-instances=0 \
             --max-instances=2 \
-            --service-account="25798898664-compute@developer.gserviceaccount.com" \
+            --service-account="cameia-cuentas-run@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \
             --network="${{ env.VPC_NETWORK }}" \
             --subnet="${{ env.VPC_SUBNET }}" \
             --vpc-egress=all-traffic \
