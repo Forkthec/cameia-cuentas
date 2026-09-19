@@ -55,7 +55,12 @@ flowchart LR
 
 ## Ejecución local
 
-Copie `.env.example` a `.env` y defina al menos `DB_PASSWORD`.
+Copie `.env.example` a `.env` y defina `DB_PASSWORD`, `FIREBASE_PROJECT_ID` y
+`FIREBASE_KEY_PATH`. Este último apunta al JSON de la cuenta de servicio de Firebase, que
+no está en el repositorio: pídaselo a quien administra el proyecto. Sin esas credenciales
+la aplicación no arranca, porque no podría completar ningún registro; para levantarla de
+todos modos, por ejemplo solo para revisar la documentación de la API, use
+`FIREBASE_ENABLED=false`.
 
 ### Con Docker (aplicación y base de datos)
 
@@ -84,7 +89,7 @@ Requiere un PostgreSQL 16 accesible en `DB_HOST:DB_PORT`.
 
 | Recurso | URL |
 |---|---|
-| Health check | `http://localhost:8081/health` → `{"status":"UP"}` |
+| Health check | `http://localhost:8081/api/v1/users/health` → `{"status":"UP"}` |
 | Documento OpenAPI | `http://localhost:8081/v3/api-docs` |
 | Referencia navegable (Swagger UI) | `http://localhost:8081/swagger-ui.html` |
 
@@ -93,7 +98,7 @@ variable viene en `.env.example`, así que basta copiarla a `.env`; `docker comp
 pasa al contenedor con `true` por defecto. El perfil `prod` la deja apagada de forma
 rígida, así que en producción tanto Swagger UI como `/v3/api-docs` responden `404`
 aunque la variable diga lo contrario.
-Ver [docs/specs/documentacion-api.md](docs/specs/documentacion-api.md).
+Ver [specs/CM-103-DocumentacionApi/spec.md](specs/CM-103-DocumentacionApi/spec.md).
 
 
 

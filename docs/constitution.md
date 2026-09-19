@@ -8,8 +8,8 @@ Principios no negociables. Toda spec y todo PR los cumple; en conflicto, esta li
 4. **Entrada de confianza:** solo el API Gateway (IAM+OIDC, VPC interna); contrato mínimo `firebase_uid, email, roles, request_id`; sin campos nuevos del JWT sin contrato documentado. → config de despliegue + DTO de entrada.
 5. **Datos sensibles:** secretos de Firebase/Wompi solo en gestor de secretos o variables de entorno, nunca en Git; logs SLF4J en español sin JWT, tokens, contraseñas ni datos de pago. → escaneo de secretos en CI + `grep` de `System.out`.
 6. **Wompi:** firma SHA-256 e idempotencia verificadas antes de cambiar cualquier suscripción o entitlement. → pruebas de firma, idempotencia y reintentos.
-7. **Spec-Driven:** toda capacidad nace de una spec aprobada en `docs/specs/`; prohibido crear implementacion si no esta en una spec.
-8. **Puerta de ambigüedad:** detenerse ante ambigüedad de seguridad, contrato, datos, pagos, permisos o arquitectura; máx. 6 preguntas; registrar en [docs/AMBIGUIDADES.md](AMBIGUIDADES.md) si el impacto es alto. → entrada en el registro.
+7. **Spec-Driven:** toda capacidad nace de una spec aprobada en `specs/CM-<numero>-<Descripcion>/` (`spec.md` con requisitos EARS, `plan.md`, `tasks.md`); prohibido crear implementacion si no esta en una spec.
+8. **Puerta de ambigüedad:** detenerse ante ambigüedad de seguridad, contrato, datos, pagos, permisos o arquitectura; máx. 6 preguntas; la decisión queda en la spec afectada y el prompt en la bitácora de IA. → spec + bitácora del día.
 9. **Tests:** JUnit 5; cada spec con casos de éxito y de error; integraciones externas con pruebas de autenticidad, reintentos, errores e idempotencia; integración con Testcontainers y puerto aleatorio. → `./mvnw.cmd test`.
 10. **Verde antes de PR:** `./mvnw.cmd test` y `./mvnw.cmd clean package` pasan localmente. → ejecución de ambos comandos.
 11. **Tamaño de cambio:** diff agregado + eliminado ≤ 1000 líneas por solicitud; si se supera, dividir en incrementos revisables y esperar confirmación. → `git diff --stat`.

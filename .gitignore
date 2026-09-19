@@ -16,10 +16,10 @@ out/
 .env
 .env.*
 !.env.example
+/firebase/*
 
 application-local.yml
 application-local.yaml
-application-local.properties
 
 HELP.md
 target/

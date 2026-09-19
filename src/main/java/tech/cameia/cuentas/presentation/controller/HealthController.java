@@ -18,6 +18,10 @@ import tech.cameia.cuentas.presentation.dto.HealthResponse;
  * <p>Es el único endpoint del servicio que no exige el contrato de entrada del API
  * Gateway, porque no lee ni modifica datos de la cuenta.</p>
  *
+ * <p>La ruta lleva el prefijo {@code /api/v1/users} porque el API Gateway reenvía la
+ * ruta completa, sin reescribirla: una sonda en {@code /health} quedaría inalcanzable
+ * a través del Gateway.</p>
+ *
  * @see tech.cameia.cuentas.presentation.dto.HealthResponse
  */
 @RestController
@@ -31,7 +35,7 @@ class HealthController {
 	 *
 	 * @return {@code 200 OK} con el estado {@code "UP"}
 	 */
-	@GetMapping("/health")
+	@GetMapping("/api/v1/users/health")
 	ResponseEntity<HealthResponse> health() {
 		return ResponseEntity.ok(HealthResponse.up());
 	}
