@@ -55,12 +55,22 @@ flowchart LR
 
 ## Ejecución local
 
-Copie `.env.example` a `.env` y defina `DB_PASSWORD`, `FIREBASE_PROJECT_ID` y
-`FIREBASE_KEY_PATH`. Este último apunta al JSON de la cuenta de servicio de Firebase, que
-no está en el repositorio: pídaselo a quien administra el proyecto. Sin esas credenciales
-la aplicación no arranca, porque no podría completar ningún registro; para levantarla de
-todos modos, por ejemplo solo para revisar la documentación de la API, use
-`FIREBASE_ENABLED=false`.
+Copie `.env.example` a `.env` y defina `DB_PASSWORD`. Por defecto la aplicación usa el
+**emulador de Firebase Auth** (`FIREBASE_PROJECT_ID=demo-cameia` y
+`FIREBASE_AUTH_EMULATOR_HOST=cameia-firebase-emulator:9099`, que ya vienen en
+`.env.example`): no necesita llave de cuenta de servicio y sus usuarios solo existen en su
+máquina. El emulador es un servicio aparte, compartido con los demás servicios, que se
+levanta desde el `docker-compose.yml` de `cameia-gateway` en la misma red `cameia-net`. Con
+`FIREBASE_AUTH_EMULATOR_HOST` definida, la aplicación acepta tokens **sin firma**, por eso se
+niega a arrancar si esa variable aparece en un despliegue (Cloud Run o perfil `prod`), aunque
+esté vacía.
+
+Para usar un proyecto **real** de Firebase, comente esa variable, defina
+`FIREBASE_PROJECT_ID` con el ID real y `FIREBASE_KEY_PATH` con la ruta al JSON de la cuenta
+de servicio, que no está en el repositorio: pídaselo a quien administra el proyecto. Sin
+emulador ni credenciales la aplicación no arranca, porque no podría completar ningún
+registro; para levantarla de todos modos, por ejemplo solo para revisar la documentación de
+la API, use `FIREBASE_ENABLED=false`.
 
 ### Con Docker (aplicación y base de datos)
 

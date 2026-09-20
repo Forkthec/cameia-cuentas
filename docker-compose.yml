@@ -57,6 +57,12 @@ services:
       FIREBASE_ENABLED: ${FIREBASE_ENABLED:-true}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:?Defina FIREBASE_PROJECT_ID en el archivo .env}
       FIREBASE_KEY_PATH: /run/secrets/firebase-service-account.json
+      # Emulador de Firebase Auth. Sin valor a propósito: Compose la pasa al contenedor solo si
+      # está definida en el entorno o en .env, y si no lo está, el contenedor no la recibe. Con ella
+      # la aplicación arranca sin llave de cuenta de servicio (ignora la ruta de arriba) y acepta
+      # tokens sin firma, por eso se niega a arrancar si la ve en un despliegue.
+      # Ejemplo: cameia-firebase-emulator:9099
+      FIREBASE_AUTH_EMULATOR_HOST:
     volumes:
       # Solo lectura, y con /dev/null como valor de respaldo: si el .env no declara la
       # ruta, la aplicación falla al arrancar en vez de quedar a medias sin credenciales.
