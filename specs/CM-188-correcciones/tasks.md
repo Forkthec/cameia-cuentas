@@ -30,18 +30,18 @@ Una tarea a la vez; marcar `[x]` antes de pasar a la siguiente. Cada tarea cabe 
 
 ## Bloque 2 — Guardias de `FirebaseConfiguration` (solo si `CM-TBD-01` = sí)
 
-- [ ] T-06 · Constructor con `ConfigurableEnvironment`, `processVariable` e `isEmulatorMode`;
-      `resolverCredenciales()` pasa a usar `isEmulatorMode` (`REQ-EMC-C04`)
-- [ ] T-07 · `rejectEmulatorOutsideProcessEnvironment()` y sus pruebas en `FirebaseConfigurationTest` (`REQ-EMC-C04`)
-- [ ] T-08 · `rejectNonDemoProjectInEmulator()`, log del `projectId` y sus pruebas (`REQ-EMC-C03`, `C05`)
-- [ ] T-09 · `FirebaseEmulatorContextTest`: caso positivo con variable de proceso simulada; comprobar
-      que `REQ-EMU-02` de CM-191 sigue en verde
-- [ ] T-10 · Quitar a propósito cada guardia y confirmar que fallan solo sus pruebas; restaurar
+- [x] T-06 · Constructor con `ConfigurableEnvironment`, `processVariable` e `isEmulatorMode`;
+      `resolverCredenciales()` pasa a usar `isEmulatorMode` (`REQ-EMC-C04`) — 24/09/2026
+- [x] T-07 · `rejectEmulatorOutsideProcessEnvironment()` y sus pruebas en `FirebaseConfigurationTest` (`REQ-EMC-C04`) — 24/09/2026: tres unitarias (solo Spring, valores distintos, variable de proceso en Cloud Run)
+- [x] T-08 · `rejectNonDemoProjectInEmulator()`, log del `projectId` y sus pruebas (`REQ-EMC-C03`, `C05`) — 24/09/2026: dos unitarias (ID real con emulador falla, ID real sin emulador arranca) y una del log
+- [x] T-09 · `FirebaseEmulatorContextTest`: caso positivo con variable de proceso simulada; comprobar
+      que `REQ-EMU-02` de CM-191 sigue en verde — 24/09/2026: el positivo sustituye `systemEnvironment`; nueva prueba de contexto para `REQ-EMC-C04`
+- [x] T-10 · Quitar a propósito cada guardia y confirmar que fallan solo sus pruebas; restaurar — 24/09/2026: sin la guardia de fuente fallan exactamente sus 3 pruebas; sin la de `demo-`, exactamente 1
 
 ## Bloque 3 — Cierre
 
-- [ ] T-11 · `./mvnw.cmd clean package` en verde; anotar pruebas antes y después (hoy 110)
-- [ ] T-12 · Actualizar `CLAUDE.md` si cambian las reglas del emulador (Reglas de seguridad)
+- [x] T-11 · `./mvnw.cmd clean package` en verde; anotar pruebas antes y después (hoy 110) — 24/09/2026: 110 → 117, `BUILD SUCCESS`. En Docker: `demo-cameia` arranca y registra `201`; el ID real no arranca
+- [x] T-12 · Actualizar `CLAUDE.md` si cambian las reglas del emulador (Reglas de seguridad) — 24/09/2026: `CLAUDE.md` (Reglas de seguridad) y `README.md` (sección Sin Docker)
 - [ ] T-13 · Bitácora de IA del día, commit y PR hacia `develop` — **solo con autorización expresa**.
       La descripción del PR debe decir que Cuentas necesita el compose del Gateway arriba y por qué
       el emulador no se movió a `cameia-infra` (spec §1.1)

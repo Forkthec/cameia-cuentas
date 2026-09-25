@@ -100,6 +100,11 @@ la configuración de la aplicación.
 
 Requiere un PostgreSQL 16 accesible en `DB_HOST:DB_PORT`.
 
+Con el emulador, `FIREBASE_AUTH_EMULATOR_HOST=localhost:9099` debe ser una **variable de entorno
+del sistema operativo** (la de la configuración de ejecución del IDE sirve), no una propiedad
+`-D`, un argumento ni una entrada de YAML: el Admin SDK solo lee el entorno del proceso y, si no
+la encuentra ahí, la aplicación se niega a arrancar. `FIREBASE_PROJECT_ID` debe empezar por `demo-`.
+
 ```powershell
 ./mvnw.cmd test            # pruebas
 ./mvnw.cmd clean package   # build

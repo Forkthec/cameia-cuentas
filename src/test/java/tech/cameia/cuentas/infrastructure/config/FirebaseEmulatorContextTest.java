@@ -2,12 +2,18 @@ package tech.cameia.cuentas.infrastructure.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
 
 /**
  * Verifica, con el contexto de Spring y la {@link FirebaseConfiguration} real, que la variable del
@@ -18,7 +24,9 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
  * guardia corre de verdad cuando Spring construye los beans. Usa {@link ApplicationContextRunner}
  * con solo esta configuración, así que no necesita PostgreSQL ni Testcontainers. La variable del
  * emulador, {@code K_SERVICE} y el perfil se pasan como propiedades, que {@code Environment}
- * resuelve igual que las variables de entorno que inyecta el despliegue.</p>
+ * resuelve igual que las variables de entorno que inyecta el despliegue. El caso positivo necesita la
+ * variable en el entorno del proceso (REQ-EMC-C04 de {@code specs/CM-188-correcciones/spec.md}): se
+ * simula sustituyendo la fuente {@code systemEnvironment}.</p>
  */
 class FirebaseEmulatorContextTest {
 
@@ -66,13 +74,40 @@ class FirebaseEmulatorContextTest {
      */
     @Test
     void emulatorHost_outsideDeployment_startsWithoutGoogleCredentials() {
-        runner.withPropertyValues("FIREBASE_AUTH_EMULATOR_HOST=localhost:9099",
-                        "cuentas.firebase.key-path=/ruta/que/no/existe/llave.json")
+        runner.withInitializer(FirebaseEmulatorContextTest::emulatorInProcess)
+                .withPropertyValues("cuentas.firebase.key-path=/ruta/que/no/existe/llave.json")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context).hasSingleBean(FirebaseAuth.class);
                     assertThat(context.getBean(FirebaseApp.class).getOptions().getProjectId())
                             .isEqualTo("demo-cameia");
                 });
+    }
+
+    /** REQ-EMC-C04: si la variable solo llega como propiedad de Spring, el contexto no arranca. */
+    @Test
+    void emulatorHost_onlyAsSpringProperty_failsStartup() {
+        runner.withPropertyValues("FIREBASE_AUTH_EMULATOR_HOST=localhost:9099")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .rootCause()
+                            .isInstanceOf(IllegalStateException.class)
+                            .hasMessageContaining("variable de entorno del sistema operativo");
+                });
+    }
+
+    /**
+     * Sustituye la fuente {@code systemEnvironment} por una copia del entorno real con la variable
+     * del emulador, como si el proceso la hubiera recibido del sistema operativo.
+     *
+     * @param context contexto que se está preparando
+     */
+    private static void emulatorInProcess(ConfigurableApplicationContext context) {
+        Map<String, Object> variables = new HashMap<>(System.getenv());
+        variables.put("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099");
+        context.getEnvironment().getPropertySources().replace(
+                StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+                new SystemEnvironmentPropertySource(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME, variables));
     }
 }

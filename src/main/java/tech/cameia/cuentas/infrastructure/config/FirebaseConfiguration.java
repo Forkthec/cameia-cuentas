@@ -3,6 +3,7 @@ package tech.cameia.cuentas.infrastructure.config;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Map;
 
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
@@ -19,7 +20,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.env.Environment;
+import org.springframework.core.env.ConfigurableEnvironment;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.env.StandardEnvironment;
 
 /**
  * Inicializa el Firebase Admin SDK, que es quien custodia las credenciales de los usuarios.
@@ -46,6 +49,13 @@ import org.springframework.core.env.Environment;
  * los acepta mientras la variable esté definida. Por eso, en un despliegue (Cloud Run, o perfil
  * {@code prod}) la variable impide el arranque: Cuentas no puede ignorarla, porque el SDK la
  * lee directamente del entorno.</p>
+ *
+ * <p>Como el SDK solo lee el entorno del proceso, el modo emulador se decide con esa misma fuente
+ * y no con el {@code Environment} de Spring, que también incluye propiedades {@code -D},
+ * argumentos y archivos YAML. Si Spring ve la variable y el proceso no, o con otro valor, el
+ * arranque falla: Cuentas entregaría credenciales ficticias y el SDK hablaría con Google. En modo
+ * emulador el ID de proyecto debe empezar por {@code demo-}, para que coincida con el del
+ * emulador y el del Gateway (CM-188).</p>
  */
 @Configuration
 @ConditionalOnProperty(name = "cuentas.firebase.enabled", havingValue = "true", matchIfMissing = true)
@@ -64,9 +74,12 @@ public class FirebaseConfiguration {
 
     private static final String DEPLOY_PROFILE = "prod";
 
+    /** Prefijo que el emulador exige a los ID de proyecto de demostración. */
+    private static final String DEMO_PROJECT_PREFIX = "demo-";
+
     private final String projectId;
     private final String keyPath;
-    private final Environment environment;
+    private final ConfigurableEnvironment environment;
 
     /**
      * Recibe la configuración del proyecto de Firebase.
@@ -74,13 +87,13 @@ public class FirebaseConfiguration {
      * @param projectId identificador del proyecto en Firebase Console
      * @param keyPath ruta al JSON de la cuenta de servicio; vacío en Cloud Run, donde se
      *                usan las credenciales por defecto del entorno
-     * @param environment entorno de Spring, del que se leen la variable del emulador,
-     *                    {@code K_SERVICE} y los perfiles activos
+     * @param environment entorno de Spring, del que se leen la variable del emulador (también en su
+     *                    fuente de variables del proceso), {@code K_SERVICE} y los perfiles activos
      */
     public FirebaseConfiguration(
             @Value("${cuentas.firebase.project-id}") String projectId,
             @Value("${cuentas.firebase.key-path:}") String keyPath,
-            Environment environment) {
+            ConfigurableEnvironment environment) {
         this.projectId = projectId;
         this.keyPath = keyPath;
         this.environment = environment;
@@ -90,12 +103,15 @@ public class FirebaseConfiguration {
      * Crea la instancia del SDK.
      *
      * @return aplicación de Firebase lista para usarse
-     * @throws IllegalStateException si las credenciales no se pueden leer, o si la variable del
-     *                               emulador está definida en un despliegue
+     * @throws IllegalStateException si las credenciales no se pueden leer; si la variable del
+     *                               emulador está definida en un despliegue, fuera del entorno del
+     *                               proceso o con un ID de proyecto que no es de demostración
      */
     @Bean
     public FirebaseApp firebaseApp() {
         rejectEmulatorInDeployment();
+        rejectEmulatorOutsideProcessEnvironment();
+        rejectNonDemoProjectInEmulator();
         try {
             FirebaseOptions opciones = FirebaseOptions.builder()
                     .setCredentials(resolverCredenciales())
@@ -137,18 +153,79 @@ public class FirebaseConfiguration {
 
     /**
      * Falla el arranque si la variable del emulador está definida en un despliegue. Cuenta como
-     * definida aunque su valor esté vacío: es el criterio más conservador.
+     * definida aunque su valor esté vacío, y se busca en Spring y en el entorno del proceso: es el
+     * criterio más conservador.
      *
      * @throws IllegalStateException si la variable existe y hay {@code K_SERVICE} o el perfil
      *                               {@code prod}
      */
     private void rejectEmulatorInDeployment() {
-        if (environment.containsProperty(EMULATOR_HOST_VARIABLE) && isDeployment()) {
+        boolean defined = environment.containsProperty(EMULATOR_HOST_VARIABLE)
+                || processVariable(EMULATOR_HOST_VARIABLE) != null;
+        if (defined && isDeployment()) {
             throw new IllegalStateException(EMULATOR_HOST_VARIABLE + " apunta al emulador de "
                     + "Firebase Auth, que emite tokens sin firma, y no puede estar definida en un "
                     + "despliegue (" + CLOUD_RUN_SERVICE_VARIABLE + " definida o perfil '"
                     + DEPLOY_PROFILE + "' activo)");
         }
+    }
+
+    /**
+     * Falla el arranque si Spring ve la variable del emulador con valor y el entorno del proceso no
+     * la tiene, o la tiene con otro valor. En ese caso el SDK no entraría en modo emulador y
+     * verificaría contra Google con credenciales ficticias.
+     *
+     * @throws IllegalStateException si la variable llegó por {@code -D}, argumentos o YAML
+     */
+    private void rejectEmulatorOutsideProcessEnvironment() {
+        String springValue = environment.getProperty(EMULATOR_HOST_VARIABLE);
+        if (springValue != null && !springValue.isBlank()
+                && !springValue.equals(processVariable(EMULATOR_HOST_VARIABLE))) {
+            throw new IllegalStateException(EMULATOR_HOST_VARIABLE + " debe definirse como variable de "
+                    + "entorno del sistema operativo: el Admin SDK de Firebase no lee propiedades -D, "
+                    + "argumentos -- ni archivos YAML. Se recomienda arrancar con docker compose (README.md)");
+        }
+    }
+
+    /**
+     * Falla el arranque si, en modo emulador, el ID de proyecto no es de demostración. Un ID real
+     * haría que Cuentas creara usuarios en un proyecto del emulador distinto al que valida el Gateway.
+     *
+     * @throws IllegalStateException si el ID de proyecto no empieza por {@code demo-}
+     */
+    private void rejectNonDemoProjectInEmulator() {
+        if (isEmulatorMode() && !projectId.startsWith(DEMO_PROJECT_PREFIX)) {
+            throw new IllegalStateException("Con " + EMULATOR_HOST_VARIABLE + " definida, FIREBASE_PROJECT_ID "
+                    + "debe empezar por '" + DEMO_PROJECT_PREFIX + "' y coincidir con el del emulador "
+                    + "(valor recibido: '" + projectId + "')");
+        }
+    }
+
+    /**
+     * @return {@code true} si la variable del emulador tiene valor en el entorno del proceso, que
+     *         es lo único que mira el Admin SDK
+     */
+    private boolean isEmulatorMode() {
+        String emulatorHost = processVariable(EMULATOR_HOST_VARIABLE);
+        return emulatorHost != null && !emulatorHost.isBlank();
+    }
+
+    /**
+     * Lee una variable de la fuente {@code systemEnvironment} de Spring, que envuelve
+     * {@code System.getenv()}. Se lee de esa fuente y no de {@code System.getenv} para poder
+     * sustituirla en las pruebas.
+     *
+     * @param name nombre de la variable
+     * @return su valor, o {@code null} si el proceso no la tiene
+     */
+    private String processVariable(String name) {
+        PropertySource<?> source = environment.getPropertySources()
+                .get(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME);
+        if (source == null || !(source.getSource() instanceof Map<?, ?> variables)) {
+            return null;
+        }
+        Object value = variables.get(name);
+        return value == null ? null : value.toString();
     }
 
     /**
@@ -169,11 +246,11 @@ public class FirebaseConfiguration {
      * @throws IOException si no hay credenciales por defecto o no se puede leer el archivo
      */
     private GoogleCredentials resolverCredenciales() throws IOException {
-        String emulatorHost = environment.getProperty(EMULATOR_HOST_VARIABLE);
-        if (emulatorHost != null && !emulatorHost.isBlank()) {
+        if (isEmulatorMode()) {
+            // CM-188 REQ-EMC-C05: el ID de proyecto se anuncia para compararlo con el emulador y el Gateway
             logger.warn("{} definida ({}): Firebase usa el emulador con credenciales ficticias y "
-                    + "acepta tokens sin firma. Solo para desarrollo local.",
-                    EMULATOR_HOST_VARIABLE, emulatorHost);
+                    + "acepta tokens sin firma, del proyecto '{}'. Solo para desarrollo local.",
+                    EMULATOR_HOST_VARIABLE, processVariable(EMULATOR_HOST_VARIABLE), projectId);
             return GoogleCredentials.create(new AccessToken("emulador-sin-credenciales", null));
         }
         if (keyPath == null || keyPath.isBlank()) {
