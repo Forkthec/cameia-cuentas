@@ -12,17 +12,21 @@ Una tarea a la vez; marcar `[x]` antes de pasar a la siguiente. Cada tarea cabe 
 ## Bloque 0 — Decisiones
 
 - [x] T-00 · Cerrar `CM-TBD-01` y `CM-TBD-02` con el equipo y anotar la decisión en el spec §4 — 24/09/2026: `CM-TBD-01` sí; `CM-TBD-02` después del Gateway
-- [ ] T-01 · Confirmar que `cameia-gateway` `CM-188-correcciones` (`1de0671`) está en `develop` o
-      fijar desde qué rama se levanta el emulador para probar la UI
+- [x] T-01 · Confirmar que `cameia-gateway` `CM-188-correcciones` (`1de0671`) está en `develop` o
+      fijar desde qué rama se levanta el emulador para probar la UI — 24/09/2026: no está en
+      `develop`; se levantó desde un worktree en `origin/CM-188-correcciones` (`c2aa0d1`)
 
 ## Bloque 1 — Emulator UI (REQ-EMC-C01, C02)
 
-- [ ] T-02 · Levantar el emulador desde el compose del Gateway y comprobar que `http://localhost:4000`
-      responde y que la pestaña *Authentication* carga
-- [ ] T-03 · Levantar Cuentas con `.env.example` por defecto, registrar un usuario y verificar en la
-      UI el usuario y el claim `plan=FREE`; guardar la evidencia para el PR
-- [ ] T-04 · `README.md`: párrafo de la Emulator UI y paso de verificación del registro (`REQ-EMC-C01`, `C02`)
-- [ ] T-05 · `.env.example`: línea que apunte a la UI junto a `FIREBASE_AUTH_EMULATOR_HOST`
+- [x] T-02 · Levantar el emulador desde el compose del Gateway y comprobar que `http://localhost:4000`
+      responde y que la pestaña *Authentication* carga — 24/09/2026: contenedor `healthy` en
+      `cameia-net`; `:4000` y `:9099` responden `200`; log "View Emulator UI at http://127.0.0.1:4000/"
+- [x] T-03 · Levantar Cuentas con `.env.example` por defecto, registrar un usuario y verificar en la
+      UI el usuario y el claim `plan=FREE`; guardar la evidencia para el PR — 24/09/2026: `201`
+      con `plan=FREE`; en el emulador (`accounts:lookup`, la API que usa la UI) el mismo `localId` con
+      `customAttributes {"plan":"FREE"}`. No se revisó visualmente en el navegador
+- [x] T-04 · `README.md`: párrafo de la Emulator UI y paso de verificación del registro (`REQ-EMC-C01`, `C02`)
+- [x] T-05 · `.env.example`: línea que apunte a la UI junto a `FIREBASE_AUTH_EMULATOR_HOST`
 
 ## Bloque 2 — Guardias de `FirebaseConfiguration` (solo si `CM-TBD-01` = sí)
 
