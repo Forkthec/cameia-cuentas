@@ -3,7 +3,7 @@
 - **Tarea:** CM-36 · Subtarea · «HU-1.1 – Backend: estado inicial de la cuenta nueva» · padre CM-14 «HU-1.1 Registro de Nuevo Usuario» · Sprint 2 · responsable: Paula Andrea Muñoz Delgado
 - **Repositorio:** `cameia-cuentas`, rama `CM-36-validaciones-registro`, creada desde `origin/develop` (`908112c`)
 - **Backlog vigente:** `05102026_01_Backlog.xlsx`, hoja `HE-01`, HU-1.1 (44 criterios) y su apartado «Cambios v4» (5-oct-2026)
-- **Estado:** spec completa de la tarea; **pendiente de aprobación de Paula**. Hay 12 preguntas abiertas (sección 15): ninguna impide empezar el bloque 1, salvo lo marcado «BLOQUEADO».
+- **Estado:** spec completa de la tarea; **pendiente de aprobación de Paula**. Hay 13 preguntas abiertas (sección 15): ninguna impide empezar el bloque 1, salvo lo marcado «BLOQUEADO».
 - **Atributos de calidad que toca:** seguridad (ASVS 6.2.4, 5.1, API3 y API6), compatibilidad de contrato (aditiva, con un cambio de textos), mantenibilidad y testabilidad (códigos de error y validación por capas), fiabilidad (sin 500 por entrada inválida).
 
 ## 1. Contexto y objetivo
@@ -33,7 +33,7 @@ Una sola spec; seis bloques, cada uno un PR hacia `develop` de menos de 1000 lí
 |---|---|---|---|
 | 1A | Formato de error con `code` en toda respuesta de error y en cada elemento de `errors[]` | H-14 de CM-283, estándar §3.6 | transversal (RT-01-CA05) |
 | 1B | Fecha estricta · mensaje de contraseña común · pronombre obligatorio · restricción de la base para los pronombres · documentación OpenAPI del registro | 1, 2 (mensaje) y 3 | CA-1.1.8, 1.1.15, 1.1.27 (mensaje), 1.1.43 |
-| 2 | Recorte y NFC de nombre, apellido y correo; cuenta de caracteres por puntos de código; un mensaje por campo en el orden fijado | 5 | CA-1.1.9 a 1.1.13 (espacios), 1.1.16 a 1.1.19, 1.1.42 |
+| 2 | Recorte y NFC de nombre, apellido y correo; cuenta de caracteres por puntos de código (incluida la contraseña); `EMAIL_TOO_LONG` en el borde; un mensaje por campo en el orden fijado | 5 | CA-1.1.9 a 1.1.13 (espacios), 1.1.16 a 1.1.19, 1.1.22, 1.1.42 |
 | 3 | `PersonName` (solo letras) | 4 | CA-1.1.31, 1.1.39, 1.1.40 |
 | 4 | Lista de 3000 contraseñas comunes | 2 (lista) | CA-1.1.27 (lista) |
 | 5 | Celular con `libphonenumber` | 6 | CA-1.1.32, 1.1.37, 1.1.38, 1.1.29 |
@@ -64,7 +64,7 @@ Fuera de alcance: ver sección 16.
 | 1.1.17 / 1.1.19 de 121 | F y B | 422 con «Los nombres no pueden superar los 120 caracteres» | Texto del CA y conteo correcto | 2 y 6 |
 | 1.1.20 correo con formato inválido | F y B | `IllegalArgumentException` → 422 **sin `field`** | Etiqueta `email` y texto | 6 |
 | 1.1.21 correo de 254 | F y B | Se acepta | Verificación V-01 (límite de Firebase) | 6 |
-| 1.1.22 correo de 255 | F y B | 422 sin `field` | Etiqueta y texto | 6 |
+| 1.1.22 correo de 255 | F y B | 422 sin `field` | Etiqueta, código y texto | 2 |
 | 1.1.23 a 1.1.26 contraseña de 11, 12, 64 y 65 | F y B | Cumple; textos sin punto | Textos del CA | 6 |
 | 1.1.27 contraseña común | F y B | 32 entradas; mensaje informal («…común brother…») | Mensaje literal (1B) y lista de 3000 (4) | 1B y 4 |
 | 1.1.28 confirmación distinta | F | — | — | — |
@@ -109,11 +109,11 @@ nombre del contrato JSON. Los mensajes van entre comillas y con su punto final, 
 
 ### Bloque 2 — reglas comunes
 
-- **REQ-RV-20.** Cuando `firstName`, `lastName` o `email` lleguen con espacios (incluidos los Unicode de `Character.isWhitespace` y el NBSP U+00A0) al inicio o al final, el servicio debe recortarlos antes de validar y de guardar. La contraseña no se recorta nunca.
+- **REQ-RV-20.** Cuando `firstName`, `lastName` o `email` lleguen con espacios al inicio o al final, el servicio debe recortarlos antes de validar y de guardar. «Espacio» es lo que recorta `String.prototype.trim` de JavaScript en el cliente: los de `Character.isWhitespace`, los separadores de espacio de Unicode (categoría Zs, incluido el NBSP U+00A0) y U+FEFF; no lo son U+200B ni los caracteres de control no listados (pregunta 13). Un texto que queda vacío tras recortar cuenta como vacío (`FIRST_NAME_REQUIRED`, `LAST_NAME_REQUIRED`, `EMAIL_REQUIRED`). Los espacios internos no se tocan. La contraseña no se recorta nunca.
 - **REQ-RV-21.** Cuando un texto llegue en forma Unicode distinta de NFC (por ejemplo `e` + U+0301), el servicio debe normalizarlo a NFC antes de contar, validar y guardar.
-- **REQ-RV-22.** Cuando se midan límites, «caracteres» son puntos de código Unicode del texto en NFC. Nombre y apellido: 1 a 120. Correo: 1 a 254. Contraseña: 12 a 64.
+- **REQ-RV-22.** Cuando se midan límites, «caracteres» son puntos de código Unicode del texto en NFC. Nombre y apellido: 1 a 120. Correo: 1 a 254. Contraseña: 12 a 64 (la contraseña se normaliza a NFC solo para contarla: a Firebase llega tal como se escribió). Si el nombre, el apellido o el correo superan el límite, el servicio debe responder 422 en su campo con `FIRST_NAME_TOO_LONG`, `LAST_NAME_TOO_LONG` o `EMAIL_TOO_LONG` («El correo no puede superar los 254 caracteres.»).
 - **REQ-RV-23.** Cuando un campo incumpla varias reglas, el servicio debe devolver solo el primer mensaje, en este orden. Nombre y apellido: vacío, más de 120, caracteres no permitidos. Correo: vacío, más de 254, formato. Contraseña: vacía, menos de 12, más de 64, común. Fecha: vacía, formato, futura, menor de 18, más de 110.
-- **REQ-RV-24.** Cuando `password` sea solo espacios, el servicio debe tratarla como vacía (`PASSWORD_REQUIRED`); una contraseña con espacios y otros caracteres (`mi clave larga 🙂`, 16 puntos de código) se acepta sin recortar (CA-1.1.41).
+- **REQ-RV-24.** Cuando `password` sea solo espacios (los de `String.isBlank`: espacio, tabulador, saltos de línea), el servicio debe tratarla como vacía (`PASSWORD_REQUIRED`); una contraseña formada solo por NBSP no cuenta como vacía y se mide como cualquier otra (diferencia aceptada con el cliente); una contraseña con espacios y otros caracteres (`mi clave larga 🙂`, 16 puntos de código) se acepta sin recortar (CA-1.1.41).
 - **REQ-RV-25.** Cuando el correo recortado y en minúsculas ya exista, un segundo registro con `  Ana@Correo.CO ` y otro con `ana@correo.co` deben resolverse como el mismo correo (CA-1.1.42).
 
 ### Bloque 3 — `PersonName`
@@ -139,7 +139,7 @@ nombre del contrato JSON. Los mensajes van entre comillas y con su punto final, 
 ### Bloque 6 — etiquetas, textos y pruebas
 
 - **REQ-RV-30.** Cuando el cuerpo no se pueda leer (JSON mal formado, un arreglo u objeto donde va un texto, `Content-Type` ilegible), el servicio debe responder 422 con `code` `REQUEST_BODY_INVALID_FORMAT` y el `detail` «Revisa el formato de los datos enviados.», sin el texto de la excepción de Jackson y sin la afirmación fija sobre el formato de la fecha que hoy incluye. (Pregunta 6: el estándar dice 400; el contrato publicado dice 422.)
-- **REQ-RV-60.** Cuando `email` no tenga formato válido, o supere 254 puntos de código, el servicio debe responder 422 con `field:"email"`, `code` `EMAIL_INVALID_FORMAT` o `EMAIL_TOO_LONG` y los textos «Ingresa un correo electrónico válido.» y «El correo no puede superar los 254 caracteres.».
+- **REQ-RV-60.** Cuando `email` no tenga formato válido, el servicio debe responder 422 con `field:"email"`, `code` `EMAIL_INVALID_FORMAT` y el texto «Ingresa un correo electrónico válido.» (la longitud la resuelve el bloque 2).
 - **REQ-RV-61.** Cuando `pronoun` sea un valor fuera de la lista (`OTRO`, `he`, `""`, `1`), el servicio debe responder 422 con `field:"pronoun"` y `code` `PRONOUN_INVALID_VALUE`. Texto: pregunta 10.
 - **REQ-RV-62.** Cuando el correo ya tenga credencial (cuenta activa, bloqueada, anonimizada o pendiente), el servicio debe responder 409 con `code` `EMAIL_ALREADY_REGISTERED` y el mensaje «Ese correo ya tiene una cuenta.», sin revelar el estado de la cuenta.
 - **REQ-RV-63.** Los mensajes de los demás campos deben ser los del catálogo de la sección 6 (pregunta 2).
@@ -196,7 +196,8 @@ lugar de la causa nueva «implausible»).
 | `BIRTH_DATE_REQUIRED`, `BIRTH_DATE_INVALID_FORMAT` | 422 | restricciones de `birthDate` | 1A y 1B |
 | `BIRTH_DATE_IN_THE_FUTURE`, `BIRTH_DATE_UNDERAGE`, `BIRTH_DATE_OUT_OF_RANGE` | 422 | `AgePolicy` (`InvalidBirthDateException.Reason`) | 1A |
 | `EMAIL_REQUIRED` | 422 | `@NotBlank` de `email` | 1A |
-| `EMAIL_TOO_LONG`, `EMAIL_INVALID_FORMAT` | 422 | `EmailAddress` | 6 |
+| `EMAIL_TOO_LONG` | 422 | restricción de longitud de `email` | 2 |
+| `EMAIL_INVALID_FORMAT` | 422 | `EmailAddress` | 6 |
 | `EMAIL_ALREADY_REGISTERED` | 409 | `EmailAlreadyRegisteredException` | 1A |
 | `PASSWORD_REQUIRED` | 422 | `@NotBlank` de `password` | 1A |
 | `PASSWORD_TOO_SHORT`, `PASSWORD_TOO_LONG`, `PASSWORD_TOO_COMMON` | 422 | `PasswordPolicy` (`WeakPasswordException`) | 1A |
@@ -284,6 +285,7 @@ Cobertura: ≥ 90 % de líneas y ramas de lo nuevo o modificado, medida con JaCo
 | D3 | Validación en dos fases: el borde devuelve todos sus errores a la vez; las reglas del dominio (edad, contraseña común, duplicado) se aplican después, de una en una | Es el diseño vigente y el más simple; el frontend ya valida todo antes de enviar. Agregarlo todo exigiría un validador que ejecute el dominio sin crear la cuenta | Agregar los errores de dominio a la lista (más código y el servicio dejaría de lanzar al primer fallo) | PENDIENTE (Paula), pregunta 7 |
 | D4 | El cuerpo ilegible sigue en **422** | Es el contrato publicado que consume Frontend (jerarquía: contrato publicado primero); el estándar sugiere 400 | Cambiar a 400: rompe lo publicado sin pedirlo ningún CA | PENDIENTE (Paula), pregunta 6 |
 | D5 | El pronombre obligatorio vive en la API; la columna sigue admitiendo `NULL` | La anonimización vacía el dato; el CA lo pide a nivel de API | `NOT NULL` en la base: rompe la anonimización | PENDIENTE (Paula) |
+| D7 | El recorte y la normalización NFC viven en el objeto de valor `SingleLineText` del dominio; el DTO los aplica en su constructor compacto (antes de la validación) y la restricción `@CodePointSize` cuenta puntos de código | Una sola definición de «espacio» y de «carácter» para el borde y el dominio; `@NotBlank` ve el texto ya recortado (así un NBSP solo cuenta como vacío); `@Size` cuenta unidades UTF-16 y no sirve para el límite en puntos de código | Normalizar solo en el controlador (la validación vería el texto sin recortar); una clase de utilidades estáticas (prohibida por el estándar); copiar la lógica en cada validador | PENDIENTE (Paula), pregunta 13 |
 | D6 | Bloque 1 en dos PR (1A formato de error, 1B correcciones) | Un solo PR superaría 900 líneas y mezclaría un refactor transversal con tres correcciones de comportamiento | Un PR único | PENDIENTE (Paula) |
 
 ## 14. Verificaciones previas de Backend
@@ -316,6 +318,12 @@ Cobertura: ≥ 90 % de líneas y ramas de lo nuevo o modificado, medida con JaCo
 | 10 | Texto de `PRONOUN_INVALID_VALUE` (el CA no lo define: solo cubre «sin elegir») | **PENDIENTE de Vela** | «Selecciona una opción.» | Bloque 6 |
 | 11 | Dependencia nueva `libphonenumber` (Java) en `pom.xml`: ¿se aprueba? Su versión se fija en la tarjeta con la última estable verificada en Maven Central | **PENDIENTE de Paula** | Sí (la exige el CA y es la misma librería del cliente) | Bloque 5 |
 | 12 | Acción para DevOps vía Vela: confirmar en staging `SELECT DISTINCT pronombres FROM microcuentas.cuenta` antes de desplegar la migración V3 | **PENDIENTE de Vela / Juan Diego Gomez** | Pedirlo en el documento a DevOps ya existente | Despliegue de 1B (no el código) |
+
+**Ronda 3**
+
+| # | Pregunta | A quién | Recomendación | Bloquea |
+|---|---|---|---|---|
+| 13 | ¿Qué es un «espacio» al recortar? Opciones: (a) el conjunto de `trim` de JavaScript (el del cliente), (b) solo `String.strip()` de Java, que deja pasar el NBSP | **PENDIENTE de Paula** | (a): cliente y servidor recortan igual (misma intención de V-05) | Bloque 2 |
 
 Además: la fecha de fin del Sprint 2 (Jira 12-oct, backlog 23-oct) y la estimación (la HU dice 5 h y 5 puntos; las seis piezas suman unas 22 h con pruebas y documentación) se llevan a Vela en el documento a Product Owner, sin pregunta nueva aquí.
 

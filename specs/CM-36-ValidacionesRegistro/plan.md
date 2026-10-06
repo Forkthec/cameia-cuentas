@@ -1,6 +1,6 @@
 # Plan — CM-36-ValidacionesRegistro
 
-Base: `origin/develop` `908112c`. Estado: pendiente de aprobación de Paula. Este plan contiene el **bloque 1** (dos PR: 1A y 1B). Los planes de los bloques 2 a 6 se
+Base: `origin/develop` `908112c`. Estado: pendiente de aprobación de Paula. Este plan contiene el **bloque 1** (dos PR: 1A y 1B, secciones 1 a 8) y el **bloque 2** (sección 9). Los planes de los bloques 3 a 6 se
 agregan a este archivo y a `tasks.md` antes de ejecutar cada uno, con el estado real del repositorio ese día; hoy solo se fijan su orden y sus dependencias (sección 7).
 
 ## 1. Cómo se aborda el bloque 1
@@ -97,3 +97,63 @@ Paralelo posible: bloque 4 con 2 y 3; el resto es secuencial porque comparten `R
 ## 8. Estimación
 
 1A ≈ 5 h (≈ 600 líneas con pruebas) · 1B ≈ 4,5 h (≈ 550 líneas). Total del bloque 1 ≈ 9,5 h (la HU entera estima 5 h; se informa a Vela).
+
+## 9. Bloque 2 — recorte, NFC y un mensaje por campo (PR 2)
+
+Base: el estado del repositorio **después de fusionar 1A y 1B** (las rutas y líneas de las tarjetas son las de `908112c` más lo que cambian esos PR; se revalidan al empezar). Se apoya en el
+`ErrorCode`, en la tabla de restricciones y en `RegisterUserRequest.toCommand()` del bloque 1. Cubre REQ-RV-20 a 25 y CA-1.1.9 a 1.1.13 (espacios), 1.1.16 a 1.1.19, 1.1.22 y 1.1.42.
+
+### 9.1 Cómo se aborda
+
+1. **`SingleLineText`** (dominio): objeto de valor que recorta con el conjunto de `trim` de JavaScript, normaliza a NFC y mide en puntos de código. Es la única definición de «espacio» y de «carácter».
+2. **`RegisterUserRequest`**: su constructor compacto aplica `SingleLineText.normalize(...)` a `firstName`, `lastName` y `email` **antes** de que Bean Validation los vea (los demás campos no se tocan). Así `@NotBlank` trata un NBSP solo como vacío y el comando ya lleva el texto recortado y en NFC.
+3. **`@CodePointSize(max, message)`** (borde): cuenta puntos de código del texto ya normalizado; sustituye a `@Size` en `firstName` y `lastName` y se agrega a `email` con 254 (nuevo código `EMAIL_TOO_LONG`, texto literal del CA «El correo no puede superar los 254 caracteres.»). Los textos existentes de nombre y apellido no cambian (bloque 6).
+4. **`EmailAddress`**: recorta con `SingleLineText`, pasa a minúsculas con `Locale.ROOT`, vuelve a normalizar a NFC y mide en puntos de código (invariante del dominio; sus excepciones y textos no cambian, los etiqueta el bloque 6).
+5. **`PasswordPolicy`**: cuenta los puntos de código del texto **normalizado a NFC solo para medirlo**; la contraseña que llega a Firebase no se modifica.
+6. **Un mensaje por campo en el orden fijado.** Se consigue por construcción: el borde (vacío, más de N) responde antes que el dominio (caracteres no permitidos —bloque 3—, formato de correo —bloque 6—, corta, larga, común). La matriz de la sección 9.4 lo fija con pruebas de campos que incumplen varias reglas a la vez.
+
+### 9.2 Archivos (paquete base `src/main/java/tech/cameia/cuentas`)
+
+| Acción | Archivo | Qué |
+|---|---|---|
+| Crear | `domain/model/SingleLineText.java` | Objeto de valor: `normalize(String)` y `length()` |
+| Modificar | `domain/model/EmailAddress.java` | Usa `SingleLineText`; longitud en puntos de código; NFC tras pasar a minúsculas |
+| Modificar | `domain/policy/PasswordPolicy.java` | Mide en puntos de código de NFC |
+| Crear | `presentation/dto/CodePointSize.java`, `presentation/dto/CodePointSizeValidator.java` | Restricción de longitud en puntos de código |
+| Modificar | `presentation/dto/RegisterUserRequest.java` | Constructor compacto; `@CodePointSize` en nombre, apellido y correo |
+| Modificar | `domain/exception/ErrorCode.java` | `EMAIL_TOO_LONG` |
+| Modificar | `presentation/advice/BusinessExceptionHandler.java` | Tabla: `firstName.CodePointSize`, `lastName.CodePointSize`, `email.CodePointSize`; se quitan las claves `.Size` |
+| Pruebas | `domain/model/SingleLineTextTest.java` (nuevo), `ValueObjectsTest`, `PasswordPolicyTest`, `presentation/dto/CodePointSizeValidatorTest` (nuevo), `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest` | Ver `tasks.md` |
+| No se tocan | `application/**`, `infrastructure/**`, `pom.xml`, migraciones | |
+
+### 9.3 Decisiones y alternativas (ver D7 de la spec)
+
+- Constructor compacto del `record` y no `@JsonDeserialize` ni un `Converter`: el `record` se construye siempre por su constructor canónico (Jackson y las pruebas), así la normalización no puede saltarse.
+- `SingleLineText.normalize(null)` devuelve `null`: `@NotBlank` sigue reportando la ausencia.
+- El límite de la base (`VARCHAR(120)`, que cuenta caracteres de PostgreSQL = puntos de código) coincide con el del código: sin migración.
+- No se recortan los demás campos: la contraseña nunca; `phoneNumber` en el bloque 5; `birthDate` es texto exacto (REQ-RV-10).
+
+### 9.4 Matriz de pruebas del bloque 2
+
+| Prueba | Valores literales | Requisito |
+|---|---|---|
+| `SingleLineTextTest` | `"  Ana  "`→`Ana`; `"\u00A0Ana\u00A0"`→`Ana`; `"\tAna\n"`→`Ana`; `"\uFEFFAna"`→`Ana`; `"\u200BAna"` se conserva; `"María  José"` conserva el doble espacio; `"e\u0301"` → `"é"` (NFC) con `length()` 1; `"𝒜"` (U+1D49C) con `length()` 1; `""`, `"   "`, `"\u00A0"` → `""`; `null` → `null` | REQ-RV-20, 21, 22 |
+| `ValueObjectsTest` (correo) | `"  Ana@Correo.CO "` → `ana@correo.co`; con NBSP en los extremos; `"a".repeat(248) + "@b.com"` (254) se acepta; 255 se rechaza; `"𝒜".repeat(126) + "@b.com"` (132 puntos de código, 258 unidades UTF-16) se acepta | REQ-RV-20 a 22, 25 |
+| `PasswordPolicyTest` | `"e\u0301".repeat(12)` (12 en NFC, 24 sin normalizar) se acepta; `"e\u0301".repeat(11)` → `PASSWORD_TOO_SHORT`; `"e\u0301".repeat(64)` se acepta; 65 → `PASSWORD_TOO_LONG` | REQ-RV-22 |
+| `CodePointSizeValidatorTest` | n−1, n, n+1 para 120 y 254; `null` válido; `𝒜`×120 válido y ×121 inválido | REQ-RV-22 |
+| `UserRegistrationControllerTest` | nombre `"  Ana  "` → el comando lleva `Ana`; `"\u00A0"` → `FIRST_NAME_REQUIRED`; 119/120/121 letras `ñ` → 201/201/`FIRST_NAME_TOO_LONG`; 119 `a` + `e\u0301` (NFD) → 201; `𝒜`×120 → 201 y ×121 → `FIRST_NAME_TOO_LONG`; apellido ídem; correo 253/254/255 → 201/201/`EMAIL_TOO_LONG` con texto literal; correo `"   "` → `EMAIL_REQUIRED`; contraseña `"  frase secreta larga  "` llega al comando **sin recortar**; contraseña de 12 espacios → `PASSWORD_REQUIRED` | REQ-RV-20 a 24 |
+| Un mensaje por campo | `firstName` = 121 `a` → un elemento `FIRST_NAME_TOO_LONG` (no también `…REQUIRED`); `email` = 255 `a` sin `@` → un elemento `EMAIL_TOO_LONG` (el formato no se evalúa); `firstName` `"   "` + `lastName` de 121 + `email` `"   "` → tres elementos, uno por campo | REQ-RV-23 |
+| E2E (Docker) | registrar `"  Ana@Correo.CO "` y luego `ana@correo.co` → 201 y 409; nombre de 120 `ñ` → 201 y la columna `nombre` guarda los 120 sin truncar; nombre en NFD → se guarda en NFC | REQ-RV-21, 25; CA-1.1.16, 1.1.42 |
+
+### 9.5 Riesgos del bloque 2
+
+| Riesgo | Mitigación |
+|---|---|
+| `Normalizer` sobre textos enormes (carga) | El cuerpo ya está limitado por el servidor (`maxPostSize`, verificado en el bloque 6); `normalize` recorre el texto una vez |
+| El constructor compacto cambia el valor que ve `toString()` o el registro de errores | `RegisterUserRequest` no se imprime nunca (lleva la contraseña); la prueba existente `laRespuestaNoDevuelveElCorreoNiLaContrasenia` sigue vigente |
+| Un correo con mayúsculas no ASCII (p. ej. `İ`) cambia de forma al pasar a minúsculas | Se vuelve a normalizar a NFC después de `toLowerCase(Locale.ROOT)` y se prueba |
+| Orden de las restricciones cuando un campo falla dos a la vez | El manejador conserva un elemento por campo (1A); las restricciones de vacío y de longitud no pueden fallar juntas |
+
+### 9.6 Orden y dependencias
+
+T-2.1 → T-2.2 y T-2.3 (independientes entre sí) → T-2.4 → T-2.5 → T-2.6 → T-2.7. **BLOQUEADO por la pregunta 13** (conjunto de «espacios»): T-2.1 y todo lo que usa `SingleLineText`; si Paula elige la opción (b), el único cambio es el cuerpo del método de recorte y la lista de casos de T-2.1. Estimación: 3 h, ≈ 350 líneas con pruebas.

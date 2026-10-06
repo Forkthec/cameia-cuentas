@@ -1,6 +1,6 @@
 # Tareas — CM-36-ValidacionesRegistro
 
-Estado: sin ejecutar; spec y plan pendientes de aprobación de Paula. Este archivo tiene las tarjetas del **bloque 1** (PR 1A y PR 1B). Las tarjetas de los bloques 2 a 6 se
+Estado: sin ejecutar; spec y plan pendientes de aprobación de Paula. Este archivo tiene las tarjetas del **bloque 1** (PR 1A y PR 1B) y del **bloque 2** (PR 2). Las tarjetas de los bloques 3 a 6 se
 agregan aquí antes de ejecutar cada bloque. Se marca `[x]` solo con la salida real de las pruebas pegada en el informe del PR.
 
 ## Reglas para todas las tarjetas (el modelo que ejecuta no lee la spec ni el plan)
@@ -351,6 +351,200 @@ Solo si Paula responde «sí, desde esta tarea». Si responde «no», se omite y
 
 ---
 
-# Bloques 2 a 6
+# PR 2 — recorte, NFC y un mensaje por campo
 
-Sus tarjetas se escriben antes de ejecutar cada uno (el plan del bloque 2 lo redacta la siguiente sesión de planificación). Orden y dependencias: `plan.md`, sección 7.
+Se ejecuta **después de fusionar 1A y 1B**; revalidar las rutas y líneas contra `origin/develop` ese día. Rama: `CM-36-recorte-nfc-registro` desde `develop`. Mensaje de commit: `CM-36 | fix(cuentas): <resultado> [IA-ASISTIDO]`. Aplican las reglas del inicio de este archivo.
+**Todas las tarjetas del PR 2 están BLOQUEADAS por la pregunta 13** hasta que Paula confirme qué es un «espacio»; la recomendación (a) es la que se escribe aquí.
+
+## [ ] T-2.1 · Objeto de valor `SingleLineText` — ≤ 30 min, ≈ 140 líneas
+
+- **Cubre:** REQ-RV-20, 21, 22. **Crear:** `domain/model/SingleLineText.java` y `src/test/.../domain/model/SingleLineTextTest.java`. **No tocar** nada más. `domain` no importa Spring ni otras capas: solo `java.text.Normalizer`.
+- **Código de referencia:**
+  ```java
+  package tech.cameia.cuentas.domain.model;
+
+  import java.text.Normalizer;
+
+  /**
+   * Texto de una línea tal como el negocio lo entiende: sin espacios en los extremos y en forma
+   * Unicode NFC, de modo que un mismo nombre escrito de dos maneras sea el mismo valor.
+   *
+   * <p>«Espacio» es lo que recorta {@code String.prototype.trim} de JavaScript en el cliente: los
+   * de {@link Character#isWhitespace(int)}, los separadores de espacio de Unicode (incluido el
+   * espacio duro U+00A0) y U+FEFF. Así cliente y servidor recortan igual. La longitud se cuenta
+   * en puntos de código, no en unidades {@code char}, para que un carácter fuera del plano básico
+   * valga uno.</p>
+   *
+   * @param value texto recortado y normalizado; vacío si no había nada más que espacios
+   */
+  public record SingleLineText(String value) {
+
+      /**
+       * Normaliza el texto recibido.
+       *
+       * @throws NullPointerException si el texto es nulo; quien admita la ausencia usa {@link #normalize(String)}
+       */
+      public SingleLineText {
+          value = normalize(java.util.Objects.requireNonNull(value));
+      }
+
+      /**
+       * Recorta y normaliza un texto sin rechazar la ausencia.
+       *
+       * @param raw texto recibido; puede ser {@code null}
+       * @return el texto recortado y en NFC, o {@code null} si {@code raw} era {@code null}
+       */
+      public static String normalize(String raw) {
+          if (raw == null) {
+              return null;
+          }
+          return trim(Normalizer.normalize(raw, Normalizer.Form.NFC));
+      }
+
+      /** @return cantidad de puntos de código del texto */
+      public int length() {
+          return value.codePointCount(0, value.length());
+      }
+
+      /** @return {@code true} si no queda ningún carácter tras recortar */
+      public boolean isEmpty() {
+          return value.isEmpty();
+      }
+
+      private static String trim(String text) {
+          int start = 0;
+          int end = text.length();
+          while (start < end && isSpace(text.codePointAt(start))) {
+              start += Character.charCount(text.codePointAt(start));
+          }
+          while (end > start && isSpace(text.codePointBefore(end))) {
+              end -= Character.charCount(text.codePointBefore(end));
+          }
+          return text.substring(start, end);
+      }
+
+      private static boolean isSpace(int codePoint) {
+          return Character.isWhitespace(codePoint)
+                  || Character.getType(codePoint) == Character.SPACE_SEPARATOR
+                  || codePoint == 0xFEFF;
+      }
+  }
+  ```
+  (Importar `java.util.Objects` en lugar del nombre completo.)
+- **Pruebas** (`SingleLineTextTest`, JUnit 5 y AssertJ sin Spring, nombres en español camelCase): una prueba o fila de `@ParameterizedTest` por cada valor de la matriz (`plan.md` §9.4, fila `SingleLineTextTest`): `"  Ana  "`→`Ana`; `"\u00A0Ana\u00A0"`→`Ana`; `"\tAna\n"`→`Ana`; `"\uFEFFAna"`→`Ana`; `"\u200BAna"` se conserva (no es espacio); `"María  José"` conserva el doble espacio interno; `"e\u0301"` (e + acento combinante) → `"é"` con `length()` 1; `"𝒜"` (U+1D49C) con `length()` 1 y `value().length()` 2; `""`, `"   "`, `"\u00A0"` → `isEmpty()`; `normalize(null)` → `null`; el constructor con `null` lanza `NullPointerException`.
+- **Trampas:** en el código fuente usar escapes `\u00A0`, `\uFEFF`, `\u0301` (no pegar los caracteres: el editor o el formateador los puede cambiar); `Character.isWhitespace` no considera espacio al U+00A0, por eso la segunda condición; el recorte debe avanzar por puntos de código, no por `char`.
+- **Verificación:** `./mvnw.cmd -q -B -Dtest=SingleLineTextTest test` en verde; `LayeredArchitectureTest` en verde.
+
+## [ ] T-2.2 · `EmailAddress` con `SingleLineText` — ≤ 20 min, ≈ 40 líneas
+
+- **Cubre:** REQ-RV-20, 21, 22, 25. **Modificar:** `domain/model/EmailAddress.java` (constructor compacto, líneas 34-45) y `ValueObjectsTest` (clase anidada del correo, línea 23 en adelante).
+- **Antes → después del constructor** (los mensajes de las excepciones **no cambian**):
+  ```java
+  // antes
+  if (value == null || value.isBlank()) { throw new IllegalArgumentException("El correo electrónico es obligatorio"); }
+  value = value.trim().toLowerCase(Locale.ROOT);
+  if (value.length() > MAX_LENGTH) { throw new IllegalArgumentException("El correo electrónico es demasiado largo"); }
+
+  // después
+  SingleLineText recortado = value == null ? null : new SingleLineText(value);
+  if (recortado == null || recortado.isEmpty()) { throw new IllegalArgumentException("El correo electrónico es obligatorio"); }
+  // se vuelve a normalizar tras pasar a minúsculas: algunas mayúsculas (como «İ») cambian de forma al convertirlas
+  value = SingleLineText.normalize(recortado.value().toLowerCase(Locale.ROOT));
+  if (value.codePointCount(0, value.length()) > MAX_LENGTH) { throw new IllegalArgumentException("El correo electrónico es demasiado largo"); }
+  ```
+  El resto (patrón de formato) no cambia. Actualizar el Javadoc: «sin espacios en los extremos (los mismos que recorta el cliente), en NFC y en minúsculas; el límite es de 254 puntos de código».
+- **Pruebas nuevas** (misma clase anidada, estilo de las existentes): `"  Ana@Correo.CO "` → `value()` = `ana@correo.co`; `"\u00A0ana@correo.co\u00A0"` → `ana@correo.co`; `"a".repeat(248) + "@b.com"` (254 puntos de código) se acepta; `"a".repeat(249) + "@b.com"` (255) lanza `IllegalArgumentException` con `hasMessage("El correo electrónico es demasiado largo")`; `"𝒜".repeat(126) + "@b.com"` (132 puntos de código y 258 unidades UTF-16) se acepta; `"\u00A0"` y `"   "` lanzan «es obligatorio»; dos correos que difieren solo en NFC/NFD (`"jose\u0301@correo.co"` y `"josé@correo.co"`) producen el mismo `value()`.
+- **Debe seguir en verde:** `rechazaUnValorSinArroba`, `rechazaUnValorSinDominio`, `rechazaUnValorVacio`, `seNormalizaAMinusculasYSinEspacios`.
+- **Verificación:** `./mvnw.cmd -q -B -Dtest=ValueObjectsTest test` en verde.
+
+## [ ] T-2.3 · `PasswordPolicy` mide en NFC — ≤ 20 min, ≈ 30 líneas
+
+- **Cubre:** REQ-RV-22. **Modificar:** `domain/policy/PasswordPolicy.java` (método `verify`) y `PasswordPolicyTest`.
+- **Cambio:** en `verify`, `int length = value.codePointCount(0, value.length());` pasa a
+  ```java
+  // La longitud se mide sobre la forma NFC para que un acento escrito con carácter combinante
+  // cuente igual que el mismo acento precompuesto; la contraseña en sí no se modifica.
+  String normalized = Normalizer.normalize(value, Normalizer.Form.NFC);
+  int length = normalized.codePointCount(0, normalized.length());
+  ```
+  `esConocida(value)` sigue comparando el texto original (recortado, en minúsculas): **no** se normaliza para comparar con la lista en este bloque.
+- **Pruebas nuevas:** `"e\u0301".repeat(12)` (24 puntos de código sin normalizar, 12 en NFC) → se acepta; `"e\u0301".repeat(11)` → `WeakPasswordException` con código `PASSWORD_TOO_SHORT`; `"e\u0301".repeat(64)` → se acepta; `"e\u0301".repeat(65)` → `PASSWORD_TOO_LONG`; el valor de la contraseña nunca aparece en el mensaje (prueba existente). Las pruebas de 11, 12, 64 y 65 caracteres y la del emoji **siguen en verde sin cambios**.
+- **Trampa:** no pasar la contraseña normalizada a `RawPassword` ni a Firebase.
+- **Verificación:** `./mvnw.cmd -q -B -Dtest=PasswordPolicyTest test` en verde.
+
+## [ ] T-2.4 · Restricción de longitud por puntos de código y normalización en el DTO — ≤ 30 min, ≈ 130 líneas
+
+- **Cubre:** REQ-RV-20 a 23. **Crear:** `presentation/dto/CodePointSize.java`, `presentation/dto/CodePointSizeValidator.java`, `src/test/.../presentation/dto/CodePointSizeValidatorTest.java`. **Modificar:** `presentation/dto/RegisterUserRequest.java`, `domain/exception/ErrorCode.java` (agregar `EMAIL_TOO_LONG`, con Javadoc), `presentation/advice/BusinessExceptionHandler.java` (tabla).
+- **Restricción** (mismo molde que `BirthDateFormat` del bloque 1):
+  ```java
+  @Documented
+  @Constraint(validatedBy = CodePointSizeValidator.class)
+  @Target({ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER})
+  @Retention(RetentionPolicy.RUNTIME)
+  public @interface CodePointSize {
+      /** @return máximo de puntos de código admitido */
+      int max();
+      String message() default "El texto supera el máximo de caracteres";
+      Class<?>[] groups() default {};
+      Class<? extends Payload>[] payload() default {};
+  }
+
+  public class CodePointSizeValidator implements ConstraintValidator<CodePointSize, String> {
+      private int max;
+      @Override public void initialize(CodePointSize anotacion) { this.max = anotacion.max(); }
+      @Override public boolean isValid(String value, ConstraintValidatorContext context) {
+          // La ausencia la reporta @NotBlank; aquí solo se mide lo que llegó
+          return value == null || value.codePointCount(0, value.length()) <= max;
+      }
+  }
+  ```
+  Javadoc completo en español (por qué no `@Size`: cuenta unidades UTF-16).
+- **`RegisterUserRequest`:** (1) constructor compacto al final del `record`:
+  ```java
+  public RegisterUserRequest {
+      // El borde valida y el comando recibe el texto ya recortado y en NFC: una sola definición de
+      // «espacio» y de «carácter». Los demás campos no se tocan; la contraseña nunca se recorta.
+      firstName = SingleLineText.normalize(firstName);
+      lastName = SingleLineText.normalize(lastName);
+      email = SingleLineText.normalize(email);
+  }
+  ```
+  (2) `@Size(max = 120, message = "Los nombres no pueden superar los 120 caracteres")` → `@CodePointSize(max = 120, message = "Los nombres no pueden superar los 120 caracteres")`; igual para `lastName` con su texto actual; (3) en `email`, agregar `@CodePointSize(max = 254, message = "El correo no puede superar los 254 caracteres.")` después de `@NotBlank`. Quitar el import de `Size` si queda sin uso.
+- **Tabla del manejador:** quitar `firstName.Size` y `lastName.Size`; agregar `Map.entry("firstName.CodePointSize", ErrorCode.FIRST_NAME_TOO_LONG)`, `Map.entry("lastName.CodePointSize", ErrorCode.LAST_NAME_TOO_LONG)` y `Map.entry("email.CodePointSize", ErrorCode.EMAIL_TOO_LONG)`. La prueba `todaRestriccionDelContratoTieneCodigo` del bloque 1 debe seguir en verde y exigir exactamente estas claves.
+- **Pruebas** (`CodePointSizeValidatorTest`, sobre un `record Caso(@CodePointSize(max = 5) String texto)`): `null`, `""`, 4, 5 → válidos; 6 → inválido; `"𝒜".repeat(5)` → válido (10 unidades UTF-16); `"𝒜".repeat(6)` → inválido.
+- **Trampas:** Jackson construye el `record` por su constructor canónico, así que el compacto siempre corre; `birthDate` y `phoneNumber` **no** se normalizan aquí.
+- **Verificación:** `./mvnw.cmd -B -Dtest='CodePointSizeValidatorTest,BusinessExceptionHandlerTest,UserRegistrationControllerTest' test` en verde.
+
+## [ ] T-2.5 · Pruebas del contrato: recorte, NFC, límites y un mensaje por campo — ≤ 30 min, ≈ 180 líneas
+
+- **Cubre:** REQ-RV-20 a 24; CA-1.1.9 a 1.1.13, 1.1.16 a 1.1.19, 1.1.22. **Modificar:** `UserRegistrationControllerTest`. Ayudas: `cuerpoConCampo(String campo, String valor)` que reemplaza el valor del campo en `cuerpoValido()` (escapar con `"\\u00A0"` en el texto Java, no el carácter pegado).
+- **Pruebas nuevas** (las que dicen «→ 422» verifican un único elemento con el `field`, `code` y mensaje indicados y `verify(servicio, never()).register(any(RegisterUserCommand.class))`):
+  1. `losTextosLlegaranRecortadosYEnNfcAlCasoDeUso`: `firstName` = `"  Ana  "`, `lastName` = `"\u00A0Pérez\u00A0"`, `email` = `"  Ana@Correo.CO "` → 201 y, con `ArgumentCaptor`, el comando lleva `Ana`, `Pérez` y `Ana@Correo.CO` (el correo se pasa a minúsculas en el dominio, no en el comando); `firstName` = `"Jose\u0301"` → el comando lleva `"José"` (NFC).
+  2. `unTextoQueSoloTieneEspaciosEsObligatorio` (`@ParameterizedTest @ValueSource`): `""`, `"   "`, `"\t"`, `"\n"`, `"\u00A0"`, `"\uFEFF"` para `firstName`, `lastName` y `email` → 422 con `FIRST_NAME_REQUIRED`, `LAST_NAME_REQUIRED`, `EMAIL_REQUIRED`; y la clave ausente y `null`.
+  3. `elNombreYElApellidoAdmitenExactamente120CaracteresYRechazan121`: letras `ñ` (119, 120 → 201; 121 → 422 `FIRST_NAME_TOO_LONG` / `LAST_NAME_TOO_LONG`); `"a".repeat(119) + "e\u0301"` → 201 (120 en NFC); `"𝒜".repeat(120)` → 201 y `"𝒜".repeat(121)` → 422.
+  4. `elCorreoAdmiteExactamente254PuntosDeCodigo`: 253 y 254 → 201; 255 → 422 `EMAIL_TOO_LONG` con `message` = `El correo no puede superar los 254 caracteres.` (CA-1.1.22). Construir con `"a".repeat(n - 6) + "@b.com"`.
+  5. `laContraseniaNoSeRecortaNiSeNormalizaAlLlegarAlCasoDeUso`: `"  frase secreta larga  "` → el comando lleva exactamente esos 23 caracteres con sus espacios; `"            "` (12 espacios) → 422 `PASSWORD_REQUIRED` con `field` = `password`.
+  6. `variosCamposQueIncumplenReglasDevuelvenUnSoloMensajePorCampo`: (a) `firstName` = `"a".repeat(121)` → un elemento `FIRST_NAME_TOO_LONG` y ninguno `FIRST_NAME_REQUIRED`; (b) `email` = `"a".repeat(255)` (sin `@`) → un elemento `EMAIL_TOO_LONG`; (c) `firstName` = `"   "`, `lastName` = `"a".repeat(121)`, `email` = `"   "` → exactamente tres elementos, uno por campo, con `FIRST_NAME_REQUIRED`, `LAST_NAME_TOO_LONG` y `EMAIL_REQUIRED`.
+- **Trampa:** el cuerpo es JSON escrito en un texto Java: un tabulador o un salto de línea reales dentro de un valor lo hacen ilegible (422 `REQUEST_BODY_INVALID_FORMAT`, no el error esperado). Para `	` y `
+` pasar el escape de JSON (en Java `"\t"` y `"\n"`); ` ` y `﻿` se escriben como escapes de Java y llegan como el carácter real, que JSON admite.
+- **Pruebas existentes a ajustar:** las que verificaban `Size` (si las hay) por el mismo texto no cambian; `elCorreoRepetido…` y las demás siguen igual.
+- **Verificación:** `./mvnw.cmd -B -Dtest=UserRegistrationControllerTest test` en verde.
+
+## [ ] T-2.6 · Pruebas de punta a punta — ≤ 30 min, ≈ 80 líneas
+
+- **Cubre:** REQ-RV-21, 25; CA-1.1.16, 1.1.42. **Modificar:** `AccountRegistrationEndToEndTest` (copiar la forma de la prueba de la línea 83 para el segundo registro).
+- **Pruebas nuevas:** (1) `unCorreoConEspaciosYMayusculasSeGuardaNormalizadoYBloqueaElSiguiente`: registrar con `"email":"  Ana@Correo.CO "` → 201; registrar de nuevo con `"ana@correo.co"` → 409 `EMAIL_ALREADY_REGISTERED`; el directorio de Firebase de pruebas tiene un solo usuario con `ana@correo.co`. (2) `unNombreDe120CaracteresSeGuardaCompleto`: `firstName` = `"ñ".repeat(120)` → 201 y `SELECT char_length(nombre) FROM microcuentas.cuenta WHERE firebase_uid = ?` igual a 120. (3) `unNombreEnNfdSeGuardaEnNfc`: `firstName` = `"Jose\u0301"` → 201 y `SELECT nombre` igual a `"José"` (cadena con `é`).
+- **Verificación:** con Docker, `./mvnw.cmd -B -Dtest=AccountRegistrationEndToEndTest test` en verde; sin Docker, decirlo.
+
+## [ ] T-2.7 · Cierre del PR 2 — ≤ 30 min
+
+- `./mvnw.cmd -B clean verify` con salida real, número de pruebas y cobertura JaCoCo de `SingleLineText`, `EmailAddress`, `PasswordPolicy`, `CodePointSize`, `CodePointSizeValidator`, `RegisterUserRequest` (≥ 90 % de líneas y ramas; la rama `null` de `normalize` y las de `isSpace` se cubren con T-2.1).
+- Revisión: `/simplify`, `/code-review high`, autochequeo (¿se normalizó la contraseña por descuido? ¿algún log con el correo?).
+- Aviso a Frontend: el servidor recorta y normaliza nombre, apellido y correo igual que el cliente; el correo de más de 254 caracteres responde 422 en `email` con `EMAIL_TOO_LONG`.
+- Entrega: PR `CM-36 | fix(cuentas): recorte, normalización NFC y límites por puntos de código en el registro [IA-ASISTIDO]`, plantilla completa, qué es mecánico (cambio de `@Size` a `@CodePointSize`) y qué importa revisar (`SingleLineText`, constructor compacto de `RegisterUserRequest`, `EmailAddress`).
+
+---
+
+# Bloques 3 a 6
+
+Sus tarjetas se escriben antes de ejecutar cada uno. Orden y dependencias: `plan.md`, sección 7.
