@@ -3,7 +3,7 @@
 - **Tarea:** CM-36 · Subtarea · «HU-1.1 – Backend: estado inicial de la cuenta nueva» · padre CM-14 «HU-1.1 Registro de Nuevo Usuario» · Sprint 2 · responsable: Paula Andrea Muñoz Delgado
 - **Repositorio:** `cameia-cuentas`, rama `CM-36-validaciones-registro`, creada desde `origin/develop` (`908112c`)
 - **Backlog vigente:** `05102026_01_Backlog.xlsx`, hoja `HE-01`, HU-1.1 (44 criterios) y su apartado «Cambios v4» (5-oct-2026)
-- **Estado:** spec completa de la tarea; **pendiente de aprobación de Paula**. Hay 13 preguntas abiertas (sección 15): ninguna impide empezar el bloque 1, salvo lo marcado «BLOQUEADO».
+- **Estado:** spec completa de la tarea; **pendiente de aprobación de Paula**. Hay 14 preguntas abiertas (sección 15): ninguna impide empezar el bloque 1, salvo lo marcado «BLOQUEADO».
 - **Atributos de calidad que toca:** seguridad (ASVS 6.2.4, 5.1, API3 y API6), compatibilidad de contrato (aditiva, con un cambio de textos), mantenibilidad y testabilidad (códigos de error y validación por capas), fiabilidad (sin 500 por entrada inválida).
 
 ## 1. Contexto y objetivo
@@ -243,7 +243,7 @@ Las tres correcciones con texto literal en el backlog (formato de fecha, contras
 | Concurrencia (doble envío) | No en esta tarea | CM-251 (registro repetido) |
 | Falla parcial | Sí | Ya cubierto por `RegisterUserServiceTest` (compensación); una validación que falla nunca llega a Firebase (`verify(directorio, never())`) |
 | Dependencias (Firebase lento o caído) | No cambia | Fuera de alcance; 500 genérico probado |
-| Carga (cuerpo grande, campos extra, JSON mal formado, tipo de contenido erróneo) | Sí | Campos extra ignorados; JSON mal formado y `text/plain` → REQ-RV-30 y 415 existente; cuerpo grande: Tomcat limita `maxPostSize` (verificación en bloque 6) |
+| Carga (cuerpo grande, campos extra, JSON mal formado, tipo de contenido erróneo) | Sí | Campos extra ignorados; JSON mal formado y `text/plain` → REQ-RV-30 y 415 existente; cuerpo grande: **hoy no hay límite** (`max-http-form-post-size` solo aplica a formularios): se mide en el bloque 6 y se decide con la pregunta 14 |
 
 ## 10. Reutilización
 
@@ -319,11 +319,12 @@ Cobertura: ≥ 90 % de líneas y ramas de lo nuevo o modificado, medida con JaCo
 | 11 | Dependencia nueva `libphonenumber` (Java) en `pom.xml`: ¿se aprueba? Su versión se fija en la tarjeta con la última estable verificada en Maven Central | **PENDIENTE de Paula** | Sí (la exige el CA y es la misma librería del cliente) | Bloque 5 |
 | 12 | Acción para DevOps vía Vela: confirmar en staging `SELECT DISTINCT pronombres FROM microcuentas.cuenta` antes de desplegar la migración V3 | **PENDIENTE de Vela / Juan Diego Gomez** | Pedirlo en el documento a DevOps ya existente | Despliegue de 1B (no el código) |
 
-**Ronda 3**
+**Ronda 3 (de 6 en 6: 13 y 14 forman la última)**
 
 | # | Pregunta | A quién | Recomendación | Bloquea |
 |---|---|---|---|---|
 | 13 | ¿Qué es un «espacio» al recortar? Opciones: (a) el conjunto de `trim` de JavaScript (el del cliente), (b) solo `String.strip()` de Java, que deja pasar el NBSP | **PENDIENTE de Paula** | (a): cliente y servidor recortan igual (misma intención de V-05) | Bloque 2 |
+| 14 | El cuerpo de `POST /api/v1/users` no tiene límite de tamaño (el servidor lo lee completo; OWASP API4). ¿Se propone una tarea aparte con un límite (p. ej. 16 KB) en un filtro de Cuentas, o se pide a DevOps un tope en el Gateway o en Cloud Run? | **PENDIENTE de Paula** (y Vela si hay tarea) | Tarea aparte con un filtro de Cuentas de 16 KB para este endpoint, más el tope del Gateway | Nada de CM-36; es un defecto de seguridad que se reporta |
 
 Además: la fecha de fin del Sprint 2 (Jira 12-oct, backlog 23-oct) y la estimación (la HU dice 5 h y 5 puntos; las seis piezas suman unas 22 h con pruebas y documentación) se llevan a Vela en el documento a Product Owner, sin pregunta nueva aquí.
 

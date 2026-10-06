@@ -149,11 +149,105 @@ Base: el estado del repositorio **después de fusionar 1A y 1B** (las rutas y l�
 
 | Riesgo | Mitigación |
 |---|---|
-| `Normalizer` sobre textos enormes (carga) | El cuerpo ya está limitado por el servidor (`maxPostSize`, verificado en el bloque 6); `normalize` recorre el texto una vez |
+| `Normalizer` sobre textos enormes (carga) | `normalize` recorre el texto una vez; hoy no existe un límite de tamaño del cuerpo (pregunta 14 de la spec, medido en T-6.6): el riesgo es el ya existente, no uno nuevo |
 | El constructor compacto cambia el valor que ve `toString()` o el registro de errores | `RegisterUserRequest` no se imprime nunca (lleva la contraseña); la prueba existente `laRespuestaNoDevuelveElCorreoNiLaContrasenia` sigue vigente |
 | Un correo con mayúsculas no ASCII (p. ej. `İ`) cambia de forma al pasar a minúsculas | Se vuelve a normalizar a NFC después de `toLowerCase(Locale.ROOT)` y se prueba |
 | Orden de las restricciones cuando un campo falla dos a la vez | El manejador conserva un elemento por campo (1A); las restricciones de vacío y de longitud no pueden fallar juntas |
 
 ### 9.6 Orden y dependencias
 
-T-2.1 → T-2.2 y T-2.3 (independientes entre sí) → T-2.4 → T-2.5 → T-2.6 → T-2.7. **BLOQUEADO por la pregunta 13** (conjunto de «espacios»): T-2.1 y todo lo que usa `SingleLineText`; si Paula elige la opción (b), el único cambio es el cuerpo del método de recorte y la lista de casos de T-2.1. Estimación: 3 h, ≈ 350 líneas con pruebas.
+T-2.1 → T-2.2 y T-2.3 (independientes entre sí) → T-2.4 → T-2.5 → T-2.6 → T-2.7. **BLOQUEADO por la pregunta 13 de la spec** (conjunto de «espacios»): T-2.1 y todo lo que usa `SingleLineText`; si Paula elige la opción (b), el único cambio es el cuerpo del método de recorte y la lista de casos de T-2.1. Estimación: 3 h, ≈ 350 líneas con pruebas.
+
+Las referencias «pregunta N» de los bloques 3 a 6 son las de la sección 15 de la spec.
+
+## 10. Bloque 3 — `PersonName`: nombre y apellido solo con letras (PR 3)
+
+Base: estado después de fusionar 1A, 1B y 2 (revalidar rutas al empezar). Cubre REQ-RV-31, 32; CA-1.1.31, 1.1.39, 1.1.40.
+
+**Cómo se aborda.** Un objeto de valor `PersonName` en `domain/model`, probado sin Spring, que recibe el texto ya recortado y en NFC (`SingleLineText`) y una parte (`FIRST_NAME` o `LAST_NAME`). Si el texto tiene un carácter fuera de `\p{L}`, `\p{M}`, espacio, apóstrofo recto, apóstrofo tipográfico (’) o guion `-`, o no tiene ninguna letra, lanza `InvalidPersonNameException` (nueva, hereda de `BusinessException`) con el código y el texto literal del CA y el nombre del campo. Vacío y más de 120 siguen siendo del borde (bloque 2); el objeto de valor los exige también como invariante defensiva con `IllegalArgumentException` (inalcanzable por la API: el borde responde antes). `RegisterUserService` crea los dos `PersonName` antes de llamar a Firebase y sigue pasando las cadenas a `Account.register`, que conserva su propia comprobación. No cambia `Account` ni la persistencia.
+
+| Acción | Archivo (base `src/main/java/tech/cameia/cuentas`) | Qué |
+|---|---|---|
+| Crear | `domain/model/PersonName.java` | Objeto de valor con `enum Part` (`FIRST_NAME`, `LAST_NAME`) que lleva el código, el nombre del campo JSON y el texto |
+| Crear | `domain/exception/InvalidPersonNameException.java` | Excepción con `getField()` |
+| Modificar | `domain/exception/ErrorCode.java` | `FIRST_NAME_INVALID_CHARACTERS`, `LAST_NAME_INVALID_CHARACTERS` |
+| Modificar | `application/service/RegisterUserService.java` | Valida los nombres antes de Firebase |
+| Modificar | `presentation/advice/BusinessExceptionHandler.java` | Manejador de la excepción nueva |
+| Pruebas | `PersonNameTest` (nueva), `RegisterUserServiceTest`, `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest` | Ver `tasks.md` |
+
+**Decisiones y descartes.** Objeto de valor en el dominio y no `@Pattern` en el DTO: la regla de negocio se prueba sin Spring y el límite de caracteres de `\p{M}` evita rechazar letras que solo existen con acento combinante. Se permiten todas las letras Unicode y los espacios internos tal como se escribieron (recomendación de la pregunta 8 de la spec, Vela): si Vela restringe el alfabeto, solo cambian la expresión y la lista de casos de T-3.1. Excepción propia y no `IllegalArgumentException`: el manejador de `IllegalArgumentException` desaparece en el bloque 6 y mostraba textos de cualquier librería (defecto 6).
+
+**Riesgos.** Una expresión regular con retroceso sobre 120 caracteres: se usa una clase de caracteres con `+` sin anidar, lineal. Nombres reales con caracteres no admitidos (`.` en «Jr.»): el CA los rechaza; se documenta en el PR.
+
+**Matriz.** Rechaza: `Ana3`, `Pérez_`, `---`, `'`, `’`, `Ana.`, `Ana@`, `<script>`, `12345`, `Ana–Luz` (guion largo U+2013), `Ana\u0000` (NUL), `Ana😀`. Acepta: `María José`, `O'Neill`, `O’Neill`, `Gómez-Ruiz`, `Müller`, `Muñoz`, `A`, `B`, `Ñandú`, `李`, `Åsa`, `María  José` (dos espacios internos), un nombre de 120 letras, `e` + acento combinante (queda en NFC). **BLOQUEADO por la pregunta 8 de la spec** solo en cuanto a `李` y los espacios dobles. Estimación: 2,5 h, ≈ 300 líneas.
+
+## 11. Bloque 4 — lista de 3000 contraseñas comunes (PR 4)
+
+Cubre REQ-RV-40 a 42; CA-1.1.27 (lista). **BLOQUEADO por V-03 / pregunta 3 de la spec** (fuente, licencia y entrega a `cameia-web`) en su parte de datos; el código se puede construir y probar antes con una lista de prueba.
+
+**Cómo se aborda.** `PasswordPolicy` deja de tener la lista en el código: recibe un `Set<String>` por su constructor (el patrón del repo: los datos entran por el constructor y los ensambla una configuración). `DomainPolicyConfiguration` carga el recurso `security/common-passwords.txt` (UTF-8, una contraseña por línea, minúsculas, sin líneas vacías) al arrancar, valida que haya al menos 3000 entradas, que cada una tenga 12 o más caracteres y que no haya repetidas, y falla el arranque con un mensaje claro si no. La carga vive en una clase de infraestructura (`CommonPasswordsLoader`) que se prueba sin contexto. Los datos van en un **commit aparte** (para que se revise como datos, no como código) junto con un `README` del recurso con la fuente, la licencia, la fecha y el comando que la generó.
+
+| Acción | Archivo | Qué |
+|---|---|---|
+| Crear | `infrastructure/config/CommonPasswordsLoader.java` | Lee, normaliza y valida el recurso |
+| Modificar | `domain/policy/PasswordPolicy.java` | Constructor `PasswordPolicy(Set<String>)`; se quita el `Set.of` y el constructor sin parámetros |
+| Modificar | `infrastructure/config/DomainPolicyConfiguration.java` | Ensambla la política con el cargador |
+| Crear (datos) | `src/main/resources/security/common-passwords.txt` y `src/main/resources/security/common-passwords.README.md` | Lista y procedencia |
+| Crear (pruebas) | `src/test/resources/security/common-passwords-test.txt` (20 entradas), `CommonPasswordsLoaderTest`, `CommonPasswordsFileTest` | Cargador y archivo real |
+| Modificar (pruebas) | `PasswordPolicyTest`, `RegisterUserServiceTest` (donde use `new PasswordPolicy()`) | Pasan una lista pequeña |
+
+**Decisiones y descartes.** Recurso en el classpath y no tabla de base de datos: es dato versionado de solo lectura que `cameia-web` debe poder tomar del repositorio. Se descarta una lista aleatoria de 3000 sin criterio de popularidad: se toman las 3000 más frecuentes de la fuente elegida que cumplen 12 o más caracteres. Si la fuente tiene menos de 3000 candidatas, se completa con una segunda fuente y se registran ambas.
+
+**Riesgos.** Diff de ≈ 3000 líneas de datos (se mide aparte, regla de la sección 17 de la spec); licencia de la fuente; los tres datos de prueba del CA (`123456789012`, `password1234`, `qwertyuiop123`) deben estar en la lista final (si la fuente no los trae, se detiene y se reporta); memoria: 3000 cadenas en un `Set`, despreciable.
+
+**Matriz.** Cargador: archivo válido de 20 → `Set` de 20; línea vacía, entrada de 11 caracteres, entrada con mayúsculas, entrada repetida, archivo con menos de 3000 (en la configuración real), archivo ausente → falla con mensaje que nombra la causa. Política: las tres contraseñas del CA, `PASSWORD1234` y `  password1234  ` se rechazan con `PASSWORD_TOO_COMMON`; una frase larga no. Archivo real: exactamente 3000 entradas, todas de 12 o más puntos de código, minúsculas, sin repetidas, con las tres de prueba. Estimación: 2 h, ≈ 150 líneas de código y ≈ 3000 de datos.
+
+## 12. Bloque 5 — celular con `libphonenumber` (PR 5)
+
+Cubre REQ-RV-50 a 53; CA-1.1.29, 1.1.32, 1.1.37, 1.1.38; V-05. **BLOQUEADO por la pregunta 11 de la spec** (dependencia nueva) y por la 9 (tipos de número).
+
+**Cómo se aborda.** (1) Se agrega la dependencia `com.googlecode.libphonenumber:libphonenumber` con la última versión estable que muestre `maven-metadata.xml` de Maven Central ese día. (2) `PhoneNumber` conserva la forma E.164 (`^\+[1-9][0-9]{7,14}$`) y agrega la comprobación de que `PhoneNumberUtil.parse(valor, null)` produce un número válido (`isValidNumber`) cuyo formato E.164 es igual al texto recibido (así `+57 300 000 0000` con espacios se rechaza). Si no lo es, lanza `InvalidPhoneNumberException` (nueva) con el código `PHONE_NUMBER_INVALID_FORMAT` y el texto del CA. (3) `RegisterUserRequest.toCommand()` convierte el celular vacío o en blanco en `null` (sin celular), y recorta los extremos. (4) Una prueba comprueba que todo número de ejemplo de `libphonenumber` (móvil y fijo de cada región) cumple la restricción `ck_cuenta_telefono_e164` de la base: REQ-RV-53.
+
+**Decisión D8 (pendiente de Paula, dentro de la pregunta 11 de la spec).** La librería se usa **directamente en el dominio** (sin puertos ni adaptadores) porque es una función pura, sin E/S ni marco, y es la forma más pequeña. El estándar dice «`domain` no importa Spring, JPA, Rabbit ni Google»; el paquete de la librería es `com.google.i18n.phonenumbers`, así que se pide confirmar que esa regla se refiere a los SDK de Google y no a una librería de cálculo. Alternativa si Paula dice no: un puerto `PhoneNumberChecker` en `domain/port`, un adaptador en `infrastructure/client` y un parámetro más en `RegisterUserService` (que ya tiene 4: se agruparía en un `RegistrationPolicies`); cuesta ≈ 120 líneas más.
+
+| Acción | Archivo | Qué |
+|---|---|---|
+| Modificar | `pom.xml` | Dependencia nueva (la única del bloque) |
+| Modificar | `domain/model/PhoneNumber.java` | Comprobación con `libphonenumber` |
+| Crear | `domain/exception/InvalidPhoneNumberException.java` | Con `getField()` = `phoneNumber` |
+| Modificar | `domain/exception/ErrorCode.java` | `PHONE_NUMBER_INVALID_FORMAT` |
+| Modificar | `presentation/dto/RegisterUserRequest.java` | `toCommand()` convierte vacío en `null` |
+| Modificar | `presentation/advice/BusinessExceptionHandler.java` | Manejador de la excepción nueva |
+| Pruebas | `ValueObjectsTest`, `PhoneNumberDatabaseCompatibilityTest` (nueva), `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest` | Ver `tasks.md` |
+
+**Riesgos.** La restricción de la base exige entre 8 y 15 dígitos en total: un número válido más corto (algunos territorios tienen números de 7 dígitos con el indicativo) haría fallar el `INSERT` con un 500; la prueba de compatibilidad lo detecta y, si ocurre, se detiene y se pregunta (migración V4 que relaje el mínimo, o rechazarlo). Diferencias de versión entre la librería Java y `libphonenumber-js`: V-05 las compara con los valores del CA y las informa a Frontend. Tamaño del artefacto (la librería pesa ≈ 0,5 MB): aceptable. Rendimiento: `PhoneNumberUtil.getInstance()` es un singleton; no hay E/S.
+
+**Matriz.** Acepta: `+573000000000`, `+34612345678`, un fijo colombiano (`+576012345678`), `+14155552671`. Rechaza (`PHONE_NUMBER_INVALID_FORMAT`): `12345`, `+57300`, `3000000000` (sin `+`), `+57 300 000 0000` (espacios), `+99912345678` (código de país inexistente), `+5730000000000000` (demasiado largo), `+573000000000abc`. Sin celular: ausente, `null`, `""`, `"   "`. Estimación: 3 h, ≈ 350 líneas.
+
+## 13. Bloque 6 — etiquetas, textos y pruebas que faltan (PR 6)
+
+Cubre REQ-RV-30, 60 a 65; CA-1.1.2 a 1.1.7, 1.1.20 a 1.1.26, 1.1.41; V-01, V-06. **BLOQUEADO por las preguntas 2 (textos), 6 (422 frente a 400) y 10 (texto del pronombre inválido) de la spec** para sus tarjetas T-6.3, T-6.2 y T-6.2 respectivamente; T-6.1, T-6.4, T-6.5 y T-6.6 no dependen de ellas.
+
+**Cómo se aborda.** (1) `EmailAddress` lanza `InvalidEmailException` (nueva, con `EMAIL_INVALID_FORMAT` y `EMAIL_TOO_LONG` como invariante) y deja de lanzar `IllegalArgumentException`. (2) Se **elimina** el manejador de `IllegalArgumentException` (defecto 6): una `IllegalArgumentException` inesperada pasa a ser un 500 genérico con `INTERNAL_ERROR`, que es lo correcto. (3) `cuerpoIlegible` distingue: si la ruta del error de Jackson apunta a `pronoun`, responde un elemento `{field:"pronoun", code:"PRONOUN_INVALID_VALUE"}`; si no, `REQUEST_BODY_INVALID_FORMAT` con el texto «Revisa el formato de los datos enviados.» (sin la afirmación sobre la fecha). (4) Se rechaza el número como valor de un enumerado con la propiedad de Jackson que corresponda (V-06 comprueba su nombre). (5) Se alinean los textos con el catálogo de la sección 5 de la spec (tabla de la tarjeta T-6.3). (6) Se completan las pruebas de edad con reloj fijo y las de los casos 1.1.41 y 1.1.42.
+
+| Acción | Archivo | Qué |
+|---|---|---|
+| Crear | `domain/exception/InvalidEmailException.java` | Con `getField()` = `email` |
+| Modificar | `domain/model/EmailAddress.java` | Lanza la excepción nueva |
+| Modificar | `domain/exception/ErrorCode.java` | `EMAIL_INVALID_FORMAT`, `PRONOUN_INVALID_VALUE` |
+| Modificar | `presentation/advice/BusinessExceptionHandler.java` | Manejador de `InvalidEmailException`; se elimina `valorInvalido`; `cuerpoIlegible` |
+| Modificar | `application.properties` | Propiedad de Jackson contra números como enumerado |
+| Modificar | `RegisterUserRequest`, `PasswordPolicy`, `AgePolicy`, `EmailAlreadyRegisteredException`, `Pronoun` (Javadoc) | Textos del catálogo |
+| Pruebas | `AgePolicyTest`, `ValueObjectsTest`, `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest`, `BusinessExceptionHandlerTest` | Ver `tasks.md` |
+
+**Decisiones y descartes.** Eliminar el manejador de `IllegalArgumentException` en vez de dejarlo: cada objeto de valor ya tiene su excepción tipada, y dejarlo reintroduce la fuga de mensajes de librerías. Mensajes del catálogo: los pide el CA y RT-01 (pregunta 2 de la spec); si Vela dice que no, esta tarjeta se omite y los textos quedan como están.
+
+**Hallazgo sobre el tamaño del cuerpo.** No existe hoy un límite de tamaño del cuerpo de `POST /api/v1/users`: `server.tomcat.max-http-form-post-size` aplica solo a formularios, no a JSON; el servidor lee el cuerpo completo (OWASP API4, consumo de recursos). En este bloque solo se **mide** (T-6.6); el límite se propone como tarea aparte (pregunta 14 de la spec).
+
+**Riesgos.** El cambio de textos rompe las pruebas de Frontend que comparan texto (se avisa); la propiedad contra números como enumerado puede no existir con ese nombre en Jackson 3 (V-06: si no existe, se detiene y se propone un deserializador de enumerados estricto); los 422 sin `field` que hoy ve Frontend ahora llevan `field` (aditivo).
+
+**Matriz.** Correo: `ana`, `ana@correo`, `ana@@correo.co`, `ana@correo..co`, `ana @correo.co` → `EMAIL_INVALID_FORMAT` en `email`; válidos `ana@correo.co`, `ana.perez+cameia@correo.com`, `ANA@Correo.CO`. Pronombre: `OTRO`, `he`, `""`, `1`, `true` → `PRONOUN_INVALID_VALUE`. Edad con reloj fijo: cumple 18 hoy (acepta) y mañana (rechaza); cumple 111 mañana (acepta) y hoy (rechaza `BIRTH_DATE_OUT_OF_RANGE`); nacido el 29/02/2000 con hoy 28/02/2018 (17 años, rechaza) y 01/03/2018 (18, acepta); nacido el 31/12 y el 01/01; fecha de mañana (`BIRTH_DATE_IN_THE_FUTURE`). CA-1.1.41: contraseña `mi clave larga 🙂` (16 puntos de código) se acepta sin recortar. CA-1.1.42: `  Ana@Correo.CO ` y luego `ana@correo.co` → 201 y 409. Estimación: 5 h, ≈ 700 líneas.
+
+## 14. Orden y dependencias de los bloques 3 a 6
+
+3 después de 2 · 4 independiente (puede ir en paralelo con 2 y 3 cuando haya fuente) · 5 después de 3 (comparten el manejador y `toCommand()`) · 6 al final. Los cuatro tocan `BusinessExceptionHandler`, `RegisterUserRequest` y `ErrorCode`: un solo PR abierto a la vez en esos archivos para no tener choques de fusión.

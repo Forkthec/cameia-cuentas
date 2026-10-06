@@ -354,7 +354,7 @@ Solo si Paula responde «sí, desde esta tarea». Si responde «no», se omite y
 # PR 2 — recorte, NFC y un mensaje por campo
 
 Se ejecuta **después de fusionar 1A y 1B**; revalidar las rutas y líneas contra `origin/develop` ese día. Rama: `CM-36-recorte-nfc-registro` desde `develop`. Mensaje de commit: `CM-36 | fix(cuentas): <resultado> [IA-ASISTIDO]`. Aplican las reglas del inicio de este archivo.
-**Todas las tarjetas del PR 2 están BLOQUEADAS por la pregunta 13** hasta que Paula confirme qué es un «espacio»; la recomendación (a) es la que se escribe aquí.
+**Todas las tarjetas del PR 2 están BLOQUEADAS por la pregunta 13 de la spec** hasta que Paula confirme qué es un «espacio»; la recomendación (a) es la que se escribe aquí.
 
 ## [ ] T-2.1 · Objeto de valor `SingleLineText` — ≤ 30 min, ≈ 140 líneas
 
@@ -544,6 +544,241 @@ Se ejecuta **después de fusionar 1A y 1B**; revalidar las rutas y líneas contr
 
 ---
 
-# Bloques 3 a 6
+# PR 3 — `PersonName`: solo letras
 
-Sus tarjetas se escriben antes de ejecutar cada uno. Orden y dependencias: `plan.md`, sección 7.
+Se ejecuta después de fusionar el PR 2. Rama `CM-36-nombre-solo-letras` desde `develop`. Aplican las reglas del inicio de este archivo. Revalidar rutas y líneas contra `origin/develop`.
+
+## [ ] T-3.1 · Objeto de valor `PersonName` y su excepción — ≤ 30 min, ≈ 150 líneas — **BLOQUEADA en `李` y espacios dobles por la pregunta 8 de la spec**
+
+- **Cubre:** REQ-RV-31, 32. **Crear:** `domain/model/PersonName.java`, `domain/exception/InvalidPersonNameException.java`, `src/test/.../domain/model/PersonNameTest.java`. **Modificar:** `domain/exception/ErrorCode.java` (agregar `FIRST_NAME_INVALID_CHARACTERS` y `LAST_NAME_INVALID_CHARACTERS` con su Javadoc).
+- **Código de referencia:**
+  ```java
+  /** Nombres o apellidos de una persona: solo letras, espacios, apóstrofo y guion. */
+  public final class PersonName {
+
+      /** Parte del nombre completo; lleva el código, el campo del contrato y el texto del rechazo. */
+      public enum Part {
+          FIRST_NAME(ErrorCode.FIRST_NAME_INVALID_CHARACTERS, "firstName",
+                  "El nombre solo puede contener letras, espacios, apóstrofo y guion."),
+          LAST_NAME(ErrorCode.LAST_NAME_INVALID_CHARACTERS, "lastName",
+                  "El apellido solo puede contener letras, espacios, apóstrofo y guion.");
+          // campos finales, constructor y accesores code(), field(), message()
+      }
+
+      private static final int MAX_LENGTH = 120;
+      /** Letras Unicode, marcas combinantes, espacio, apóstrofo recto y tipográfico (’) y guion. */
+      private static final Pattern ALLOWED = Pattern.compile("^[\\p{L}\\p{M} '’-]+$");
+      private static final Pattern HAS_LETTER = Pattern.compile("\\p{L}");
+
+      private final String value;
+
+      public PersonName(String raw, Part part) { ... }   // ver el párrafo siguiente
+  }
+  ```
+  `PersonName` es una **clase final inmutable** (no un `record`: su constructor recibe el texto y la parte) con `private final String value`, constructor `PersonName(String raw, Part part)` y `value()`. El constructor: `SingleLineText text = new SingleLineText(raw)` (si `raw` es `null`, `IllegalArgumentException("El nombre es obligatorio")`); si `text.isEmpty()` → `IllegalArgumentException("El nombre es obligatorio")`; si `text.length() > 120` → `IllegalArgumentException("El nombre supera 120 caracteres")` (invariantes defensivas: el borde ya respondió); si `!ALLOWED.matcher(v).matches() || !HAS_LETTER.matcher(v).find()` → `throw new InvalidPersonNameException(part)`. `InvalidPersonNameException extends BusinessException` con `super(part.code(), part.message())` y `getField()` que devuelve `part.field()`. Javadoc completo en español (por qué se admiten las marcas combinantes, por qué el apóstrofo tipográfico).
+- **Pruebas** (`PersonNameTest`, sin Spring; `@ParameterizedTest @ValueSource` para cada lista): inválidos con `Part.FIRST_NAME` y con `Part.LAST_NAME` (el mensaje y el código son los de cada parte): `Ana3`, `Pérez_`, `---`, `'`, `’`, `Ana.`, `Ana@`, `<script>`, `12345`, `Ana–Luz`, `Ana😀`, y el NUL como `"Ana" + (char) 0`. Válidos: `María José`, `O'Neill`, `O’Neill`, `Gómez-Ruiz`, `Müller`, `Muñoz`, `A`, `B`, `Ñandú`, `李`, `Åsa`, `María  José`, `"a".repeat(120)`, `"Jose\u0301"` (su `value()` es `José`). Defensivas: `""`, `"   "` y 121 letras lanzan `IllegalArgumentException`. `toString` no se sobrescribe (el nombre no es secreto, pero no se registra: no hay logs en la clase).
+- **Trampas:** en el fuente, escribir `\\p{L}` con dos barras dentro de la cadena Java; el apóstrofo tipográfico va como el carácter ’ (el proyecto compila en UTF-8); el guion al final de la clase `[...-]` no define un rango.
+- **Verificación:** `./mvnw.cmd -q -B -Dtest=PersonNameTest test` en verde; `LayeredArchitectureTest` en verde (el dominio no importa Spring).
+
+## [ ] T-3.2 · El servicio valida los nombres antes de Firebase — ≤ 20 min, ≈ 30 líneas
+
+- **Cubre:** REQ-RV-31. **Modificar:** `application/service/RegisterUserService.java` (método `register`, antes de `directorio.createUser`) y `RegisterUserServiceTest`.
+- **Cambio:** después de construir `email`, `password` y `birthDate`, agregar
+  ```java
+  PersonName firstName = new PersonName(command.firstName(), PersonName.Part.FIRST_NAME);
+  PersonName lastName = new PersonName(command.lastName(), PersonName.Part.LAST_NAME);
+  ```
+  y pasar `firstName.value()` y `lastName.value()` a `Account.register(...)`. Agregar `@throws InvalidPersonNameException` al Javadoc.
+- **Pruebas** (con el doble `InMemoryFirebaseUserDirectory`, como las existentes): `unNombreConNumerosNoCreaCredencialNiCuenta` (`Ana3` → `InvalidPersonNameException`, el directorio queda sin usuarios y el repositorio sin cuentas); lo mismo con apellido `Pérez_`; `unNombreConTildesSeGuardaTalCual` (`María José` y `Gómez-Ruiz`).
+- **Verificación:** `./mvnw.cmd -B -Dtest=RegisterUserServiceTest test` en verde.
+
+## [ ] T-3.3 · Manejador y pruebas del contrato — ≤ 30 min, ≈ 90 líneas
+
+- **Cubre:** REQ-RV-31; CA-1.1.31, 1.1.39, 1.1.40. **Modificar:** `presentation/advice/BusinessExceptionHandler.java`, `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest`.
+- **Manejador** (mismo molde que `fechaInvalida`): `@ExceptionHandler(InvalidPersonNameException.class) ProblemDetail nombreInvalido(InvalidPersonNameException error)` → 422, título `Datos no válidos`, `code` de nivel superior `VALIDATION_FAILED`, `errors` con un elemento `campo(error.getField(), error.getErrorCode(), error.getMessage())`.
+- **Pruebas del controlador:** el servicio simulado lanza `new InvalidPersonNameException(Part.FIRST_NAME)` → 422, `field` = `firstName`, `code` = `FIRST_NAME_INVALID_CHARACTERS`, `message` = «El nombre solo puede contener letras, espacios, apóstrofo y guion.»; igual con `LAST_NAME`.
+- **E2E (Docker):** (1) `Ana3` y `Pérez_` → 422 en cada campo y sin rastro (misma comprobación que la prueba del menor de edad); (2) `María José`/`Gómez-Ruiz`, `O'Neill`/`Müller` y `A`/`B` → 201 y la fila guarda los textos tal cual.
+- **Verificación:** `./mvnw.cmd -B -Dtest='UserRegistrationControllerTest,AccountRegistrationEndToEndTest,BusinessExceptionHandlerTest' test` en verde.
+
+## [ ] T-3.4 · Cierre del PR 3 — ≤ 30 min
+
+`clean verify` con salida real y cobertura de `PersonName`, `InvalidPersonNameException`, `RegisterUserService` (≥ 90 %); `/simplify`, `/code-review high`; aviso a Frontend (nuevos códigos de nombre y apellido; los textos son los del CA). PR: `CM-36 | feat(cuentas): nombre y apellido solo con letras, espacios, apóstrofo y guion [IA-ASISTIDO]`.
+
+---
+
+# PR 4 — lista de 3000 contraseñas comunes
+
+Rama `CM-36-contrasenas-comunes` desde `develop`. **Las tarjetas T-4.1 y T-4.2 (código) no dependen de la fuente; T-4.3 (datos) está BLOQUEADA por V-03 / pregunta 3 de la spec.** Los datos van en un commit aparte.
+
+## [ ] T-4.1 · La política recibe la lista por constructor — ≤ 30 min, ≈ 90 líneas
+
+- **Cubre:** REQ-RV-40. **Modificar:** `domain/policy/PasswordPolicy.java`, `PasswordPolicyTest`, `RegisterUserServiceTest` y cualquier otra prueba que haga `new PasswordPolicy()` (buscar con `git grep "new PasswordPolicy"`).
+- **Cambio:** quitar el `Set.of(...)` de 32 entradas y el comentario que lo justifica; agregar `private final Set<String> commonPasswords;` y
+  ```java
+  /**
+   * @param commonPasswords contraseñas rechazadas aunque cumplan la longitud, ya en minúsculas;
+   *                        la lista que usa la aplicación se carga de un recurso versionado
+   */
+  public PasswordPolicy(Set<String> commonPasswords) {
+      this.commonPasswords = Set.copyOf(commonPasswords);
+  }
+  ```
+  y `esConocida` usa `commonPasswords`. Sin constructor sin parámetros. Actualizar el Javadoc de la clase (la lista ya no está en el código; el comparador ignora mayúsculas y recorta los extremos).
+- **Pruebas:** en `PasswordPolicyTest` y `RegisterUserServiceTest`, `new PasswordPolicy(Set.of("123456789012", "password1234", "qwertyuiop123"))`. Mantener todas las pruebas existentes (11/12/64/65 caracteres, emoji, ignora mayúsculas y espacios, valor nunca en el mensaje) y agregar: una contraseña que no está en la lista pasa aunque se parezca (`password12345` con una lista que solo tiene `password1234`); la lista vacía no rechaza nada.
+- **Verificación:** `./mvnw.cmd -B -Dtest='PasswordPolicyTest,RegisterUserServiceTest' test` en verde. Esta tarjeta deja la aplicación sin bean de política hasta T-4.2: no ejecutar el contexto completo entre ambas.
+
+## [ ] T-4.2 · Cargador del recurso y ensamblado — ≤ 30 min, ≈ 130 líneas
+
+- **Cubre:** REQ-RV-40, 41. **Crear:** `infrastructure/config/CommonPasswordsLoader.java`, `src/test/resources/security/common-passwords-test.txt` (20 contraseñas de 12 o más caracteres en minúsculas, una por línea, incluidas las tres del CA), `src/test/.../infrastructure/config/CommonPasswordsLoaderTest.java`. **Modificar:** `infrastructure/config/DomainPolicyConfiguration.java` (método `passwordPolicy`).
+- **Código de referencia:**
+  ```java
+  /** Lee la lista de contraseñas comunes y comprueba que cumple lo que la política supone de ella. */
+  public final class CommonPasswordsLoader {
+      static final int MINIMUM_ENTRIES = 3000;
+      static final int MINIMUM_LENGTH = 12;
+
+      /**
+       * @param resource recurso UTF-8 con una contraseña por línea
+       * @param minimumEntries mínimo de entradas exigido
+       * @return conjunto inmutable de contraseñas en minúsculas
+       * @throws IllegalStateException con la causa exacta si el recurso falta, está vacío, tiene menos entradas
+       *         de las exigidas, una línea vacía, una entrada de menos de 12 caracteres, con mayúsculas o repetida
+       */
+      public static Set<String> load(Resource resource, int minimumEntries) { ... }
+  }
+  ```
+  Reglas: leer con `StandardCharsets.UTF_8`, una línea = una entrada; línea vacía, entrada de menos de 12 puntos de código, entrada distinta de su `toLowerCase(Locale.ROOT)` y entrada repetida son errores (con el número de línea, **sin imprimir la contraseña**); menos de `minimumEntries` es un error. En `DomainPolicyConfiguration`: `@Bean PasswordPolicy passwordPolicy(@Value("classpath:security/common-passwords.txt") Resource lista)` → `new PasswordPolicy(CommonPasswordsLoader.load(lista, CommonPasswordsLoader.MINIMUM_ENTRIES))`.
+- **Pruebas** (`CommonPasswordsLoaderTest`, con `ByteArrayResource` y con el recurso de prueba): archivo válido de 20 → conjunto de 20; con `minimumEntries` 21 → falla; línea vacía; entrada de 11 caracteres; entrada con mayúsculas; entrada repetida; recurso inexistente (`ClassPathResource("security/no-existe.txt")`); archivo vacío. En todos, el mensaje nombra la causa y el número de línea y **no** contiene la contraseña. Usar `assertThatThrownBy(...).isInstanceOf(IllegalStateException.class).hasMessageContaining(...)`.
+- **Trampa:** hasta que exista el recurso real (T-4.3), el contexto de Spring no arranca (`FileNotFoundException`): las pruebas con contexto (`CuentaSchemaMigrationTest`, E2E) **fallarán hasta T-4.3**; por eso T-4.2 y T-4.3 van en el mismo PR y se ejecutan juntas en CI. Para trabajar antes de tener los datos, usar temporalmente `src/main/resources/security/common-passwords.txt` con 3000 entradas generadas (`pass` + número rellenado a 12 caracteres) **sin comprometerlas** (`git update-index --assume-unchanged` o dejarlas fuera del commit).
+- **Verificación:** `./mvnw.cmd -q -B -Dtest=CommonPasswordsLoaderTest test` en verde.
+
+## [ ] T-4.3 · Datos: la lista de 3000 — ≤ 30 min de trabajo + revisión de licencia — **BLOQUEADA por V-03 / pregunta 3 de la spec**
+
+- **Cubre:** REQ-RV-40, 42; CA-1.1.27. **Crear:** `src/main/resources/security/common-passwords.txt` y `src/main/resources/security/common-passwords.README.md`; **Crear (prueba):** `src/test/.../infrastructure/config/CommonPasswordsFileTest.java`.
+- **Procedimiento (en una carpeta temporal vacía, fuera del repositorio; la fuente es un archivo no confiable: se lee, nunca se ejecuta):** (1) descargar la fuente elegida y registrar URL, fecha y licencia; (2) filtrar las entradas de 12 o más puntos de código, pasar a minúsculas, recortar, quitar repetidas y conservar el orden de popularidad de la fuente; (3) tomar las primeras 3000; si hay menos, completar con la segunda fuente y registrarla; (4) comprobar que están `123456789012`, `password1234` y `qwertyuiop123` (si falta alguna, **detenerse y reportar**); (5) escribir el archivo con saltos de línea `\n`, UTF-8 sin BOM. El `README` registra: fuente(s), URL, licencia, fecha, el comando exacto con que se generó y la frase «La lista se entrega a `cameia-web` de la forma decidida en la pregunta 9».
+- **Prueba** (`CommonPasswordsFileTest`, sin contexto): cargar el recurso real con `CommonPasswordsLoader.load(..., 3000)`; exactamente 3000 entradas; las tres del CA presentes; `PasswordPolicy` con esa lista rechaza `123456789012`, `PASSWORD1234` y `  qwertyuiop123  ` con `PASSWORD_TOO_COMMON`.
+- **Entrega:** commit aparte `CM-36 | chore(cuentas): lista de 3000 contraseñas comunes [IA-ASISTIDO]`; en el PR, decir qué es dato (no se revisa línea por línea) y qué es código.
+- **Verificación:** `./mvnw.cmd -B test` en verde, contexto completo incluido.
+
+## [ ] T-4.4 · Cierre del PR 4 — ≤ 30 min
+
+`clean verify`, cobertura de `PasswordPolicy`, `CommonPasswordsLoader` y `DomainPolicyConfiguration` (≥ 90 %); **`/security-review`** (ASVS 6.2.4); medir el arranque antes y después (la carga de 3000 líneas) y reportarlo; aviso a Frontend con la ruta del archivo. PR: `CM-36 | feat(cuentas): lista de 3000 contraseñas comunes cargada desde un recurso versionado [IA-ASISTIDO]`.
+
+---
+
+# PR 5 — celular con `libphonenumber`
+
+Rama `CM-36-celular-libphonenumber` desde `develop`. **BLOQUEADO por las preguntas 11 y 9 de la spec.**
+
+## [ ] T-5.1 · Dependencia — ≤ 15 min, ≈ 8 líneas
+
+- **Cubre:** REQ-RV-50. **Modificar:** `pom.xml`. **Antes:** leer `https://repo1.maven.org/maven2/com/googlecode/libphonenumber/libphonenumber/maven-metadata.xml` y anotar el valor de `<release>`; usar **esa** versión, declarada como propiedad `<libphonenumber.version>` junto a `firebase-admin.version` (línea 32).
+- **Cambio:** agregar a `<dependencies>`: `groupId` `com.googlecode.libphonenumber`, `artifactId` `libphonenumber`, `version` `${libphonenumber.version}`. **Detenerse** si las coordenadas no existen o si la licencia no es Apache 2.0, y reportar.
+- **Verificación:** `./mvnw.cmd -q -B -DskipTests package` compila.
+
+## [ ] T-5.2 · `PhoneNumber` valida con la librería — ≤ 30 min, ≈ 110 líneas
+
+- **Cubre:** REQ-RV-50, 52. **Crear:** `domain/exception/InvalidPhoneNumberException.java` (`extends BusinessException`, `super(ErrorCode.PHONE_NUMBER_INVALID_FORMAT, "Revisa el número, no coincide con el formato del país elegido.")`, `getField()` = `phoneNumber`). **Modificar:** `domain/exception/ErrorCode.java` (agregar `PHONE_NUMBER_INVALID_FORMAT`), `domain/model/PhoneNumber.java`, `ValueObjectsTest` (clase anidada del celular, línea 53 en adelante).
+- **Cambio en el constructor compacto** (después del recorte y de la comprobación E.164 actual): 
+  ```java
+  PhoneNumberUtil util = PhoneNumberUtil.getInstance();
+  try {
+      Phonenumber.PhoneNumber parsed = util.parse(value, null);   // el texto lleva «+», no hace falta región
+      if (!util.isValidNumber(parsed) || !value.equals(util.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164))) {
+          throw new InvalidPhoneNumberException();
+      }
+  } catch (NumberParseException fallo) {
+      throw new InvalidPhoneNumberException();
+  }
+  ```
+  El `IllegalArgumentException` del valor nulo o vacío se conserva (inalcanzable por la API tras T-5.3). El texto «debe incluir el indicativo del país…» de la comprobación E.164 actual se sustituye: si no cumple `^\+[1-9][0-9]{7,14}$` también lanza `InvalidPhoneNumberException`.
+- **Pruebas** (en la clase anidada del celular; se ajustan las existentes que esperaban `IllegalArgumentException`): acepta `+573000000000`, `+34612345678`, `+576012345678`, `+14155552671`; rechaza con `InvalidPhoneNumberException` (código y texto literales): `12345`, `+57300`, `3000000000`, `+57 300 000 0000`, `+99912345678`, `+5730000000000000`, `+573000000000abc`. `rechazaUnNumeroSinIndicativoDePais` y `rechazaUnNumeroConSeparadores` pasan a esperar la excepción nueva. `noRevelaSuValorAlConvertirseATexto` sigue en verde.
+- **Trampa:** `PhoneNumberUtil.parse` con un texto sin `+` y región `null` lanza `NumberParseException`; aquí ya se rechazó antes por forma. Un valor que la librería da por válido pero cuyo formato canónico difiere (con ceros iniciales o extensión) se rechaza por la comparación.
+- **Verificación:** `./mvnw.cmd -q -B -Dtest=ValueObjectsTest test` en verde.
+
+## [ ] T-5.3 · Sin celular, manejador y compatibilidad con la base — ≤ 30 min, ≈ 120 líneas
+
+- **Cubre:** REQ-RV-51, 52, 53; CA-1.1.29. **Modificar:** `presentation/dto/RegisterUserRequest.java` (`toCommand()`), `presentation/advice/BusinessExceptionHandler.java`. **Crear:** `src/test/.../domain/model/PhoneNumberDatabaseCompatibilityTest.java`.
+- **`toCommand()`:** el celular pasa por `SingleLineText.normalize`; si queda `null` o vacío, el comando lleva `null`.
+- **Manejador:** `InvalidPhoneNumberException` → 422, `code` `VALIDATION_FAILED`, `errors` con `campo(error.getField(), error.getErrorCode(), error.getMessage())`.
+- **`PhoneNumberDatabaseCompatibilityTest`** (sin Spring): para cada región de `PhoneNumberUtil.getSupportedRegions()` y para los tipos `MOBILE` y `FIXED_LINE`, `util.getExampleNumberForType(region, tipo)` (si no es `null`) formateado en E.164 debe cumplir `^\+[1-9][0-9]{7,14}$` (la restricción `ck_cuenta_telefono_e164`). Si algún número no la cumple, la prueba lista las regiones y **se detiene el bloque**: decidir con Paula entre una migración V4 que relaje el mínimo o rechazar esos números (no improvisar).
+- **Pruebas del controlador:** celular ausente, `null`, `""`, `"   "` → 201 con `phoneNumber()` nulo en el comando; `"  +573000000000  "` → el comando lleva `+573000000000`; servicio simulado que lanza `InvalidPhoneNumberException` → 422, `field` = `phoneNumber`, `code` = `PHONE_NUMBER_INVALID_FORMAT`, mensaje literal.
+- **Verificación:** `./mvnw.cmd -B -Dtest='PhoneNumberDatabaseCompatibilityTest,UserRegistrationControllerTest,BusinessExceptionHandlerTest' test` en verde.
+
+## [ ] T-5.4 · Punta a punta y paridad con el cliente (V-05) — ≤ 30 min, ≈ 70 líneas
+
+- **E2E (Docker):** `+573000000000` → 201 y la columna `telefono` guarda `+573000000000`; `+34612345678` → 201 y guarda `+34612345678`; `12345` → 422 `PHONE_NUMBER_INVALID_FORMAT` sin rastro; sin celular → 201 y `telefono` es `NULL`.
+- **V-05:** la tabla con el resultado de `isValidNumber` de la versión Java para los 11 valores de la matriz (sección 12 del plan) va en la descripción del PR, con la nota de que Frontend debe comparar con `libphonenumber-js` (`isValid`); si algún valor del CA difiere, se reporta antes de abrir el PR.
+- **Verificación:** con Docker, `./mvnw.cmd -B -Dtest=AccountRegistrationEndToEndTest test` en verde.
+
+## [ ] T-5.5 · Cierre del PR 5 — ≤ 30 min
+
+`clean verify`; cobertura de `PhoneNumber`, `InvalidPhoneNumberException` y `RegisterUserRequest` (≥ 90 %); `/security-review` (dependencia nueva: confirmar su licencia y que CodeQL/Dependabot la cubren); aviso a Frontend. PR: `CM-36 | feat(cuentas): validar el celular con libphonenumber [IA-ASISTIDO]`.
+
+---
+
+# PR 6 — etiquetas, textos y pruebas que faltan
+
+Rama `CM-36-etiquetas-textos-registro` desde `develop`, al final. Estado base: después de los PR 1A a 5.
+
+## [ ] T-6.1 · `EmailAddress` con excepción tipada — ≤ 30 min, ≈ 80 líneas
+
+- **Cubre:** REQ-RV-60; CA-1.1.20. **Crear:** `domain/exception/InvalidEmailException.java` (con `getField()` = `email`; constructor `(ErrorCode code, String mensaje)`). **Modificar:** `domain/exception/ErrorCode.java` (`EMAIL_INVALID_FORMAT`), `domain/model/EmailAddress.java`, `presentation/advice/BusinessExceptionHandler.java`, `ValueObjectsTest`.
+- **Cambio:** en `EmailAddress`, el formato inválido lanza `new InvalidEmailException(ErrorCode.EMAIL_INVALID_FORMAT, "Ingresa un correo electrónico válido.")` y el exceso de longitud `new InvalidEmailException(ErrorCode.EMAIL_TOO_LONG, "El correo no puede superar los 254 caracteres.")`; vacío o nulo sigue siendo `IllegalArgumentException` defensiva (el borde responde antes). El manejador: 422, `VALIDATION_FAILED`, un elemento con el campo, el código y el mensaje de la excepción.
+- **Pruebas:** `ana`, `ana@correo`, `ana@@correo.co`, `ana@correo..co`, `ana @correo.co` → `InvalidEmailException` con `EMAIL_INVALID_FORMAT`; 255 puntos de código → `EMAIL_TOO_LONG`; válidos `ana@correo.co`, `ana.perez+cameia@correo.com`, `ANA@Correo.CO` (queda `ana@correo.co`); controlador: servicio simulado que lanza la excepción → 422, `field` = `email`. Ajustar las pruebas existentes de `ValueObjectsTest` que esperaban `IllegalArgumentException` por formato.
+- **Verificación:** `./mvnw.cmd -B -Dtest='ValueObjectsTest,UserRegistrationControllerTest' test` en verde.
+
+## [ ] T-6.2 · Cuerpo ilegible, pronombre inválido y fin del manejador genérico — ≤ 30 min, ≈ 110 líneas — **BLOQUEADA por las preguntas 6 y 10 de la spec**
+
+- **Cubre:** REQ-RV-30, 61, 65. **Modificar:** `presentation/advice/BusinessExceptionHandler.java`, `domain/exception/ErrorCode.java` (`PRONOUN_INVALID_VALUE`), `src/main/resources/application.properties`, `BusinessExceptionHandlerTest`, `UserRegistrationControllerTest`.
+- **`cuerpoIlegible`:** si `error.getCause()` es `tools.jackson.databind.exc.MismatchedInputException` y el último elemento de `getPath()` tiene `getPropertyName()` igual a `"pronoun"` → 422, `VALIDATION_FAILED`, un elemento `campo("pronoun", PRONOUN_INVALID_VALUE, <texto de la pregunta 10 de la spec>)`; en cualquier otro caso → 422, `REQUEST_BODY_INVALID_FORMAT`, `detail` «Revisa el formato de los datos enviados.» (sin la mención a la fecha). El `logger.warn` sigue registrando solo el nombre de la clase de la excepción. (Si la pregunta 6 de la spec resulta en 400, el estado cambia solo en la rama «cualquier otro caso».)
+- **Eliminar** el método `valorInvalido(IllegalArgumentException)` y su `import`; una `IllegalArgumentException` pasa a `falloInterno` (500 `INTERNAL_ERROR`). Verificar con `git grep -n "IllegalArgumentException" src/main` que no quedó una ruta alcanzable por la API (las de `RawPassword`, `BirthDate`, `SingleLineText`, `PersonName` y `PhoneNumber` son defensivas).
+- **Propiedad de Jackson (V-06):** agregar a `application.properties` `spring.jackson.deserialization.fail-on-numbers-for-enums=true`. **Verificar primero** que Spring Boot 4.1.1 con Jackson 3 reconoce ese nombre (arrancar la prueba de la tarjeta y comprobar que `"pronoun":1` ya no se acepta). Si la propiedad no existe o no surte efecto, **detenerse y reportar**: la alternativa es un deserializador de enumerados estricto (decisión de Paula).
+- **Pruebas:** `"pronoun":"OTRO"`, `"he"`, `""`, `1`, `true` → 422, `field` = `pronoun`, `code` = `PRONOUN_INVALID_VALUE`; JSON mal formado (`{"firstName":`), `birthDate` como `[]` y como `{}` → 422 `REQUEST_BODY_INVALID_FORMAT` y `detail` sin la palabra «fecha»; un `IllegalArgumentException("secreto de librería")` lanzado por un controlador de prueba → 500, `INTERNAL_ERROR`, sin el texto.
+- **Verificación:** `./mvnw.cmd -B -Dtest='BusinessExceptionHandlerTest,UserRegistrationControllerTest' test` en verde.
+
+## [ ] T-6.3 · Textos del catálogo — ≤ 30 min, ≈ 90 líneas — **BLOQUEADA por la pregunta 2 de la spec**
+
+- **Cubre:** REQ-RV-62, 63; CA-1.1.2, 1.1.3, 1.1.6, 1.1.7, 1.1.9 a 1.1.13, 1.1.17, 1.1.19, 1.1.23, 1.1.26. **Modificar:** `RegisterUserRequest.java`, `PasswordPolicy.java`, `AgePolicy.java`, `EmailAlreadyRegisteredException.java` y las pruebas que comparan texto.
+- **Tabla antes → después (solo cambia el texto; códigos y estados no):**
+  | Dónde | Antes | Después |
+  |---|---|---|
+  | `firstName` `@NotBlank` | Los nombres son obligatorios | Ingresa tu nombre. |
+  | `firstName` `@CodePointSize` | Los nombres no pueden superar los 120 caracteres | El nombre no puede superar los 120 caracteres. |
+  | `lastName` `@NotBlank` | Los apellidos son obligatorios | Ingresa tu apellido. |
+  | `lastName` `@CodePointSize` | Los apellidos no pueden superar los 120 caracteres | El apellido no puede superar los 120 caracteres. |
+  | `birthDate` `@NotBlank` | La fecha de nacimiento es obligatoria | Ingresa tu fecha de nacimiento. |
+  | `email` `@NotBlank` | El correo electrónico es obligatorio | Ingresa tu correo electrónico. |
+  | `password` `@NotBlank` | La contraseña es obligatoria | Ingresa tu contraseña. |
+  | `PasswordPolicy` corta | La contraseña debe tener al menos 12 caracteres | La contraseña debe tener al menos 12 caracteres. |
+  | `PasswordPolicy` larga | La contraseña no puede superar los 64 caracteres | La contraseña no puede superar los 64 caracteres. |
+  | `AgePolicy` futura | Fecha de nacimiento inválida | Fecha de nacimiento inválida. |
+  | `AgePolicy` menor | Debes ser mayor de edad | Debes ser mayor de edad. |
+  | `AgePolicy` más de 110 | La fecha de nacimiento no es plausible, por favor verifícala | Verifica tu fecha de nacimiento. |
+  | `EmailAlreadyRegisteredException` | Este correo ya se encuentra registrado | Ese correo ya tiene una cuenta. |
+  | Detalle del 422 de campos | Revisa los campos marcados | Revisa los campos marcados. |
+  El texto de `Account.register` («Los nombres son obligatorios») es una invariante defensiva inalcanzable: no se toca.
+- **Pruebas:** actualizar cada expectativa de texto de `UserRegistrationControllerTest`, `PasswordPolicyTest`, `AgePolicyTest`, `AccountRegistrationEndToEndTest`; agregar una prueba por texto de la tabla en el controlador (una por campo). **Detenerse** si una prueba de Frontend o un documento del repo citan un texto de la columna «Antes» y reportarlo.
+- **Verificación:** `./mvnw.cmd -B test` en verde.
+
+## [ ] T-6.4 · Pruebas de edad con reloj fijo — ≤ 30 min, ≈ 90 líneas
+
+- **Cubre:** CA-1.1.3 a 1.1.7. **Modificar:** `domain/policy/AgePolicyTest.java` (reloj `Clock.fixed(... UTC)` como en la línea 32).
+- **Casos** (hoy = 2026-10-06 UTC; cada uno con su `Reason` o aceptación): nacido 2008-10-06 (cumple 18 hoy) → acepta; 2008-10-07 (mañana) → `UNDERAGE`; 1915-10-07 (cumple 111 mañana) → acepta; 1915-10-06 (111 hoy) → `IMPLAUSIBLE` (código `BIRTH_DATE_OUT_OF_RANGE`); 2026-10-07 → `IN_THE_FUTURE`; 2026-10-06 → `UNDERAGE`; nacido el 2000-02-29 con hoy 2018-02-28 → `UNDERAGE` y con hoy 2018-03-01 → acepta (cumple el 1 de marzo en año no bisiesto); nacido el 2000-12-31 con hoy 2018-12-31 → acepta y con hoy 2018-12-30 → `UNDERAGE`; nacido el 2000-01-01 con hoy 2017-12-31 → `UNDERAGE` y con hoy 2018-01-01 → acepta; entre las 19:00 y las 24:00 de Colombia (`Instant.parse("2026-10-07T01:30:00Z")`) la fecha es 2026-10-07 (prueba existente `laEdadSeCalculaEnUtc…`, mantenerla). Una fila `@ParameterizedTest @CsvSource` para los pares de fecha de nacimiento y reloj.
+- **Verificación:** `./mvnw.cmd -q -B -Dtest=AgePolicyTest test` en verde.
+
+## [ ] T-6.5 · Casos que cumplen sin prueba (1.1.41, 1.1.42, 1.1.29, cumpleaños) — ≤ 30 min, ≈ 90 líneas
+
+- **Cubre:** CA-1.1.29, 1.1.41, 1.1.42. **Modificar:** `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest`.
+- **Pruebas:** (1) CA-1.1.41: contraseña `mi clave larga 🙂` (16 puntos de código) → 201 y el comando lleva exactamente ese texto; en el E2E, el registro se completa y la credencial se crea con esa contraseña (el doble de Firebase la recibe sin recortar). (2) CA-1.1.42: `  Ana@Correo.CO ` → 201 con `ana@correo.co` y un segundo registro con `ana@correo.co` → 409 `EMAIL_ALREADY_REGISTERED`. (3) CA-1.1.29: sin celular → 201 y `telefono` `NULL`. (4) Cuerpo con `estado`:`ACTIVE` y `plan`:`PREMIUM` extra → 201, la cuenta queda `PENDING_VERIFICATION` y `FREE` (RT-01-CA06). (5) Un campo desconocido cualquiera se ignora.
+- **Verificación:** con Docker, `./mvnw.cmd -B -Dtest='UserRegistrationControllerTest,AccountRegistrationEndToEndTest' test` en verde.
+
+## [ ] T-6.6 · Verificaciones V-01 y tamaño del cuerpo — ≤ 30 min, sin cambios de producción
+
+- **V-01:** con el emulador de Firebase Auth (ver `CLAUDE.md` y la spec de arranque con el emulador), registrar un correo de exactamente 254 puntos de código con parte local de 64 (`"a".repeat(64) + "@" + dominio de 189 caracteres en etiquetas de hasta 63`) y anotar la respuesta. Si Firebase lo rechaza, **no recortar ni cambiar el límite**: informar a Vela (el CA-1.1.21 usa el máximo que Firebase acepte).
+- **Tamaño del cuerpo:** enviar a `POST /api/v1/users` un JSON de 2 MB y otro de 20 MB con `firstName` enorme y anotar estado, tiempo y memoria. No se corrige aquí: el resultado alimenta la pregunta 14 de la spec.
+- **Evidencia:** las salidas (sin datos reales) van en el informe del PR.
+
+## [ ] T-6.7 · Cierre del PR 6 y de la tarea — ≤ 45 min
+
+`clean verify` con cobertura de toda la clase tocada (≥ 90 %); `/simplify`, `/code-review high`, `/security-review`; Postman o `.http` con los casos de la sección 5 de la spec; aviso a Frontend con el cambio de textos y de códigos; recorrido final de los 44 CA contra el código fusionado (lo hace B22); comentario de Jira con el formato del `CLAUDE.md`. PR: `CM-36 | fix(cuentas): etiquetas de campo, textos del catálogo y pruebas de borde del registro [IA-ASISTIDO]`.
