@@ -27,7 +27,7 @@ Tamaños estimados en líneas agregadas más eliminadas; se miden con `git diff 
 |---|---|---|
 | A | `specs/CM-283-AlinearEstandar/spec.md`, `plan.md`, `tasks.md` | 750 |
 | B | Crear `docs/estandar-backend.md` (≈ 400), `docs/errores.md`, `docs/adr/0001-codigo-de-error-y-request-id.md`, `docs/bitacora-ia/README.md` y `01_alinear-estandar-backend_prompt.md`; reescribir `docs/constitution.md`; eliminar `guidelines.md` y `docs/specs/.gitkeep` | 700 |
-| C1 | Reescribir `CLAUDE.md`; crear `AGENTS.md`; modificar `README.md` y `CONTRATO-GATEWAY-CM-14.md` | 520 |
+| C1 | Reescribir `CLAUDE.md`; crear `AGENTS.md`; modificar `README.md`; eliminar `CONTRATO-GATEWAY-CM-14.md` | 520 |
 | C2 | No hay | — |
 
 Orden: A, B, C1. Es el repositorio modelo: B incluye la redacción del estándar común. B y C1 suman unas 790 líneas, así que van en un solo PR desde `CM-283-estandar-comun` (D-16), con el título `CM-283 | docs(estandar): estándar común y CLAUDE.md alineados [IA-ASISTIDO]`; se abre cuando la pieza A está fusionada.

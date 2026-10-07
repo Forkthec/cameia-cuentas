@@ -82,7 +82,7 @@ Resueltas con Juan Vela el 17/09/2026. Cada una es la base de al menos un requis
 | # | Tema | Decisión |
 |---|---|---|
 | CU-1 | Estado inicial de la cuenta | La cuenta **no nace `ACTIVE`**. Nace `PENDING_VERIFICATION`, un estado nuevo, y solo pasa a `ACTIVE` cuando el correo queda verificado. El DDL admite hoy únicamente `ACTIVE`, `DISABLED` y `ANONYMIZED`, y su trigger `trg_cuenta_validar_insert` exige nacer `ACTIVE`: el DDL **no es fuente de verdad absoluta** y se corrige. `DISABLED` conserva su significado, que es una cuenta bloqueada, por ejemplo por impago |
-| CU-2 | Quién activa la cuenta | Un **endpoint propio de Cuentas**, de Caso A: exige un ID Token cuyo claim `email_verified` sea `true`. La ruta es `POST /api/v1/users/me/verification`. Lo que el Gateway debe tener en cuenta está en [CONTRATO-GATEWAY-CM-14.md](../../CONTRATO-GATEWAY-CM-14.md); su coordinación la asume Juan Vela |
+| CU-2 | Quién activa la cuenta | Un **endpoint propio de Cuentas**, de Caso A: exige un ID Token cuyo claim `email_verified` sea `true`. La ruta es `POST /api/v1/users/me/verification`. Lo que el Gateway debe tener en cuenta está en [CLAUDE.md](../../CLAUDE.md) §3; su coordinación la asume Juan Vela |
 | CU-3 | Plan Gratis | El registro escribe el custom claim `plan=FREE` en Firebase. **No** se crea suscripción, tarifa ni fila en `sincronizacion_claim_firebase`: eso exige semillas comerciales aún no decididas y va en su propia spec. **El claim no respalda ningún derecho ni cuota**, tal como advierte el aviso del encabezado |
 | CU-4 | Campos y obligatoriedad | Obligatorios: nombres, apellidos, fecha de nacimiento, correo y contraseña. Opcionales: celular y pronombres. El celular llega en **E.164** (`+573001234567`) y Cuentas lo rechaza si no lo está; no lo normaliza ni asume país |
 | CU-5 | Formato de error | **Problem Details, RFC 7807** (`application/problem+json`), con una lista de errores por campo. Esto cierra la pregunta abierta de contrato de respuesta que estaba en `CLAUDE.md`. La versión de la API va en la ruta, `/api/v1`, como ya la declara el Gateway |
@@ -408,7 +408,7 @@ Resueltas por Juan Vela el 17/09/2026.
 
 | ID | Pregunta | Estado | Respuesta |
 |---|---|---|---|
-| `CU-TBD-01` | ¿Cuál es la ruta exacta del endpoint de activación? | ✅ Cerrada | `POST /api/v1/users/me/verification`, Caso A. La coordinación con el Gateway la asume Juan Vela; lo que ese equipo debe tener en cuenta está en [CONTRATO-GATEWAY-CM-14.md](../../CONTRATO-GATEWAY-CM-14.md) |
+| `CU-TBD-01` | ¿Cuál es la ruta exacta del endpoint de activación? | ✅ Cerrada | `POST /api/v1/users/me/verification`, Caso A. La coordinación con el Gateway la asume Juan Vela; lo que ese equipo debe tener en cuenta está en [CLAUDE.md](../../CLAUDE.md) §3 |
 | `CU-TBD-02` | ¿Cuándo se crea la suscripción FREE que respalda el claim? | ✅ Cerrada | Fuera de CM-14 por tiempo de sprint. El claim `plan=FREE` **no respalda nada**; queda advertido en mayúsculas al inicio de esta spec |
 | `CU-TBD-03` | ¿Qué política de contraseña se exige? | ✅ Cerrada | La de **OWASP**, junto con el resto de decisiones de seguridad de la HU (CU-10, `REQ-CU-11b`) |
 | `CU-TBD-04` | ¿Qué pasa con una cuenta que nunca verifica el correo? | ⛔ Bloqueada | Nadie lo especificó. Escalada al Product Owner en [bloqueo.md](bloqueo.md); bloquea el cierre de la HU, no el inicio de la implementación |

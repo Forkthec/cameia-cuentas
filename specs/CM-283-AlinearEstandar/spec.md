@@ -222,7 +222,7 @@ Cada hallazgo se comprobó contra `origin/develop` y tiene un destino. «P1» es
 | `guidelines.md` | Eliminar | D-08; lo que tenía de más está en la sección 4.1 |
 | `docs/specs/.gitkeep` | Eliminar | Carpeta vacía; las specs viven en `specs/` |
 | `README.md` | Modificar | REQ-DOC-09 y REQ-CU-08 |
-| `CONTRATO-GATEWAY-CM-14.md` | Modificar | REQ-CU-09 |
+| `CONTRATO-GATEWAY-CM-14.md` | Eliminar | REQ-CU-09 |
 | `CONTRIBUTING.md` | Sin cambios | Es el modelo de REQ-DOC-08 |
 
 ### 6.2 Requisitos
@@ -235,7 +235,7 @@ Cada hallazgo se comprobó contra `origin/develop` y tiene un destino. «P1» es
 - **REQ-CU-06 (constitución).** La constitución deberá incluir además: «16. **Pagos:** la firma SHA-256 y la idempotencia de Wompi se verifican antes de cambiar una suscripción o un entitlement. → pruebas de firma, de idempotencia y de reintentos» y «17. **Ingreso de terceros:** los webhooks de terceros llegan por el Gateway, nunca directo al servicio. → configuración de rutas del Gateway».
 - **REQ-CU-07 (errores).** `docs/errores.md` deberá listar en «Respuestas sin código» cada estado que produce `BusinessExceptionHandler` en `origin/develop`, leído del manejador, y deberá decir que Cuentas aún no emite `code`. En el mismo apartado deberá anotar, con su destino, cada respuesta publicada que difiere del estándar (D-21): el 422 ante un cuerpo ilegible, el texto del 500, la `IllegalArgumentException` genérica que llega con su mensaje y la cuenta bloqueada o anonimizada que termina en 500 (H-C8 y H-C9).
 - **REQ-CU-08 (README).** El `README.md` deberá reemplazar sus líneas de contribución (rama `<tipo>/CM-NNN`, tipos con `perf`) por un enlace a `CONTRIBUTING.md`, y deberá usar `./mvnw.cmd clean verify` como comando de verificación.
-- **REQ-CU-09 (contrato con el Gateway).** `CONTRATO-GATEWAY-CM-14.md` deberá citar RFC 9457 donde cita RFC 7807 y deberá nombrar al rol (Product Owner) en la línea «Responsable de llevarlo al Gateway»; el resto del documento no se modifica.
+- **REQ-CU-09 (contrato con el Gateway).** `CONTRATO-GATEWAY-CM-14.md` deberá retirarse: es la nota de traspaso de la spec del registro al Gateway, el Gateway ya la implementó y su contenido vive en esa spec y en el `CLAUDE.md`. Lo único que no estaba en otro documento pasa a la sección 3 del `CLAUDE.md`, en la fila de `X-User-Plan`: «no respalda ningún derecho ni cuota hasta que exista la spec de planes». Los enlaces de la spec del registro que lo citaban pasarán a la sección 3 del `CLAUDE.md`.
 - **REQ-CU-10.** El `CLAUDE.md` no deberá conservar: la sección de metodología, la de ambigüedades, la de límite de tamaño, las de nombrado, idioma y documentación de código, la de bitácora por hoja personal, la de título y plantilla de commit con `[IA-ASISTIDO]`, ni el ejemplo de commit `CM-105: …`; todo eso vive ahora en el estándar y en la sección 9.
 
 ### 6.3 Hallazgos propios y destino
@@ -245,7 +245,7 @@ Cada hallazgo se comprobó contra `origin/develop` y tiene un destino. «P1» es
 | H-C1 | `README.md` indica ramas `<tipo>/CM-NNN` y tipos con `perf`, y su `CLAUDE.md` indica `CM-<n>`: el repositorio se contradice a sí mismo | P1 C |
 | H-C2 | El `CLAUDE.md` dice que el commit lleva `[IA-ASISTIDO]` y su ejemplo de idioma usa `CM-105: …` | P1 C |
 | H-C3 | Carpeta `docs/specs/` vacía junto a `specs/` | P1 B |
-| H-C4 | `CONTRATO-GATEWAY-CM-14.md` cita RFC 7807 | P1 C |
+| H-C4 | `CONTRATO-GATEWAY-CM-14.md` es una nota de traspaso que el Gateway ya implementó, cita RFC 7807 y repite la spec del registro y el `CLAUDE.md` | P1 C: se retira (REQ-CU-09) |
 | H-C5 | Las pruebas de integración se llaman `*Test` y las ejecuta Surefire con las unitarias | P2-02 |
 | H-C6 | Cuentas no emite `code` ni `requestId` | Primera tarea de código de Cuentas; PD-08 respondida: `requestId` desde CM-36 (PR 1A) |
 | H-C7 | `ActivateAccountService.activate` es `@Transactional` y consulta Firebase dentro de la transacción, contra la sección 3 del estándar | CM-179, bloque 1 (decisión D3 de su spec): la activación deja de ser `@Transactional` y de consultar Firebase, y el adaptador traduce el conflicto de versión a una excepción de dominio |

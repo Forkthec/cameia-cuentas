@@ -10,7 +10,7 @@
 ## Bloque 0 — Previo: la sonda de salud alcanzable desde el Gateway
 
 > No depende de nada de CM-14 y se hace primero. Motivo en [plan.md](plan.md) §0 y en
-> [CONTRATO-GATEWAY-CM-14.md](../../CONTRATO-GATEWAY-CM-14.md) §3.
+> [CLAUDE.md](../../CLAUDE.md) §3.
 
 - [x] **T-00** Mover la sonda de `GET /health` a `GET /api/v1/users/health` en `HealthController` y ajustar `HealthControllerTest` (mismo cuerpo, mismos códigos, `POST` sigue dando `405`).
 - [x] **T-01** Actualizar el `HEALTHCHECK` del `Dockerfile`, y el de `docker-compose.yml` si lo declara, a la ruta nueva. Verificar con `docker compose up --build` y `docker ps` mostrando `healthy`. Verificado el 17/09/2026: `docker ps` muestra `cameia-cuentas Up (healthy)`, `GET /api/v1/users/health` responde `200` con `{"status":"UP"}` y la ruta vieja `/health` responde `404`. `docker-compose.yml` no declara `healthcheck` para la aplicación, así que solo cambió el `Dockerfile`.
