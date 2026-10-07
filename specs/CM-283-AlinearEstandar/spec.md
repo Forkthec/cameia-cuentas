@@ -237,7 +237,7 @@ Cada hallazgo se comprobó contra `origin/develop` y tiene un destino. «P1» es
 | H-C3 | Carpeta `docs/specs/` vacía junto a `specs/` | P1 B |
 | H-C4 | `CONTRATO-GATEWAY-CM-14.md` cita RFC 7807 | P1 C |
 | H-C5 | Las pruebas de integración se llaman `*Test` y las ejecuta Surefire con las unitarias | P2-02 |
-| H-C6 | Cuentas no emite `code` ni `requestId` | Primera tarea de código de Cuentas; depende de PD-08 |
+| H-C6 | Cuentas no emite `code` ni `requestId` | Primera tarea de código de Cuentas; PD-08 respondida: `requestId` desde CM-36 (PR 1A) |
 
 ## 7. Parte 2 en cameia-cuentas
 
@@ -301,13 +301,13 @@ Una pieza por PR, del 13 al 23 de octubre de 2026, después de los bloques de hi
 |---|---|---|
 | P2-02 Failsafe | Sí | Renombrar a `*IT` las pruebas que usan `@Testcontainers` o `@SpringBootTest` (por ejemplo `AccountRegistrationEndToEndTest`, `AccountRepositoryAdapterTest` y `CuentaSchemaMigrationTest`; la lista completa sale del `git grep` de REQ-P2-02-3) |
 | P2-03 Plugin de formato | Condicionada a PD-01 | — |
-| P2-05 `requestId` | Sí | Filtro servlet; el cuerpo de error con `requestId` lo decide la spec de la primera tarea de código (PD-08) |
+| P2-05 `requestId` | Sí | Filtro servlet; el cuerpo de error ya lleva `requestId` desde CM-36 (PD-08); P2-05 agrega el filtro y el `MDC` y reutiliza ese valor |
 | P2-07 Configuración | Sí | Puerto 8081 (ya cumple); `prod` y bandera `API_DOCUMENTATION_ENABLED` (ya cumplen: solo se verifican y se ordena `.env.example`) |
 | P2-10 JaCoCo | Sí | — |
 | P2-11 Dependabot | Sí | — |
 | P2-14 Verificación | Sí | — |
 
-Pendiente propio: **PD-08.** Si el cuerpo de error de Cuentas lleva `requestId` desde la primera tarea de código o desde el filtro de P2-05. Responsable: Backend, en la spec de esa tarea. Bloquea el orden entre ambas.
+**PD-08 (respondida por Paula el 6-oct-2026):** el cuerpo de error de Cuentas lleva `requestId` desde la primera tarea de código (CM-36, PR 1A), tomado de `X-Request-Id` o generado; el filtro de P2-05 llega después y no cambia el contrato.
 
 ## 8. Casos de verificación
 
@@ -330,6 +330,10 @@ Cada caso se ejecuta con salida real y se reporta en el PR. Los comandos son de 
 | V-13 | La Parte 1 no cambia código | `git diff --name-only origin/develop` | Solo archivos `*.md`, `CONTRIBUTING.md`, `docs/**` y `specs/**` |
 
 Casos de la Parte 2: los de cada pieza en la sección 7.
+
+**Parte 1 terminada** = V-01 a V-13 en verde con su salida real en el PR de cada repositorio. **Secciones comunes:** las secciones que repiten las cuatro specs se cambian en las cuatro en el mismo bloque de trabajo; V-01 compara el estándar, no la redacción de las specs.
+
+**V-14 (solo lectura, no condiciona la Parte 1).** Con el servicio en local, `curl -si` a una ruta que responda un error (por ejemplo, un 404 o un 422) y anotar el `Content-Type`. Si no declara `charset=UTF-8` (ASVS 4.1.1), el hallazgo se registra con su evidencia y se corrige en la primera tarea de código de este servicio, no en CM-283.
 
 ## 9. Fuera de alcance
 
