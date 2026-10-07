@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import tech.cameia.cuentas.application.command.RegisterUserCommand;
 import tech.cameia.cuentas.application.service.RegisterUserService;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
+import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException.Reason;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
@@ -95,7 +96,8 @@ class UserRegistrationControllerTest {
     @Test
     void laContraseniaDebilSeSenialaEnSuCampo() throws Exception {
         when(servicio.register(any(RegisterUserCommand.class)))
-                .thenThrow(new WeakPasswordException("La contraseña debe tener al menos 12 caracteres"));
+                .thenThrow(new WeakPasswordException(ErrorCode.PASSWORD_TOO_SHORT,
+                        "La contraseña debe tener al menos 12 caracteres"));
 
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoValido()))
                 .andExpect(status().isUnprocessableEntity())
