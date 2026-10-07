@@ -48,7 +48,7 @@ Ver spec, sección 13 (D1 a D6). Resumen de lo que el plan agrega:
 - Tabla `campo + restricción → ErrorCode` como constante package-private del manejador (`Map.ofEntries`), para que la prueba la lea. Un `switch` sobre el nombre de la restricción se descartó: no se puede recorrer en una prueba.
 - La restricción de fecha **ignora** el texto vacío o en blanco (devuelve «válido»): la ausencia la reporta `@NotBlank`, así no hay dos errores para el mismo campo.
 - El control de que el formato de la restricción y la conversión de `toCommand()` no se separen: ambos usan **el mismo** `DateTimeFormatter` (constante package-private del validador), nunca dos patrones.
-- Sin `requestId` hasta que se responda la pregunta 4: la tarjeta T-1A.5 queda **BLOQUEADA por PD-08**; el resto de 1A no depende de ella.
+- `requestId` desde 1A (PD-08 respondida por Paula el 6-oct-2026); el resto de 1A no depende de ella.
 
 ## 5. Riesgos
 
@@ -85,10 +85,10 @@ Justificación del caso manual: comprobar el JSON de OpenAPI exige levantar el c
 ## 7. Orden y dependencias de toda la tarea
 
 1. **1A → 1B** (1B emite códigos nuevos y usa la tabla).
-2. **Bloques 2 y 3 en un solo PR** (decidido por Paula el 6-oct-2026: tocan los mismos archivos y suman ≈ 650 líneas), después de 1B. Dentro del PR, primero el recorte y NFC (secciones 9) y después `PersonName` (sección 10), porque el nombre recortado y en NFC entra a `PersonName`. La parte de `PersonName` con `李` y los espacios dobles espera la pregunta 8 (Vela); si no hay respuesta al empezar, se detiene y se avisa a Paula (no se escribe la regla con la recomendación).
+2. **Bloques 2 y 3 en un solo PR** (decidido por Paula el 6-oct-2026: tocan los mismos archivos y suman ≈ 650 líneas), después de 1B. Dentro del PR, primero el recorte y NFC (secciones 9) y después `PersonName` (sección 10), porque el nombre recortado y en NFC entra a `PersonName`. Pregunta 8 decidida: toda letra `\p{L}` y los espacios internos repetidos se unen en uno (`SingleLineText.normalizeName`).
 3. Bloque 4 en paralelo con 2 y 3 (fuente decidida: SecLists filtrada, pregunta 3).
-4. Bloque 5 cuando se quiera (dependencia aprobada, pregunta 11); la pregunta 9 (tipos de número) es de Vela.
-5. Bloque 6 al final: usa las tablas de todos los bloques, exige la respuesta de las preguntas 2 y 10 (Vela) y que CM-251 esté fusionada (su prueba de CA-1.1.42 espera 200).
+4. Bloque 5 cuando se quiera (dependencia aprobada, pregunta 11; tipos de número decididos, pregunta 9).
+5. Bloque 6 al final: usa las tablas de todos los bloques, exige que CM-251 esté fusionada (su prueba de CA-1.1.42 espera 200).
 Paralelo posible: bloque 4 con 2 y 3; el resto es secuencial porque comparten `RegisterUserRequest` y el manejador.
 
 **Fuera de esta tarea, pero dependen de ella:** CM-251 y el bloque 1 de CM-179 empiezan en cuanto se fusione **1A** (no esperan a 1B, 2 ni 3: decidido por Paula el 6-oct-2026). Lo que se fusione después hace un rebase pequeño.
@@ -157,7 +157,7 @@ Base: el estado del repositorio **después de fusionar 1A y 1B** (las rutas y l�
 
 ### 9.6 Orden y dependencias
 
-T-2.1 → T-2.2 y T-2.3 (independientes entre sí) → T-2.4 → T-2.5 → T-2.6 → T-2.7. **BLOQUEADO por la pregunta 13 de la spec** (conjunto de «espacios»): T-2.1 y todo lo que usa `SingleLineText`; si Paula elige la opción (b), el único cambio es el cuerpo del método de recorte y la lista de casos de T-2.1. Estimación: 3 h, ≈ 350 líneas con pruebas.
+T-2.1 → T-2.2 y T-2.3 (independientes entre sí) → T-2.4 → T-2.5 → T-2.6 → T-2.7. (pregunta 13 respondida: el conjunto de `trim()` de JavaScript) (conjunto de «espacios»): T-2.1 y todo lo que usa `SingleLineText`; si Paula elige la opción (b), el único cambio es el cuerpo del método de recorte y la lista de casos de T-2.1. Estimación: 3 h, ≈ 350 líneas con pruebas.
 
 Las referencias «pregunta N» de los bloques 3 a 6 son las de la sección 15 de la spec.
 
@@ -180,11 +180,11 @@ Base: estado después de fusionar 1A, 1B y 2 (revalidar rutas al empezar). Cubre
 
 **Riesgos.** Una expresión regular con retroceso sobre 120 caracteres: se usa una clase de caracteres con `+` sin anidar, lineal. Nombres reales con caracteres no admitidos (`.` en «Jr.»): el CA los rechaza; se documenta en el PR.
 
-**Matriz.** Rechaza: `Ana3`, `Pérez_`, `---`, `'`, `’`, `Ana.`, `Ana@`, `<script>`, `12345`, `Ana–Luz` (guion largo U+2013), `Ana\u0000` (NUL), `Ana😀`. Acepta: `María José`, `O'Neill`, `O’Neill`, `Gómez-Ruiz`, `Müller`, `Muñoz`, `A`, `B`, `Ñandú`, `李`, `Åsa`, `María  José` (dos espacios internos), un nombre de 120 letras, `e` + acento combinante (queda en NFC). **BLOQUEADO por la pregunta 8 de la spec** solo en cuanto a `李` y los espacios dobles. Estimación: 2,5 h, ≈ 300 líneas.
+**Matriz.** Rechaza: `Ana3`, `Pérez_`, `---`, `'`, `’`, `Ana.`, `Ana@`, `<script>`, `12345`, `Ana–Luz` (guion largo U+2013), `Ana\u0000` (NUL), `Ana😀`. Acepta: `María José`, `O'Neill`, `O’Neill`, `Gómez-Ruiz`, `Müller`, `Muñoz`, `A`, `B`, `Ñandú`, `李`, `Åsa`, `María  José` (se guarda `María José`: `normalizeName` une los espacios), un nombre de 120 letras, `e` + acento combinante (queda en NFC). Pregunta 8 decidida por Paula (6-oct-2026). Estimación: 2,5 h, ≈ 300 líneas.
 
 ## 11. Bloque 4 — lista de 3000 contraseñas comunes (PR 4)
 
-Cubre REQ-RV-40 a 42; CA-1.1.27 (lista). **BLOQUEADO por V-03 / pregunta 3 de la spec** (fuente, licencia y entrega a `cameia-web`) en su parte de datos; el código se puede construir y probar antes con una lista de prueba.
+Cubre REQ-RV-40 a 42; CA-1.1.27 (lista). Fuente decidida (pregunta 3: SecLists filtrada; V-03 verifica licencia y conteo al empezar) (fuente, licencia y entrega a `cameia-web`) en su parte de datos; el código se puede construir y probar antes con una lista de prueba.
 
 **Cómo se aborda.** `PasswordPolicy` deja de tener la lista en el código: recibe un `Set<String>` por su constructor (el patrón del repo: los datos entran por el constructor y los ensambla una configuración). `DomainPolicyConfiguration` carga el recurso `security/common-passwords.txt` (UTF-8, una contraseña por línea, minúsculas, sin líneas vacías) al arrancar, valida que haya al menos 3000 entradas, que cada una tenga 12 o más caracteres y que no haya repetidas, y falla el arranque con un mensaje claro si no. La carga vive en una clase de infraestructura (`CommonPasswordsLoader`) que se prueba sin contexto. Los datos van en un **commit aparte** (para que se revise como datos, no como código) junto con un `README` del recurso con la fuente, la licencia, la fecha y el comando que la generó.
 
@@ -205,7 +205,7 @@ Cubre REQ-RV-40 a 42; CA-1.1.27 (lista). **BLOQUEADO por V-03 / pregunta 3 de la
 
 ## 12. Bloque 5 — celular con `libphonenumber` (PR 5)
 
-Cubre REQ-RV-50 a 53; CA-1.1.29, 1.1.32, 1.1.37, 1.1.38; V-05. **BLOQUEADO por la pregunta 11 de la spec** (dependencia nueva) y por la 9 (tipos de número).
+Cubre REQ-RV-50 a 53; CA-1.1.29, 1.1.32, 1.1.37, 1.1.38; V-05. Dependencia aprobada (pregunta 11) y tipos de número decididos (pregunta 9) (dependencia nueva) y por la 9 (tipos de número).
 
 **Cómo se aborda.** (1) Se agrega la dependencia `com.googlecode.libphonenumber:libphonenumber` con la última versión estable que muestre `maven-metadata.xml` de Maven Central ese día. (2) `PhoneNumber` conserva la forma E.164 (`^\+[1-9][0-9]{7,14}$`) y agrega la comprobación de que `PhoneNumberUtil.parse(valor, null)` produce un número válido (`isValidNumber`) cuyo formato E.164 es igual al texto recibido (así `+57 300 000 0000` con espacios se rechaza). Si no lo es, lanza `InvalidPhoneNumberException` (nueva) con el código `PHONE_NUMBER_INVALID_FORMAT` y el texto del CA. (3) `RegisterUserRequest.toCommand()` convierte el celular vacío o en blanco en `null` (sin celular), y recorta los extremos. (4) Una prueba comprueba que todo número de ejemplo de `libphonenumber` (móvil y fijo de cada región) cumple la restricción `ck_cuenta_telefono_e164` de la base: REQ-RV-53.
 
@@ -227,7 +227,7 @@ Cubre REQ-RV-50 a 53; CA-1.1.29, 1.1.32, 1.1.37, 1.1.38; V-05. **BLOQUEADO por l
 
 ## 13. Bloque 6 — etiquetas, textos y pruebas que faltan (PR 6)
 
-Cubre REQ-RV-30, 60 a 65; CA-1.1.2 a 1.1.7, 1.1.20 a 1.1.26, 1.1.41; V-01, V-06. **BLOQUEADO por las preguntas 2 (textos), 6 (422 frente a 400) y 10 (texto del pronombre inválido) de la spec** para sus tarjetas T-6.3, T-6.2 y T-6.2 respectivamente; T-6.1, T-6.4, T-6.5 y T-6.6 no dependen de ellas.
+Cubre REQ-RV-30, 60 a 65; CA-1.1.2 a 1.1.7, 1.1.20 a 1.1.26, 1.1.41; V-01, V-06. Preguntas 2, 6 y 10 cerradas (textos de los CA, 422 y «Selecciona una opción.») para sus tarjetas T-6.3, T-6.2 y T-6.2 respectivamente; T-6.1, T-6.4, T-6.5 y T-6.6 no dependen de ellas.
 
 **Cómo se aborda.** (1) `EmailAddress` lanza `InvalidEmailException` (nueva, con `EMAIL_INVALID_FORMAT` y `EMAIL_TOO_LONG` como invariante) y deja de lanzar `IllegalArgumentException`. (2) Se **elimina** el manejador de `IllegalArgumentException` (defecto 6): una `IllegalArgumentException` inesperada pasa a ser un 500 genérico con `INTERNAL_ERROR`, que es lo correcto. (3) `cuerpoIlegible` distingue: si la ruta del error de Jackson apunta a `pronoun`, responde un elemento `{field:"pronoun", code:"PRONOUN_INVALID_VALUE"}`; si no, `REQUEST_BODY_INVALID_FORMAT` con el texto «Revisa el formato de los datos enviados.» (sin la afirmación sobre la fecha). (4) Se rechaza el número como valor de un enumerado con la propiedad de Jackson que corresponda (V-06 comprueba su nombre). (5) Se alinean los textos con el catálogo de la sección 5 de la spec (tabla de la tarjeta T-6.3). (6) Se completan las pruebas de edad con reloj fijo y las de los casos 1.1.41 y 1.1.42.
 

@@ -436,7 +436,7 @@ Se ejecuta **después de fusionar 1A y 1B**; revalidar las rutas y líneas contr
   }
   ```
   (Importar `java.util.Objects` en lugar del nombre completo.)
-- **Pruebas** (`SingleLineTextTest`, JUnit 5 y AssertJ sin Spring, nombres en español camelCase): una prueba o fila de `@ParameterizedTest` por cada valor de la matriz (`plan.md` §9.4, fila `SingleLineTextTest`): `"  Ana  "`→`Ana`; `"\u00A0Ana\u00A0"`→`Ana`; `"\tAna\n"`→`Ana`; `"\uFEFFAna"`→`Ana`; `"\u200BAna"` se conserva (no es espacio); `"María  José"` conserva el doble espacio interno; `"e\u0301"` (e + acento combinante) → `"é"` con `length()` 1; `"𝒜"` (U+1D49C) con `length()` 1 y `value().length()` 2; `""`, `"   "`, `"\u00A0"` → `isEmpty()`; `normalize(null)` → `null`; el constructor con `null` lanza `NullPointerException`.
+- **Pruebas** (`SingleLineTextTest`, JUnit 5 y AssertJ sin Spring, nombres en español camelCase): una prueba o fila de `@ParameterizedTest` por cada valor de la matriz (`plan.md` §9.4, fila `SingleLineTextTest`): `"  Ana  "`→`Ana`; `"\u00A0Ana\u00A0"`→`Ana`; `"\tAna\n"`→`Ana`; `"\uFEFFAna"`→`Ana`; `"\u200BAna"` se conserva (no es espacio); `"María  José"` conserva el doble espacio interno con `normalize` y queda `"María José"` con `normalizeName` (método nuevo: `normalize` y después cada secuencia de espacios del mismo conjunto del recorte pasa a un U+0020; `normalizeName(null)` → `null`); `"Ana\u00A0\u00A0Luz"` → `"Ana Luz"` con `normalizeName`; `"e\u0301"` (e + acento combinante) → `"é"` con `length()` 1; `"𝒜"` (U+1D49C) con `length()` 1 y `value().length()` 2; `""`, `"   "`, `"\u00A0"` → `isEmpty()`; `normalize(null)` → `null`; el constructor con `null` lanza `NullPointerException`.
 - **Trampas:** en el código fuente usar escapes `\u00A0`, `\uFEFF`, `\u0301` (no pegar los caracteres: el editor o el formateador los puede cambiar); `Character.isWhitespace` no considera espacio al U+00A0, por eso la segunda condición; el recorte debe avanzar por puntos de código, no por `char`.
 - **Verificación:** `./mvnw.cmd -q -B -Dtest=SingleLineTextTest test` en verde; `LayeredArchitectureTest` en verde.
 
@@ -509,8 +509,8 @@ Se ejecuta **después de fusionar 1A y 1B**; revalidar las rutas y líneas contr
   public RegisterUserRequest {
       // El borde valida y el comando recibe el texto ya recortado y en NFC: una sola definición de
       // «espacio» y de «carácter». Los demás campos no se tocan; la contraseña nunca se recorta.
-      firstName = SingleLineText.normalize(firstName);
-      lastName = SingleLineText.normalize(lastName);
+      firstName = SingleLineText.normalizeName(firstName);   // además une los espacios internos repetidos
+      lastName = SingleLineText.normalizeName(lastName);
       email = SingleLineText.normalize(email);
   }
   ```
@@ -553,7 +553,7 @@ Se ejecuta **después de fusionar 1A y 1B**; revalidar las rutas y líneas contr
 
 Se ejecuta después de fusionar el PR 2. Rama `CM-36-nombre-solo-letras` desde `develop`. Aplican las reglas del inicio de este archivo. Revalidar rutas y líneas contra `origin/develop`.
 
-## [ ] T-3.1 · Objeto de valor `PersonName` y su excepción — ≤ 30 min, ≈ 150 líneas — **BLOQUEADA en `李` y espacios dobles por la pregunta 8 de la spec**
+## [ ] T-3.1 · Objeto de valor `PersonName` y su excepción — ≤ 30 min, ≈ 150 líneas
 
 - **Cubre:** REQ-RV-31, 32. **Crear:** `domain/model/PersonName.java`, `domain/exception/InvalidPersonNameException.java`, `src/test/.../domain/model/PersonNameTest.java`. **Modificar:** `domain/exception/ErrorCode.java` (agregar `FIRST_NAME_INVALID_CHARACTERS` y `LAST_NAME_INVALID_CHARACTERS` con su Javadoc).
 - **Código de referencia:**
@@ -581,7 +581,7 @@ Se ejecuta después de fusionar el PR 2. Rama `CM-36-nombre-solo-letras` desde `
   }
   ```
   `PersonName` es una **clase final inmutable** (no un `record`: su constructor recibe el texto y la parte) con `private final String value`, constructor `PersonName(String raw, Part part)` y `value()`. El constructor: `SingleLineText text = new SingleLineText(raw)` (si `raw` es `null`, `IllegalArgumentException("El nombre es obligatorio")`); si `text.isEmpty()` → `IllegalArgumentException("El nombre es obligatorio")`; si `text.length() > 120` → `IllegalArgumentException("El nombre supera 120 caracteres")` (invariantes defensivas: el borde ya respondió); si `!ALLOWED.matcher(v).matches() || !HAS_LETTER.matcher(v).find()` → `throw new InvalidPersonNameException(part)`. `InvalidPersonNameException extends BusinessException` con `super(part.code(), part.message())` y `getField()` que devuelve `part.field()`. Javadoc completo en español (por qué se admiten las marcas combinantes, por qué el apóstrofo tipográfico).
-- **Pruebas** (`PersonNameTest`, sin Spring; `@ParameterizedTest @ValueSource` para cada lista): inválidos con `Part.FIRST_NAME` y con `Part.LAST_NAME` (el mensaje y el código son los de cada parte): `Ana3`, `Pérez_`, `---`, `'`, `’`, `Ana.`, `Ana@`, `<script>`, `12345`, `Ana–Luz`, `Ana😀`, y el NUL como `"Ana" + (char) 0`. Válidos: `María José`, `O'Neill`, `O’Neill`, `Gómez-Ruiz`, `Müller`, `Muñoz`, `A`, `B`, `Ñandú`, `李`, `Åsa`, `María  José`, `"a".repeat(120)`, `"Jose\u0301"` (su `value()` es `José`). Defensivas: `""`, `"   "` y 121 letras lanzan `IllegalArgumentException`. `toString` no se sobrescribe (el nombre no es secreto, pero no se registra: no hay logs en la clase).
+- **Pruebas** (`PersonNameTest`, sin Spring; `@ParameterizedTest @ValueSource` para cada lista): inválidos con `Part.FIRST_NAME` y con `Part.LAST_NAME` (el mensaje y el código son los de cada parte): `Ana3`, `Pérez_`, `---`, `'`, `’`, `Ana.`, `Ana@`, `<script>`, `12345`, `Ana–Luz`, `Ana😀`, y el NUL como `"Ana" + (char) 0`. Válidos: `María José`, `O'Neill`, `O’Neill`, `Gómez-Ruiz`, `Müller`, `Muñoz`, `A`, `B`, `Ñandú`, `李`, `Åsa`, `María José`, `"a".repeat(120)`, `"Jose\u0301"` (su `value()` es `José`). Defensivas: `""`, `"   "` y 121 letras lanzan `IllegalArgumentException`. `toString` no se sobrescribe (el nombre no es secreto, pero no se registra: no hay logs en la clase).
 - **Trampas:** en el fuente, escribir `\\p{L}` con dos barras dentro de la cadena Java; el apóstrofo tipográfico va como el carácter ’ (el proyecto compila en UTF-8); el guion al final de la clase `[...-]` no define un rango.
 - **Verificación:** `./mvnw.cmd -q -B -Dtest=PersonNameTest test` en verde; `LayeredArchitectureTest` en verde (el dominio no importa Spring).
 
@@ -673,7 +673,7 @@ Rama `CM-36-contrasenas-comunes` desde `develop`. **Fuente decidida (pregunta 3)
 
 # PR 5 — celular con `libphonenumber`
 
-Rama `CM-36-celular-libphonenumber` desde `develop`. **Dependencia aprobada (pregunta 11). La pregunta 9 (tipos de número, Vela) sigue abierta: sin respuesta, el bloque no empieza y se avisa a Paula.**
+Rama `CM-36-celular-libphonenumber` desde `develop`. **Dependencia aprobada (pregunta 11) y tipos de número decididos (pregunta 9: los mismos que `isValid` del cliente).**
 
 ## [ ] T-5.1 · Dependencia — ≤ 15 min, ≈ 8 líneas
 

@@ -110,7 +110,7 @@ nombre del contrato JSON. Los mensajes van entre comillas y con su punto final, 
 
 ### Bloque 2 — reglas comunes
 
-- **REQ-RV-20.** Cuando `firstName`, `lastName` o `email` lleguen con espacios al inicio o al final, el servicio debe recortarlos antes de validar y de guardar. «Espacio» es lo que recorta `String.prototype.trim` de JavaScript en el cliente: los de `Character.isWhitespace`, los separadores de espacio de Unicode (categoría Zs, incluido el NBSP U+00A0) y U+FEFF; no lo son U+200B ni los caracteres de control no listados (pregunta 13). Un texto que queda vacío tras recortar cuenta como vacío (`FIRST_NAME_REQUIRED`, `LAST_NAME_REQUIRED`, `EMAIL_REQUIRED`). Los espacios internos no se tocan. La contraseña no se recorta nunca.
+- **REQ-RV-20.** Cuando `firstName`, `lastName` o `email` lleguen con espacios al inicio o al final, el servicio debe recortarlos antes de validar y de guardar. «Espacio» es lo que recorta `String.prototype.trim` de JavaScript en el cliente: los de `Character.isWhitespace`, los separadores de espacio de Unicode (categoría Zs, incluido el NBSP U+00A0) y U+FEFF; no lo son U+200B ni los caracteres de control no listados (pregunta 13). Un texto que queda vacío tras recortar cuenta como vacío (`FIRST_NAME_REQUIRED`, `LAST_NAME_REQUIRED`, `EMAIL_REQUIRED`). En el correo los espacios internos no se tocan; en `firstName` y `lastName` cada secuencia de espacios internos se reduce a un espacio (`María  José` → `María José`; decisión de Paula, 6-oct-2026). La contraseña no se recorta nunca.
 - **REQ-RV-21.** Cuando un texto llegue en forma Unicode distinta de NFC (por ejemplo `e` + U+0301), el servicio debe normalizarlo a NFC antes de contar, validar y guardar.
 - **REQ-RV-22.** Cuando se midan límites, «caracteres» son puntos de código Unicode del texto en NFC. Nombre y apellido: 1 a 120. Correo: 1 a 254. Contraseña: 12 a 64 (la contraseña se normaliza a NFC solo para contarla: a Firebase llega tal como se escribió). Si el nombre, el apellido o el correo superan el límite, el servicio debe responder 422 en su campo con `FIRST_NAME_TOO_LONG`, `LAST_NAME_TOO_LONG` o `EMAIL_TOO_LONG` («El correo no puede superar los 254 caracteres.»).
 - **REQ-RV-23.** Cuando un campo incumpla varias reglas, el servicio debe devolver solo el primer mensaje, en este orden. Nombre y apellido: vacío, más de 120, caracteres no permitidos. Correo: vacío, más de 254, formato. Contraseña: vacía, menos de 12, más de 64, común. Fecha: vacía, formato, futura, menor de 18, más de 110.
@@ -121,7 +121,7 @@ nombre del contrato JSON. Los mensajes van entre comillas y con su punto final, 
 
 - **REQ-RV-31.** Cuando `firstName` o `lastName` (recortados y en NFC) contengan algún carácter que no sea una letra Unicode (`\p{L}`), una marca combinante (`\p{M}`), un espacio, el apóstrofo recto `'`, el apóstrofo tipográfico `’` o el guion `-`, o no contengan ninguna letra, el servicio debe responder 422 con `FIRST_NAME_INVALID_CHARACTERS` o `LAST_NAME_INVALID_CHARACTERS` y el mensaje «El nombre solo puede contener letras, espacios, apóstrofo y guion.» o «El apellido solo puede contener letras, espacios, apóstrofo y guion.».
   - Rechaza: `Ana3`, `Pérez_`, `---`, `'`, `Ana.`, `Ana@`, `<script>`, `Ana\u0000`, `12345`, `Ana–Luz` (guion largo).
-  - Acepta: `María José`, `O'Neill`, `O’Neill`, `Gómez-Ruiz`, `Müller`, `Muñoz`, `A`, `B`, `Ñandú`, `María  José` (dos espacios internos, ver pregunta 8).
+  - Acepta: `María José`, `O'Neill`, `O’Neill`, `Gómez-Ruiz`, `Müller`, `Muñoz`, `A`, `B`, `Ñandú`, `María  José` (se guarda como `María José`), `李`, `Åsa`.
 - **REQ-RV-32.** La regla debe vivir en el objeto de valor `PersonName` del dominio, probado sin Spring; el DTO no repite la expresión.
 
 ### Bloque 4 — lista de contraseñas
@@ -321,10 +321,10 @@ Cobertura: ≥ 90 % de líneas y ramas de lo nuevo o modificado, medida con JaCo
 
 | # | Pregunta | A quién | Recomendación | Bloquea |
 |---|---|---|---|---|
-| 1 | ¿Las correcciones de HU-1.1 viven en CM-36? Jira no tiene una tarea «Ajustes v4 – Backend» de Cuentas para HU-1.1 | **PENDIENTE de Vela** | Sí, en CM-36 | Dónde se registra y cierra el trabajo; nada de código |
+| 1 | ¿Las correcciones de HU-1.1 viven en CM-36? Jira no tiene una tarea «Ajustes v4 – Backend» de Cuentas para HU-1.1 | **No era pregunta: se comunica. Las correcciones de HU-1.1 se registran en CM-36; se informa a Vela** | Sí, en CM-36 | Dónde se registra y cierra el trabajo; nada de código |
 | 2 | ¿El servidor devuelve los textos del catálogo de los CA en todos los campos (sección 5)? | **Cerrada sin consulta (cambio sin alternativa):** RT-01 ya lo dice: las mismas reglas en la interfaz y en el backend y «el mensaje literal de cada campo está en su CA» | Sí: RT-01 pide las mismas reglas en cliente y servidor | Bloque 6 (T-6.3) |
-| 8 | Nombre y apellido: ¿letras de otros alfabetos (`\p{L}`: «李», «Åsa») y espacios dobles internos («María  José»)? El CA dice «letras (con tildes, ñ y ü)» | **PENDIENTE de Vela** | Permitir todo `\p{L}` y los espacios internos sin colapsar | La parte de `PersonName` del PR 2+3 |
-| 9 | Celular: ¿todos los tipos que `libphonenumber` da por válidos o solo móvil y fijo? | **PENDIENTE de Vela** | Igual que el cliente (`isValid`) | Bloque 5 |
+| 8 | Nombre y apellido: ¿letras de otros alfabetos (`\p{L}`: «李», «Åsa») y espacios dobles internos («María  José»)? El CA dice «letras (con tildes, ñ y ü)» | **Decidida por Paula (6-oct-2026): se acepta toda letra (`\p{L}`); los espacios internos repetidos de nombre y apellido se unen en uno** | Permitir todo `\p{L}` y los espacios internos sin colapsar | La parte de `PersonName` del PR 2+3 |
+| 9 | Celular: ¿todos los tipos que `libphonenumber` da por válidos o solo móvil y fijo? | **Decidida por Paula (6-oct-2026): los mismos números que el cliente (`isValid`)** | Igual que el cliente (`isValid`) | Bloque 5 |
 | 10 | Texto de `PRONOUN_INVALID_VALUE` (el CA no lo define) | **Cerrada sin consulta (cambio sin alternativa):** RT-01 fija el texto para listas: «Selecciona una opción.» | «Selecciona una opción.» | Bloque 6 (T-6.2) |
 | 12 | Confirmar en staging `SELECT DISTINCT pronombres FROM microcuentas.cuenta` antes de desplegar la migración V3 | **PENDIENTE de Juan Diego Gomez**, vía Vela | Pedirlo en el documento a DevOps | Despliegue de 1B (no el código) |
 
