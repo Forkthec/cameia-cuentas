@@ -119,7 +119,7 @@ Causas del vocabulario cerrado del estándar: `NOT_VERIFIED`, `NOT_FOUND`, `DISA
 
 - **Migración nueva** (bloque 2): índice parcial `ix_cuenta_pendiente_fecha_creacion ON microcuentas.cuenta (fecha_creacion) WHERE estado = 'PENDING_VERIFICATION'`. Justificación: filtro diario fijo sobre una tabla que crece con cada registro (estándar §B.5). Se prueba con Testcontainers y `EXPLAIN` no se exige (tabla pequeña); la prueba comprueba que el índice existe. El número de versión es el siguiente libre cuando se fusione (CM-36 usa V3 para la restricción de pronombres).
 - Sin columnas nuevas (P-03: sin `correo_verificado`). `fecha_creacion` ya es `timestamptz` y `fecha_actualizacion` se actualiza con `@PreUpdate`.
-- Borrado de fila: `DELETE` por `firebase_uid`; la tabla no tiene claves foráneas hacia ella en este servicio.
+- Borrado de fila: `DELETE` por `firebase_uid` **y** `estado = 'PENDING_VERIFICATION'` en la misma sentencia (si la persona activó la cuenta entre la consulta y el borrado, la fila no se borra); la tabla no tiene claves foráneas hacia ella en este servicio.
 
 ## 8. Seguridad y calidad
 
@@ -200,6 +200,8 @@ Plantilla del correo y DNS (CM-255) · pantallas y llamadas de `cameia-web` · e
 | 11 | D7: ¿cuatro PR (1, 2, 3, 4)? | **Respondida (Paula, 6-oct): sí, la recomendación** | Sí | Orden de entrega |
 | 12 | Orden: el bloque 3 (Gateway) depende de CM-260 (charset); ¿se hace CM-260 antes? | **Respondida (Paula, 6-oct): sí, la recomendación** | Sí, CM-260 primero (≈ 1 h) | Bloque 3 |
 | 13 | ¿Los bloques 1 y 2 de Cuentas se ejecutan después de los PR de CM-36 y CM-251, que tocan el mismo manejador de errores? | **Respondida (Paula, 6-oct): sí, la recomendación** | Solo el PR 1A de CM-36 antes (no CM-251) | Orden del bloque 1 |
+| 14 | P-JOB-1: en un Cloud Run Job no existe `K_SERVICE` (existe `CLOUD_RUN_JOB`) y la guarda del emulador de Firebase solo protege por el perfil `prod`. ¿Se agrega `CLOUD_RUN_JOB` a la detección en el bloque 4? | **PENDIENTE de Paula** | Sí (≈ 10 líneas y una prueba) | Tarjeta T-4.3 |
+| 15 | Nivel del log de una cuenta que la purga no pudo procesar: `WARN` sin traza, con el `firebaseUid` y solo el nombre de la clase de la excepción (el mensaje de Firebase puede traer datos personales). El resumen va en `INFO` y el aviso de fallidas en `WARN` | **PENDIENTE de Paula** | Aceptar: la cuenta se reintenta sola al día siguiente; `ERROR` alertaría por algo que se recupera solo | T-2.5 (una línea) |
 
 ## 15. Estimación
 
