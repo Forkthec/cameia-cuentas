@@ -131,7 +131,8 @@ class BusinessExceptionHandlerTest {
                         .doesNotContain("ck_cuenta_nombre"));
 
         assertThat(salida.getOut())
-                .contains("constraint=ck_cuenta_nombre, code=INTERNAL_ERROR, requestId=restriccion-1")
+                .contains("constraint=ck_cuenta_nombre, sqlState=")
+                .contains("code=INTERNAL_ERROR, requestId=restriccion-1")
                 .doesNotContain("Ana Pérez");
     }
 
@@ -224,6 +225,21 @@ class BusinessExceptionHandlerTest {
                 new ConstraintViolationException("sin nombre", new SQLException("Ana Pérez"), null)));
 
         assertThat(salida.getOut()).contains("constraint=desconocida").doesNotContain("Ana Pérez");
+    }
+
+    @Test
+    void unaViolacionSinNombreRegistraElSqlStateParaDiagnosticarlaSinElMensaje(CapturedOutput salida) {
+        manejador.integridadDeDatos(new DataIntegrityViolationException("x",
+                new ConstraintViolationException("sin nombre", new SQLException("Ana Pérez", "23502"), null)));
+
+        assertThat(salida.getOut()).contains("constraint=desconocida, sqlState=23502").doesNotContain("Ana Pérez");
+    }
+
+    @Test
+    void sinExcepcionDeJdbcElSqlStateEsDesconocido(CapturedOutput salida) {
+        manejador.integridadDeDatos(new DataIntegrityViolationException("x"));
+
+        assertThat(salida.getOut()).contains("sqlState=desconocido");
     }
 
     @Test

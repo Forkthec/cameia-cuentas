@@ -25,6 +25,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
+import tech.cameia.cuentas.domain.exception.InvalidEmailException;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.RawPassword;
 
@@ -167,6 +168,21 @@ class FirebaseUserDirectoryAdapterTest {
                 new RawPassword("frase secreta larga")))
                 .isInstanceOf(IllegalStateException.class)
                 .isNotInstanceOf(DependencyUnavailableException.class);
+    }
+
+    @Test
+    void unCorreoQueFirebaseRechazaEsUnCorreoInvalido() throws Exception {
+        // Así llega el INVALID_EMAIL del servidor: INVALID_ARGUMENT sin código de autenticación.
+        when(firebaseAuth.createUser(any(UserRecord.CreateRequest.class)))
+                .thenThrow(new FirebaseAuthException(ErrorCode.INVALID_ARGUMENT, "INVALID_EMAIL", null, null, null));
+
+        assertThatThrownBy(() -> adaptador.createUser(new EmailAddress("ana..perez@cameia.tech"),
+                new RawPassword("frase secreta larga")))
+                .isInstanceOfSatisfying(InvalidEmailException.class, error -> {
+                    assertThat(error.getErrorCode()).isEqualTo(tech.cameia.cuentas.domain.exception.ErrorCode.EMAIL_INVALID_FORMAT);
+                    assertThat(error.getField()).isEqualTo("email");
+                })
+                .hasMessage("Ingresa un correo electrónico válido.");
     }
 
     @Test

@@ -8,9 +8,7 @@ import tech.cameia.cuentas.domain.model.PersonName;
  * <p>Lleva el campo del contrato al que pertenece, para que el error se muestre junto al
  * campo correcto del formulario.</p>
  */
-public class InvalidPersonNameException extends BusinessException {
-
-    private final String field;
+public class InvalidPersonNameException extends InvalidFieldException {
 
     /**
      * Crea la excepción para una parte del nombre.
@@ -18,16 +16,6 @@ public class InvalidPersonNameException extends BusinessException {
      * @param part parte del nombre rechazada, con su código, su campo y su mensaje
      */
     public InvalidPersonNameException(PersonName.Part part) {
-        super(part.code(), part.message());
-        this.field = part.field();
-    }
-
-    /**
-     * Indica el campo rechazado.
-     *
-     * @return nombre del campo en el contrato JSON
-     */
-    public String getField() {
-        return field;
+        super(part.field(), part.code(), part.message());
     }
 }

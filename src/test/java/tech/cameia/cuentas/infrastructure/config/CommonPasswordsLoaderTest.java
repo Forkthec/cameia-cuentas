@@ -60,6 +60,22 @@ class CommonPasswordsLoaderTest {
     }
 
     @Test
+    void unaEntradaDe65CaracteresNoArrancaNiRevelaLaEntrada() {
+        String larga = "a".repeat(65);
+
+        assertThatThrownBy(() -> CommonPasswordsLoader.load(recurso("a".repeat(64) + "\n" + larga + "\n"), 1))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("línea 2")
+                .hasMessageContaining("más de 64 caracteres")
+                .hasMessageNotContaining(larga);
+    }
+
+    @Test
+    void unaEntradaDe64CaracteresSeAdmite() {
+        assertThat(CommonPasswordsLoader.load(recurso("a".repeat(64) + "\n"), 1)).containsExactly("a".repeat(64));
+    }
+
+    @Test
     void unaEntradaConMayusculasNoArranca() {
         assertThatThrownBy(() -> CommonPasswordsLoader.load(recurso("Password1234\n"), 1))
                 .isInstanceOf(IllegalStateException.class)

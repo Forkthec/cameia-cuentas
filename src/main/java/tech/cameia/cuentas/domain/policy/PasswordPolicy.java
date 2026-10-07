@@ -23,10 +23,10 @@ import tech.cameia.cuentas.domain.model.SingleLineText;
 public class PasswordPolicy {
 
     /** Longitud mínima exigida, en caracteres. */
-    private static final int MINIMUM_LENGTH = 12;
+    public static final int MINIMUM_LENGTH = 12;
 
     /** Longitud máxima admitida; por encima se rechaza en vez de recortar. */
-    private static final int MAXIMUM_LENGTH = 64;
+    public static final int MAXIMUM_LENGTH = 64;
 
     /** Texto del criterio de aceptación para una contraseña común; nunca repite la contraseña. */
     private static final String COMMON_PASSWORD_MESSAGE = "Esta contraseña es demasiado común, elige otra.";

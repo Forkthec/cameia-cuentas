@@ -7,7 +7,7 @@ package tech.cameia.cuentas.domain.exception;
  * motivo viaja con la excepción: quien la traduce a HTTP no tiene que deducirlo del
  * texto.</p>
  */
-public class InvalidBirthDateException extends BusinessException {
+public class InvalidBirthDateException extends InvalidFieldException {
 
     /** Causa concreta del rechazo. */
     public enum Reason {
@@ -46,7 +46,7 @@ public class InvalidBirthDateException extends BusinessException {
      * @param mensaje texto en español que el modal de registro muestra tal cual
      */
     public InvalidBirthDateException(Reason reason, String mensaje) {
-        super(reason.code(), mensaje);
+        super("birthDate", reason.code(), mensaje);
         this.reason = reason;
     }
 

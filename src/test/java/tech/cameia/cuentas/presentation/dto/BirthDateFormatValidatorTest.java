@@ -47,7 +47,8 @@ class BirthDateFormatValidatorTest {
     @ValueSource(strings = {"31/02/2000", "29/02/2001", "31/04/2000", "15/13/2000", "1/1/2000", "00/01/2000",
         "01/00/2000", "abc", "2000-01-01", "12-04-1995", "12/04/95", " 12/04/1995", "12/04/1995 ",
         "12/04/1995T00:00", "20000101", "12/04/1995\n", "12 /04/1995", "12/04/ 1995", "32/01/2000",
-        "١٢/٠٤/١٩٩٥", "12/04/10000", "12.04.1995"})
+        "١٢/٠٤/١٩٩٥", "12/04/10000", "12.04.1995", "01/01/-2000", "01/01/+2000", "01/01/+12345",
+        "+1/01/2000", "01/+1/2000", "12/04/199"})
     void unaFechaImposibleOMalEscritaTieneUnaSolaViolacionConElMensajeDelCriterio(String fecha) {
         Set<ConstraintViolation<Caso>> violaciones = validador.validate(new Caso(fecha));
 
@@ -76,10 +77,10 @@ class BirthDateFormatValidatorTest {
     }
 
     @Test
-    void unAnioConSignoEsUnaFechaRealQueLuegoRechazaLaPoliticaDeEdad() {
-        // El formato de año admite signo para años de más de cuatro cifras o anteriores a la
-        // era común; la fecha resultante es real y la política de edad la rechaza por
-        // inverosímil, así que no llega a guardarse.
-        assertThat(BirthDateFormatValidator.parse("01/01/-2000")).contains(LocalDate.of(-2000, 1, 1));
+    void unAnioConSignoODeMasDeCuatroCifrasNoSeInterpreta() {
+        // CA-1.1.8 exige dd/mm/aaaa: un año con signo es un error de formato, no una fecha que
+        // luego rechace la política de edad con otro código.
+        assertThat(BirthDateFormatValidator.parse("01/01/-2000")).isEmpty();
+        assertThat(BirthDateFormatValidator.parse("01/01/+12345")).isEmpty();
     }
 }

@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
+import tech.cameia.cuentas.domain.exception.InvalidEmailException;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.RawPassword;
 import tech.cameia.cuentas.domain.port.FirebaseUserDirectory;
@@ -62,6 +63,7 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
      * @param password contraseña ya validada por la política del dominio
      * @return identificador del usuario creado
      * @throws EmailAlreadyRegisteredException si ese correo ya tiene credencial
+     * @throws InvalidEmailException si Firebase rechaza el correo como dato inválido
      * @throws DependencyUnavailableException si Firebase no respondió o falló de su lado
      * @throws IllegalStateException si Firebase rechaza la creación por cualquier otro motivo
      */
@@ -78,8 +80,29 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
             if (AuthErrorCode.EMAIL_ALREADY_EXISTS.equals(error.getAuthErrorCode())) {
                 throw new EmailAlreadyRegisteredException();
             }
+            if (esDatoInvalido(error)) {
+                // EmailAddress es permisiva a propósito y Firebase podría ser más estricta. No se
+                // conoce un correo que pase la regla propia y Firebase rechace (el emulador los
+                // acepta todos), así que es una defensa. Para la persona sería un correo inválido
+                // (CA-1.1.20); el aviso deja ver en el log que las dos reglas difieren.
+                logger.warn("Firebase rechazó como inválido un correo que pasó la validación propia [codigo={}]",
+                        error.getErrorCode());
+                throw InvalidEmailException.invalidFormat();
+            }
             throw indisponibleOEnRechazo(error, "Firebase rechazó la creación del usuario");
         }
+    }
+
+    /**
+     * Indica si Firebase rechazó un dato de la solicitud de creación.
+     *
+     * <p>El SDK no tiene un código propio para el correo inválido: el {@code INVALID_EMAIL} del
+     * servidor llega como {@code INVALID_ARGUMENT} sin código de autenticación. El único dato
+     * libre de la solicitud que Firebase puede rechazar es el correo: la contraseña llega ya
+     * validada con un mínimo de 12 caracteres, por encima de los 6 que exige Firebase.</p>
+     */
+    private static boolean esDatoInvalido(FirebaseAuthException error) {
+        return error.getErrorCode() == ErrorCode.INVALID_ARGUMENT && error.getAuthErrorCode() == null;
     }
 
     /**

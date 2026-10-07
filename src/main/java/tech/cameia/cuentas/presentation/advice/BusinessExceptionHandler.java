@@ -1,6 +1,7 @@
 package tech.cameia.cuentas.presentation.advice;
 
 import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,6 +19,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -31,16 +33,11 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import tech.cameia.cuentas.domain.exception.AccountNotFoundException;
-import tech.cameia.cuentas.domain.exception.BusinessException;
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.EmailNotVerifiedException;
 import tech.cameia.cuentas.domain.exception.ErrorCode;
-import tech.cameia.cuentas.domain.exception.InvalidBirthDateException;
-import tech.cameia.cuentas.domain.exception.InvalidEmailException;
-import tech.cameia.cuentas.domain.exception.InvalidPersonNameException;
-import tech.cameia.cuentas.domain.exception.InvalidPhoneNumberException;
-import tech.cameia.cuentas.domain.exception.WeakPasswordException;
+import tech.cameia.cuentas.domain.exception.InvalidFieldException;
 import tools.jackson.databind.exc.MismatchedInputException;
 
 /**
@@ -140,58 +137,18 @@ class BusinessExceptionHandler {
     }
 
     /**
-     * Fecha de nacimiento que no permite registrarse.
+     * Rechazo del dominio que pertenece a un solo campo: fecha de nacimiento, contraseña,
+     * nombre, apellido, correo o celular.
      *
-     * @param error excepción con el motivo del rechazo
-     * @return {@code 422 Unprocessable Entity} con un elemento para el campo {@code birthDate}
-     */
-    @ExceptionHandler(InvalidBirthDateException.class)
-    ProblemDetail fechaInvalida(InvalidBirthDateException error) {
-        return campoDeDominioInvalido("birthDate", error);
-    }
-
-    /**
-     * Contraseña que no cumple la política.
+     * <p>Sale con la misma forma que los errores del contrato (un elemento en {@code errors}),
+     * para que el cliente lea siempre la lista. El campo lo trae la excepción.</p>
      *
-     * @param error excepción con la regla incumplida
-     * @return {@code 422 Unprocessable Entity} con un elemento para el campo {@code password}
-     */
-    @ExceptionHandler(WeakPasswordException.class)
-    ProblemDetail contraseniaDebil(WeakPasswordException error) {
-        return campoDeDominioInvalido("password", error);
-    }
-
-    /**
-     * Nombre o apellido con caracteres que no son letras, espacios, apóstrofo ni guion.
-     *
-     * @param error excepción con el campo rechazado
+     * @param error excepción con el campo, el código y el mensaje del criterio
      * @return {@code 422 Unprocessable Entity} con un elemento para ese campo
      */
-    @ExceptionHandler(InvalidPersonNameException.class)
-    ProblemDetail nombreInvalido(InvalidPersonNameException error) {
-        return campoDeDominioInvalido(error.getField(), error);
-    }
-
-    /**
-     * Correo sin forma de correo o demasiado largo.
-     *
-     * @param error excepción con la causa
-     * @return {@code 422 Unprocessable Entity} con un elemento para el campo {@code email}
-     */
-    @ExceptionHandler(InvalidEmailException.class)
-    ProblemDetail correoInvalido(InvalidEmailException error) {
-        return campoDeDominioInvalido(error.getField(), error);
-    }
-
-    /**
-     * Celular que no es un número válido para el país de su indicativo.
-     *
-     * @param error excepción con el campo rechazado
-     * @return {@code 422 Unprocessable Entity} con un elemento para el campo {@code phoneNumber}
-     */
-    @ExceptionHandler(InvalidPhoneNumberException.class)
-    ProblemDetail celularInvalido(InvalidPhoneNumberException error) {
-        return campoDeDominioInvalido(error.getField(), error);
+    @ExceptionHandler(InvalidFieldException.class)
+    ProblemDetail campoDeDominioInvalido(InvalidFieldException error) {
+        return validacion(List.of(campo(error.getField(), error.getErrorCode(), error.getMessage())));
     }
 
     /**
@@ -307,7 +264,9 @@ class BusinessExceptionHandler {
      * persona, porque la validación del contrato y del dominio actúa antes: una violación es
      * un defecto y responde como cualquier fallo imprevisto. El mensaje de la base incluye el
      * valor de la columna (un dato personal), así que ni se devuelve ni se registra: el log
-     * lleva solo el nombre de la restricción.</p>
+     * lleva solo el nombre de la restricción y el SQLState, el código estándar de cinco
+     * caracteres que dice la causa (por ejemplo {@code 23502}, un nulo en una columna
+     * obligatoria) cuando la violación no tiene nombre de restricción.</p>
      *
      * @param error excepción traducida por Spring
      * @return {@code 500 Internal Server Error} con un mensaje genérico
@@ -316,9 +275,9 @@ class BusinessExceptionHandler {
     ProblemDetail integridadDeDatos(DataIntegrityViolationException error) {
         ProblemDetail problema = problema(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno", DETALLE_INTERNO,
                 ErrorCode.INTERNAL_ERROR);
-        logger.error("Violación de restricción de la base [constraint={}, code={}, requestId={}, causa={}]",
-                restriccionDe(error), ErrorCode.INTERNAL_ERROR, problema.getProperties().get("requestId"),
-                claseMasEspecifica(error));
+        logger.error("Violación de restricción de la base [constraint={}, sqlState={}, code={}, requestId={}, causa={}]",
+                restriccionDe(error), estadoSqlDe(error), ErrorCode.INTERNAL_ERROR,
+                problema.getProperties().get("requestId"), claseMasEspecifica(error));
         return problema;
     }
 
@@ -365,6 +324,22 @@ class BusinessExceptionHandler {
     }
 
     /**
+     * Tipo de respuesta que quien llama no acepta.
+     *
+     * <p>Es un error del cliente: su {@code Accept} no admite ninguno de los tipos que la ruta
+     * produce. El cuerpo sale igual en {@code application/problem+json}, como todo error del
+     * servicio.</p>
+     *
+     * @param error excepción con los tipos que la ruta sí produce
+     * @return {@code 406 Not Acceptable} con el código {@code MEDIA_TYPE_NOT_ACCEPTABLE}
+     */
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    ProblemDetail tipoDeRespuestaNoAdmitido(HttpMediaTypeNotAcceptableException error) {
+        return rechazo(HttpStatus.NOT_ACCEPTABLE, "Tipo de respuesta no admitido", "Tipo de respuesta no admitido.",
+                ErrorCode.MEDIA_TYPE_NOT_ACCEPTABLE);
+    }
+
+    /**
      * Cualquier otro fallo.
      *
      * @param error excepción no prevista
@@ -379,14 +354,6 @@ class BusinessExceptionHandler {
         logger.error("Fallo no controlado [code={}, requestId={}]", ErrorCode.INTERNAL_ERROR,
                 problema.getProperties().get("requestId"), error);
         return problema;
-    }
-
-    /**
-     * Error de dominio de un solo campo (edad, contraseña): sale con la misma forma que los
-     * errores del contrato, para que el cliente lea siempre la lista {@code errors}.
-     */
-    private ProblemDetail campoDeDominioInvalido(String nombre, BusinessException error) {
-        return validacion(List.of(campo(nombre, error.getErrorCode(), error.getMessage())));
     }
 
     /** Respuesta 422 con lista de campos, código {@code VALIDATION_FAILED} y {@code detail} fijo. */
@@ -495,6 +462,17 @@ class BusinessExceptionHandler {
             }
         }
         return "desconocida";
+    }
+
+    /** SQLState de la primera excepción de JDBC en la cadena de causas; nunca su mensaje. */
+    private static String estadoSqlDe(Throwable error) {
+        Throwable actual = error;
+        for (int nivel = 0; actual != null && nivel < MAX_CAUSAS; nivel++, actual = actual.getCause()) {
+            if (actual instanceof SQLException jdbc && jdbc.getSQLState() != null) {
+                return jdbc.getSQLState();
+            }
+        }
+        return "desconocido";
     }
 
     /** Nombre simple de la causa más profunda: dice qué falló sin citar el valor recibido. */
