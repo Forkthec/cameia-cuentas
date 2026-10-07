@@ -30,6 +30,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import tech.cameia.cuentas.domain.exception.AccountNotFoundException;
 import tech.cameia.cuentas.domain.exception.BusinessException;
+import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.EmailNotVerifiedException;
 import tech.cameia.cuentas.domain.exception.ErrorCode;
@@ -246,6 +247,24 @@ class BusinessExceptionHandler {
         String detalle = origen.startsWith(PAQUETE_DOMINIO) ? error.getMessage() : "Revisa los datos enviados.";
         return rechazo(HttpStatus.UNPROCESSABLE_ENTITY, TITULO_VALIDACION, detalle,
                 ErrorCode.REQUEST_INVALID_VALUE, "origen=" + origen);
+    }
+
+    /**
+     * Dependencia externa (Firebase) que no respondió o falló de su lado.
+     *
+     * <p>Es un fallo del servicio y no de la persona, así que se registra en {@code ERROR}
+     * con la causa técnica; la respuesta solo dice que puede reintentar.</p>
+     *
+     * @param error excepción con la causa técnica
+     * @return {@code 503 Service Unavailable} con el código {@code DEPENDENCY_UNAVAILABLE}
+     */
+    @ExceptionHandler(DependencyUnavailableException.class)
+    ProblemDetail dependenciaNoDisponible(DependencyUnavailableException error) {
+        ProblemDetail problema = problema(HttpStatus.SERVICE_UNAVAILABLE, "Servicio no disponible", DETALLE_INTERNO,
+                error.getErrorCode());
+        logger.error("Dependencia no disponible [code={}, requestId={}]", error.getErrorCode(),
+                problema.getProperties().get("requestId"), error);
+        return problema;
     }
 
     /**

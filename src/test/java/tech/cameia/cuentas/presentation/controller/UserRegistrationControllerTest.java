@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import tech.cameia.cuentas.application.command.RegisterUserCommand;
 import tech.cameia.cuentas.application.service.RegisterUserService;
+import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException;
@@ -112,6 +113,21 @@ class UserRegistrationControllerTest {
                 .andExpect(jsonPath("$.errors[0].field").value("password"))
                 .andExpect(jsonPath("$.errors[0].code").value("PASSWORD_TOO_SHORT"))
                 .andExpect(jsonPath("$.errors[0].message").value("La contraseña debe tener al menos 12 caracteres"));
+    }
+
+    @Test
+    void firebaseNoDisponibleResponde503ConSuCodigoYSinLaCausa() throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class)))
+                .thenThrow(new DependencyUnavailableException(new java.io.IOException("Connection refused")));
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoValido()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("DEPENDENCY_UNAVAILABLE"))
+                .andExpect(jsonPath("$.detail").value("Ocurrió un error. Inténtalo de nuevo."))
+                .andExpect(jsonPath("$.requestId").isNotEmpty())
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Connection refused"))));
     }
 
     @Test

@@ -1,7 +1,9 @@
 package tech.cameia.cuentas.infrastructure.client;
 
+import java.io.IOException;
 import java.util.Map;
 
+import com.google.firebase.ErrorCode;
 import com.google.firebase.auth.AuthErrorCode;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
@@ -9,6 +11,7 @@ import com.google.firebase.auth.UserRecord;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.RawPassword;
@@ -59,7 +62,8 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
      * @param password contraseña ya validada por la política del dominio
      * @return identificador del usuario creado
      * @throws EmailAlreadyRegisteredException si ese correo ya tiene credencial
-     * @throws IllegalStateException si Firebase falla por cualquier otro motivo
+     * @throws DependencyUnavailableException si Firebase no respondió o falló de su lado
+     * @throws IllegalStateException si Firebase rechaza la creación por cualquier otro motivo
      */
     @Override
     public String createUser(EmailAddress email, RawPassword password) {
@@ -74,7 +78,7 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
             if (AuthErrorCode.EMAIL_ALREADY_EXISTS.equals(error.getAuthErrorCode())) {
                 throw new EmailAlreadyRegisteredException();
             }
-            throw new IllegalStateException("Firebase rechazó la creación del usuario", error);
+            throw indisponibleOEnRechazo(error, "Firebase rechazó la creación del usuario");
         }
     }
 
@@ -85,14 +89,15 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
      * resto de la plataforma a través del Gateway.</p>
      *
      * @param firebaseUid identificador del usuario
-     * @throws IllegalStateException si Firebase rechaza la escritura
+     * @throws DependencyUnavailableException si Firebase no respondió o falló de su lado
+     * @throws IllegalStateException si Firebase rechaza la escritura por cualquier otro motivo
      */
     @Override
     public void assignFreePlanClaim(String firebaseUid) {
         try {
             firebaseAuth.setCustomUserClaims(firebaseUid, Map.of(PLAN_CLAIM, FREE_PLAN));
         } catch (FirebaseAuthException error) {
-            throw new IllegalStateException("Firebase rechazó la escritura del plan del usuario", error);
+            throw indisponibleOEnRechazo(error, "Firebase rechazó la escritura del plan del usuario");
         }
     }
 
@@ -100,8 +105,9 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
      * Elimina la credencial del usuario.
      *
      * @param firebaseUid identificador del usuario
-     * @throws IllegalStateException si Firebase rechaza el borrado; quien compensa decide
-     *                               qué hacer con ese fallo
+     * @throws DependencyUnavailableException si Firebase no respondió o falló de su lado
+     * @throws IllegalStateException si Firebase rechaza el borrado por cualquier otro motivo;
+     *                               quien compensa decide qué hacer con ese fallo
      */
     @Override
     public void deleteUser(String firebaseUid) {
@@ -109,8 +115,31 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
             firebaseAuth.deleteUser(firebaseUid);
             logger.info("Credencial eliminada en Firebase para el usuario {}", firebaseUid);
         } catch (FirebaseAuthException error) {
-            throw new IllegalStateException("Firebase rechazó la eliminación del usuario", error);
+            throw indisponibleOEnRechazo(error, "Firebase rechazó la eliminación del usuario");
         }
+    }
+
+    /**
+     * Separa la indisponibilidad de Firebase de un rechazo.
+     *
+     * <p>Cuenta como indisponibilidad lo que la persona resuelve reintentando: el servicio no
+     * respondió a tiempo, respondió que no está disponible, falló de su lado, o la conexión
+     * misma falló (el SDK lo informa con una causa de E/S y el código {@code UNKNOWN} cuando
+     * la conexión es rechazada, o {@code DEADLINE_EXCEEDED} cuando se agota el tiempo).
+     * Cualquier otro error es un rechazo de un dato que pasó la validación propia: un
+     * defecto, no algo pasajero.</p>
+     *
+     * @param error excepción del SDK
+     * @param rechazo texto técnico para el log si no es indisponibilidad
+     * @return la excepción que se debe lanzar
+     */
+    private static RuntimeException indisponibleOEnRechazo(FirebaseAuthException error, String rechazo) {
+        ErrorCode codigo = error.getErrorCode();
+        boolean indisponible = codigo == ErrorCode.UNAVAILABLE
+                || codigo == ErrorCode.DEADLINE_EXCEEDED
+                || codigo == ErrorCode.INTERNAL
+                || error.getCause() instanceof IOException;
+        return indisponible ? new DependencyUnavailableException(error) : new IllegalStateException(rechazo, error);
     }
 
     /**

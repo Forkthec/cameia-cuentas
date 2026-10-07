@@ -15,6 +15,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import tech.cameia.cuentas.application.command.RegisterUserCommand;
+import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
@@ -98,6 +99,18 @@ class RegisterUserServiceTest {
         assertThat(repositorio.guardadas).isEmpty();
         // La credencial se borró, así que el correo vuelve a estar libre: el segundo
         // intento no choca con "este correo ya se encuentra registrado".
+        directorio.dejarDeFallar();
+        assertThat(servicio.register(comando()).getFirebaseUid()).isNotBlank();
+    }
+
+    @Test
+    void firebaseNoDisponibleAlEscribirElPlanCompensaYPropagaLaMismaExcepcion() {
+        directorio.quedarIndisponibleAlEscribirElPlan();
+
+        assertThatThrownBy(() -> servicio.register(comando())).isInstanceOf(DependencyUnavailableException.class);
+
+        assertThat(repositorio.guardadas).isEmpty();
+        // La credencial se borró: un segundo intento no choca con un correo ocupado.
         directorio.dejarDeFallar();
         assertThat(servicio.register(comando()).getFirebaseUid()).isNotBlank();
     }

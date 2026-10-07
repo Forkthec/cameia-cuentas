@@ -64,8 +64,10 @@ public class RegisterUserService {
      *         no cumple la política
      * @throws tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException si el
      *         correo ya tiene credencial
-     * @throws IllegalStateException si falla Firebase o la base de datos; en ese caso la
-     *         credencial recién creada ya quedó compensada
+     * @throws tech.cameia.cuentas.domain.exception.DependencyUnavailableException si Firebase
+     *         no respondió o falló de su lado; la credencial recién creada ya quedó compensada
+     * @throws IllegalStateException si Firebase rechaza la operación o falla la base de datos;
+     *         en ese caso la credencial recién creada ya quedó compensada
      */
     public Account register(RegisterUserCommand command) {
         EmailAddress email = new EmailAddress(command.email());
