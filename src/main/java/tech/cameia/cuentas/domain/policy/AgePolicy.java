@@ -57,17 +57,17 @@ public class AgePolicy {
         LocalDate value = birthDate.value();
 
         if (value.isAfter(today)) {
-            throw new InvalidBirthDateException(Reason.IN_THE_FUTURE, "Fecha de nacimiento inválida");
+            throw new InvalidBirthDateException(Reason.IN_THE_FUTURE, "Fecha de nacimiento inválida.");
         }
 
         int age = Period.between(value, today).getYears();
 
         if (age > IMPLAUSIBLE_AGE) {
             throw new InvalidBirthDateException(Reason.IMPLAUSIBLE,
-                    "La fecha de nacimiento no es plausible, por favor verifícala");
+                    "Verifica tu fecha de nacimiento.");
         }
         if (age < MINIMUM_AGE) {
-            throw new InvalidBirthDateException(Reason.UNDERAGE, "Debes ser mayor de edad");
+            throw new InvalidBirthDateException(Reason.UNDERAGE, "Debes ser mayor de edad.");
         }
     }
 }

@@ -9,6 +9,8 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException;
@@ -52,7 +54,7 @@ class AgePolicyTest {
 
         assertThatThrownBy(() -> policy.verify(cumpleManiana))
                 .isInstanceOf(InvalidBirthDateException.class)
-                .hasMessage("Debes ser mayor de edad")
+                .hasMessage("Debes ser mayor de edad.")
                 .extracting(excepcion -> ((InvalidBirthDateException) excepcion).getReason())
                 .isEqualTo(Reason.UNDERAGE);
     }
@@ -63,7 +65,7 @@ class AgePolicyTest {
 
         assertThatThrownBy(() -> policy.verify(futura))
                 .isInstanceOf(InvalidBirthDateException.class)
-                .hasMessage("Fecha de nacimiento inválida")
+                .hasMessage("Fecha de nacimiento inválida.")
                 .extracting(excepcion -> ((InvalidBirthDateException) excepcion).getReason())
                 .isEqualTo(Reason.IN_THE_FUTURE);
     }
@@ -74,6 +76,7 @@ class AgePolicyTest {
 
         assertThatThrownBy(() -> policy.verify(ciento_once))
                 .isInstanceOf(InvalidBirthDateException.class)
+                .hasMessage("Verifica tu fecha de nacimiento.")
                 .extracting(excepcion -> ((InvalidBirthDateException) excepcion).getReason())
                 .isEqualTo(Reason.IMPLAUSIBLE);
     }
@@ -110,5 +113,51 @@ class AgePolicyTest {
         BirthDate cumpleHoy = new BirthDate(LocalDate.of(2008, 9, 18));
 
         assertThatCode(() -> policyUtc.verify(cumpleHoy)).doesNotThrowAnyException();
+    }
+
+    /**
+     * Límites de cada regla con el día de hoy fijado en cada fila. La columna del resultado es
+     * {@code ACEPTA} o el motivo del rechazo.
+     */
+    @ParameterizedTest(name = "[{index}] nacido {0}, hoy {1} -> {2}")
+    @CsvSource({
+        // Mayoría de edad: cumple 18 hoy, mañana, y el mismo día de nacimiento.
+        "2008-10-06, 2026-10-06, ACEPTA",
+        "2008-10-07, 2026-10-06, UNDERAGE",
+        "2026-10-06, 2026-10-06, UNDERAGE",
+        // Tope de 110 años: cumple 111 mañana (todavía 110) y hoy.
+        "1915-10-07, 2026-10-06, ACEPTA",
+        "1915-10-06, 2026-10-06, IMPLAUSIBLE",
+        // Fecha futura: mañana.
+        "2026-10-07, 2026-10-06, IN_THE_FUTURE",
+        // Nacido un 29 de febrero: en un año no bisiesto cumple el 1 de marzo, no el 28 de febrero.
+        "2000-02-29, 2018-02-28, UNDERAGE",
+        "2000-02-29, 2018-03-01, ACEPTA",
+        // Cambio de año: nacido el 31/12 y el 01/01.
+        "2000-12-31, 2018-12-31, ACEPTA",
+        "2000-12-31, 2018-12-30, UNDERAGE",
+        "2000-01-01, 2017-12-31, UNDERAGE",
+        "2000-01-01, 2018-01-01, ACEPTA"})
+    void cadaLimiteDeEdadSeEvaluaConElDiaExacto(LocalDate nacimiento, LocalDate hoy, String esperado) {
+        AgePolicy politica = new AgePolicy(Clock.fixed(hoy.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
+        BirthDate fecha = new BirthDate(nacimiento);
+
+        if ("ACEPTA".equals(esperado)) {
+            assertThatCode(() -> politica.verify(fecha)).doesNotThrowAnyException();
+        } else {
+            assertThatThrownBy(() -> politica.verify(fecha))
+                    .isInstanceOf(InvalidBirthDateException.class)
+                    .extracting(excepcion -> ((InvalidBirthDateException) excepcion).getReason())
+                    .isEqualTo(Reason.valueOf(esperado));
+        }
+    }
+
+    @Test
+    void entreLasSieteYLaMedianocheDeColombiaYaEsElDiaSiguienteEnUtc() {
+        // 20:30 del 6 de octubre en Bogotá son las 01:30 del 7 en UTC: quien cumple 18 el 7
+        // ya puede registrarse, aunque en Colombia todavía sea el día anterior.
+        AgePolicy politica = new AgePolicy(Clock.fixed(Instant.parse("2026-10-07T01:30:00Z"), ZoneOffset.UTC));
+
+        assertThatCode(() -> politica.verify(new BirthDate(LocalDate.of(2008, 10, 7)))).doesNotThrowAnyException();
     }
 }

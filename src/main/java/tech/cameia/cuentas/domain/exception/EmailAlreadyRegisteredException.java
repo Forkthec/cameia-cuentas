@@ -10,7 +10,7 @@ package tech.cameia.cuentas.domain.exception;
  */
 public class EmailAlreadyRegisteredException extends BusinessException {
 
-    private static final String MENSAJE = "Este correo ya se encuentra registrado";
+    private static final String MENSAJE = "Ese correo ya tiene una cuenta.";
 
     /** Crea la excepción con el mensaje que ve la persona que se registra. */
     public EmailAlreadyRegisteredException() {

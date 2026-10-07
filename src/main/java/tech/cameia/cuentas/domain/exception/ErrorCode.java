@@ -18,7 +18,10 @@ public enum ErrorCode {
     /** Falló algo imprevisto que la persona no puede corregir. */
     INTERNAL_ERROR,
 
-    /** Un objeto de valor rechazó un dato sin indicar el campo; respaldo temporal hasta que cada uno tenga su código. */
+    /**
+     * Una restricción del contrato sin código asignado rechazó un campo. Es un respaldo que no
+     * debe emitirse: una prueba exige que toda restricción tenga su código.
+     */
     REQUEST_INVALID_VALUE,
 
     /** Falta el nombre. */
@@ -60,6 +63,9 @@ public enum ErrorCode {
     /** El correo supera el máximo de caracteres. */
     EMAIL_TOO_LONG,
 
+    /** El correo no tiene forma de correo. */
+    EMAIL_INVALID_FORMAT,
+
     /** El correo ya tiene una cuenta. */
     EMAIL_ALREADY_REGISTERED,
 
@@ -77,6 +83,9 @@ public enum ErrorCode {
 
     /** Falta elegir los pronombres. */
     PRONOUN_REQUIRED,
+
+    /** Los pronombres no son ninguna de las opciones de la lista. */
+    PRONOUN_INVALID_VALUE,
 
     /** El celular no es un número válido para el país de su indicativo. */
     PHONE_NUMBER_INVALID_FORMAT,

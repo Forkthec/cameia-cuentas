@@ -74,11 +74,11 @@ public class PasswordPolicy {
 
         if (length < MINIMUM_LENGTH) {
             throw new WeakPasswordException(ErrorCode.PASSWORD_TOO_SHORT,
-                    "La contraseña debe tener al menos " + MINIMUM_LENGTH + " caracteres");
+                    "La contraseña debe tener al menos " + MINIMUM_LENGTH + " caracteres.");
         }
         if (length > MAXIMUM_LENGTH) {
             throw new WeakPasswordException(ErrorCode.PASSWORD_TOO_LONG,
-                    "La contraseña no puede superar los " + MAXIMUM_LENGTH + " caracteres");
+                    "La contraseña no puede superar los " + MAXIMUM_LENGTH + " caracteres.");
         }
         if (esConocida(value)) {
             throw new WeakPasswordException(ErrorCode.PASSWORD_TOO_COMMON, COMMON_PASSWORD_MESSAGE);

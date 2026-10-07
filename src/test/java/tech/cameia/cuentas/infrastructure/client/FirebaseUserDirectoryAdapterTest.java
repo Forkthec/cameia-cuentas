@@ -63,7 +63,7 @@ class FirebaseUserDirectoryAdapterTest {
         assertThatThrownBy(() -> adaptador.createUser(new EmailAddress("ana@cameia.tech"),
                 new RawPassword("frase secreta larga")))
                 .isInstanceOf(EmailAlreadyRegisteredException.class)
-                .hasMessage("Este correo ya se encuentra registrado");
+                .hasMessage("Ese correo ya tiene una cuenta.");
     }
 
     @Test
