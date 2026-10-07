@@ -37,6 +37,7 @@ import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException;
 import tech.cameia.cuentas.domain.exception.InvalidPersonNameException;
+import tech.cameia.cuentas.domain.exception.InvalidPhoneNumberException;
 import tech.cameia.cuentas.domain.model.PersonName;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException.Reason;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
@@ -520,6 +521,47 @@ class UserRegistrationControllerTest {
                 .andExpect(jsonPath("$.errors[0].field").value(parte.field()))
                 .andExpect(jsonPath("$.errors[0].code").value(parte.code().name()))
                 .andExpect(jsonPath("$.errors[0].message").value(parte.message()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\"sinCelular\":1", "\"phoneNumber\":null", "\"phoneNumber\":\"\"", "\"phoneNumber\":\"   \"",
+        "\"phoneNumber\":\" \""})
+    void sinCelularElComandoLlevaNulo(String fragmento) throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON)
+                        .content(cuerpoValido().replace("\"phoneNumber\":\"+573001234567\"", fragmento)))
+                .andExpect(status().isCreated());
+
+        verify(servicio).register(comando.capture());
+        assertThat(comando.getValue().phoneNumber()).isNull();
+    }
+
+    @Test
+    void elCelularLlegaRecortadoAlCasoDeUso() throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON)
+                        .content(cuerpoConCampo("phoneNumber", "\"  +573000000000  \"")))
+                .andExpect(status().isCreated());
+
+        verify(servicio).register(comando.capture());
+        assertThat(comando.getValue().phoneNumber()).isEqualTo("+573000000000");
+    }
+
+    @Test
+    void unCelularInvalidoSeSenialaEnSuCampo() throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class))).thenThrow(new InvalidPhoneNumberException());
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoValido()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("phoneNumber"))
+                .andExpect(jsonPath("$.errors[0].code").value("PHONE_NUMBER_INVALID_FORMAT"))
+                .andExpect(jsonPath("$.errors[0].message")
+                        .value("Revisa el número, no coincide con el formato del país elegido."));
     }
 
     @Test

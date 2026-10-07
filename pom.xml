@@ -30,6 +30,7 @@
 		<java.version>21</java.version>
 		<therapi-javadoc.version>0.15.0</therapi-javadoc.version>
 		<firebase-admin.version>9.10.0</firebase-admin.version>
+		<libphonenumber.version>9.0.40</libphonenumber.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -63,6 +64,12 @@
 			<groupId>com.google.firebase</groupId>
 			<artifactId>firebase-admin</artifactId>
 			<version>${firebase-admin.version}</version>
+		</dependency>
+		<!-- Valida el celular con la misma librería que usa el formulario web (version Java de libphonenumber, Apache 2.0). -->
+		<dependency>
+			<groupId>com.googlecode.libphonenumber</groupId>
+			<artifactId>libphonenumber</artifactId>
+			<version>${libphonenumber.version}</version>
 		</dependency>
 
 		<dependency>

@@ -7,7 +7,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
+
+import tech.cameia.cuentas.domain.exception.ErrorCode;
+import tech.cameia.cuentas.domain.exception.InvalidPhoneNumberException;
 
 /**
  * Prueba de los objetos de valor del registro descritos en
@@ -118,6 +122,60 @@ class ValueObjectsTest {
         void rechazaUnNumeroConSeparadores() {
             assertThatThrownBy(() -> new PhoneNumber("+57 300 123 4567"))
                     .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"+573000000000", "+34612345678", "+576012345678", "+14155552671", "+573001234567"})
+        void unNumeroNuevoValidoParaSuPaisSeAcepta(String numero) {
+            assertThat(PhoneNumber.fromInput(numero).value()).isEqualTo(numero);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"12345", "+57300", "3000000000", "+57 300 000 0000", "+99912345678",
+            "+5730000000000000", "+573000000000abc", "+573000000000;ext=12", "+0573000000000", "+5730000000000"})
+        void unNumeroNuevoQueNoEsValidoParaSuPaisSeRechazaConSuCodigoYSinRepetirlo(String numero) {
+            assertThatThrownBy(() -> PhoneNumber.fromInput(numero))
+                    .isInstanceOf(InvalidPhoneNumberException.class)
+                    .hasMessage("Revisa el número, no coincide con el formato del país elegido.")
+                    .hasMessageNotContaining(numero)
+                    .satisfies(error -> {
+                        assertThat(((InvalidPhoneNumberException) error).getErrorCode())
+                                .isEqualTo(ErrorCode.PHONE_NUMBER_INVALID_FORMAT);
+                        assertThat(((InvalidPhoneNumberException) error).getField()).isEqualTo("phoneNumber");
+                    });
+        }
+
+        @ParameterizedTest
+        @NullSource
+        @ValueSource(strings = {"", "   "})
+        void sinNumeroNoEsUnNumeroNuevo(String numero) {
+            assertThatThrownBy(() -> PhoneNumber.fromInput(numero)).isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        void unNumeroConElPrefijoNacionalSobranteNoEstaEnSuFormaCanonicaYSeRechaza() {
+            // La librería quita el 0 nacional y da el número por válido, pero su forma canónica es
+            // +447400123456: el texto recibido no es ese número tal como se guardaría.
+            assertThatThrownBy(() -> PhoneNumber.fromInput("+4407400123456"))
+                    .isInstanceOf(InvalidPhoneNumberException.class);
+            assertThat(PhoneNumber.fromInput("+447400123456").value()).isEqualTo("+447400123456");
+        }
+
+        @ParameterizedTest
+        @NullSource
+        @ValueSource(strings = {"", "  "})
+        void unNumeroGuardadoNoPuedeFaltar(String numero) {
+            assertThatThrownBy(() -> new PhoneNumber(numero))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("El número de celular es obligatorio cuando se envía");
+        }
+
+        @Test
+        void unNumeroYaGuardadoQueSoloCumpleLaFormaSeReconstruyeIgual() {
+            // +57300 no existe para su país, pero cumple la forma de la base: una fila antigua
+            // con ese valor se sigue leyendo; solo un número nuevo pasa por la regla del país.
+            assertThat(new PhoneNumber("+5730000000").value()).isEqualTo("+5730000000");
+            assertThatThrownBy(() -> PhoneNumber.fromInput("+5730000000")).isInstanceOf(InvalidPhoneNumberException.class);
         }
     }
 
