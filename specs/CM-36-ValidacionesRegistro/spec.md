@@ -3,7 +3,7 @@
 - **Tarea:** CM-36 · Subtarea · «HU-1.1 – Backend: estado inicial de la cuenta nueva» · padre CM-14 «HU-1.1 Registro de Nuevo Usuario» · Sprint 2 · responsable: Paula Andrea Muñoz Delgado
 - **Repositorio:** `cameia-cuentas`, rama `CM-36-validaciones-registro`, creada desde `origin/develop` (`908112c`)
 - **Backlog vigente:** `05102026_01_Backlog.xlsx`, hoja `HE-01`, HU-1.1 (44 criterios) y su apartado «Cambios v4» (5-oct-2026)
-- **Estado:** spec completa de la tarea, **pendiente de aprobación expresa de Paula** (revisada con sus respuestas del 7-oct-2026). Las preguntas de Paula están respondidas (sección 15); quedan abiertas las de Vela y DevOps, que solo afectan a textos y nombres de los bloques 3, 5 y 6 y al despliegue de 1B.
+- **Estado:** spec completa de la tarea, **aprobada por Paula el 7-oct-2026** («apruebo el plan»), ya revisada con sus respuestas de ese día; el push y los PR siguen pidiéndose a Paula cada vez. Las preguntas de Paula están respondidas (sección 15); quedan abiertas las de Vela y DevOps, que solo afectan a textos y nombres de los bloques 3, 5 y 6 y al despliegue de 1B.
 - **Atributos de calidad que toca:** seguridad (ASVS 6.2.4, 5.1, API3 y API6), compatibilidad de contrato (aditiva, con un cambio de textos), mantenibilidad y testabilidad (códigos de error y validación por capas), fiabilidad (sin 500 por entrada inválida).
 
 ## 1. Contexto y objetivo

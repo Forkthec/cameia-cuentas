@@ -1,6 +1,6 @@
 # Tareas — CM-36-ValidacionesRegistro
 
-Estado: sin ejecutar; spec y plan pendientes de aprobación de Paula. Este archivo tiene las tarjetas del **bloque 1** (PR 1A y PR 1B) y del **bloque 2** (PR 2). Las tarjetas de los bloques 3 a 6 se
+Estado: sin ejecutar; spec y plan aprobados por Paula el 7-oct-2026 («apruebo el plan»). La ejecución es meticulosa: ningún error se oculta (se reporta con su salida real), cada tarjeta se verifica con pruebas de camino feliz, de cada validación, de límites y de casos no previstos, y el código se revisa antes de cerrar. Este archivo tiene las tarjetas del **bloque 1** (PR 1A y PR 1B) y del **bloque 2** (PR 2). Las tarjetas de los bloques 3 a 6 se
 agregan aquí antes de ejecutar cada bloque. Se marca `[x]` solo con la salida real de las pruebas pegada en el informe del PR.
 
 ## Reglas para todas las tarjetas (el modelo que ejecuta no lee la spec ni el plan)

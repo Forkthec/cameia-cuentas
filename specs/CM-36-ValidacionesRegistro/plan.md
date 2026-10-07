@@ -1,6 +1,6 @@
 # Plan — CM-36-ValidacionesRegistro
 
-Base: `origin/develop` `908112c`. Estado: pendiente de aprobación de Paula. Este plan contiene los seis bloques: el **bloque 1** (dos PR: 1A y 1B, secciones 1 a 8), el **bloque 2** (sección 9) y los **bloques 3 a 6**
+Base: `origin/develop` `908112c`. Estado: aprobado por Paula el 7-oct-2026 («apruebo el plan»). Este plan contiene los seis bloques: el **bloque 1** (dos PR: 1A y 1B, secciones 1 a 8), el **bloque 2** (sección 9) y los **bloques 3 a 6**
 (secciones 10 a 14). El orden y las dependencias están en la sección 7. Antes de ejecutar cada bloque se revalidan rutas y líneas contra el estado real de `develop` ese día.
 
 ## 1. Cómo se aborda el bloque 1
