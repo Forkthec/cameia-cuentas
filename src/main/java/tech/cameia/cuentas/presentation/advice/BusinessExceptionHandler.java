@@ -87,6 +87,12 @@ class BusinessExceptionHandler {
     /** {@code detail} de todo fallo que la persona no puede corregir. */
     private static final String DETALLE_INTERNO = "Ocurrió un error. Inténtalo de nuevo.";
 
+    /**
+     * Máximo de causas que se recorren: una cadena con un ciclo (A causada por B y B por A) no
+     * debe dejar el hilo en un bucle.
+     */
+    private static final int MAX_CAUSAS = 32;
+
     /** Paquete del dominio: sus excepciones traen textos escritos para la persona. */
     private static final String PAQUETE_DOMINIO = "tech.cameia.cuentas.domain";
 
@@ -449,12 +455,10 @@ class BusinessExceptionHandler {
 
     /** Nombre de la restricción violada, buscado en la cadena de causas; nunca el mensaje. */
     private static String restriccionDe(Throwable error) {
-        for (Throwable actual = error; actual != null; actual = actual.getCause()) {
+        Throwable actual = error;
+        for (int nivel = 0; actual != null && nivel < MAX_CAUSAS; nivel++, actual = actual.getCause()) {
             if (actual instanceof ConstraintViolationException hibernate && hibernate.getConstraintName() != null) {
                 return hibernate.getConstraintName();
-            }
-            if (actual.getCause() == actual) {
-                break;
             }
         }
         return "desconocida";
@@ -463,7 +467,7 @@ class BusinessExceptionHandler {
     /** Nombre simple de la causa más profunda: dice qué falló sin citar el valor recibido. */
     private static String claseMasEspecifica(Throwable error) {
         Throwable actual = error;
-        while (actual.getCause() != null && actual.getCause() != actual) {
+        for (int nivel = 0; actual.getCause() != null && nivel < MAX_CAUSAS; nivel++) {
             actual = actual.getCause();
         }
         return actual.getClass().getSimpleName();

@@ -16,8 +16,20 @@ import com.jayway.jsonpath.JsonPath;
 
 import jakarta.validation.Constraint;
 
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.MethodParameter;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.http.MockHttpInputMessage;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.ServletRequestBindingException;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -45,6 +57,8 @@ import tech.cameia.cuentas.presentation.dto.RegisterUserRequest;
 class BusinessExceptionHandlerTest {
 
     private static final String UUID_V4 = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
+
+    private final BusinessExceptionHandler manejador = new BusinessExceptionHandler();
 
     private final MockMvc mockMvc = MockMvcBuilders
             .standaloneSetup(new ControladorQueFalla())
@@ -123,6 +137,99 @@ class BusinessExceptionHandlerTest {
         mockMvc.perform(get("/restriccion-sin-nombre"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+
+        assertThat(salida.getOut()).contains("constraint=desconocida").doesNotContain("Ana Pérez");
+    }
+
+    @Test
+    void unaRestriccionSinCodigoUsaElRespaldoYRegistraUnError(CapturedOutput salida) throws Exception {
+        BeanPropertyBindingResult resultado = new BeanPropertyBindingResult(new Object(), "request");
+        resultado.addError(new FieldError("request", "telefono", null, false,
+                new String[] {"Pattern.request.telefono", "Pattern"}, null, null));
+        MethodArgumentNotValidException error = new MethodArgumentNotValidException(
+                new MethodParameter(Object.class.getMethod("equals", Object.class), 0), resultado);
+
+        ProblemDetail problema = manejador.camposInvalidos(error);
+
+        assertThat(problema.getProperties()).containsEntry("code", "VALIDATION_FAILED");
+        assertThat(problema.getProperties().get("errors")).asInstanceOf(InstanceOfAssertFactories.LIST)
+                .containsExactly(new BusinessExceptionHandler.CampoRechazado("telefono", "REQUEST_INVALID_VALUE",
+                        "Valor no válido"));
+        assertThat(salida.getOut()).contains("ERROR").contains("Restricción del contrato sin código de error: telefono.Pattern");
+    }
+
+    @Test
+    void fueraDeUnaPeticionElRequestIdSeGeneraIgual() {
+        RequestContextHolder.resetRequestAttributes();
+
+        ProblemDetail problema = manejador.falloInterno(new IllegalStateException("x"));
+
+        assertThat((String) problema.getProperties().get("requestId")).matches(UUID_V4);
+    }
+
+    @Test
+    void sinRespuestaAsociadaElRequestIdSeTomaDeLaPeticionSinFallar() {
+        MockHttpServletRequest peticion = new MockHttpServletRequest();
+        peticion.addHeader("X-Request-Id", "solo-peticion");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(peticion));
+        try {
+            ProblemDetail problema = manejador.falloInterno(new IllegalStateException("x"));
+
+            assertThat(problema.getProperties()).containsEntry("requestId", "solo-peticion");
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+    }
+
+    @Test
+    void unaPeticionIncompletaQueNoEsPorUnEncabezadoRegistraSoloLaClase(CapturedOutput salida) {
+        ProblemDetail problema = manejador.peticionIncompleta(new ServletRequestBindingException("valor secreto"));
+
+        assertThat(problema.getStatus()).isEqualTo(400);
+        assertThat(problema.getProperties()).containsEntry("code", "IDENTITY_REQUIRED");
+        assertThat(salida.getOut()).contains("causa=ServletRequestBindingException").doesNotContain("valor secreto");
+    }
+
+    @Test
+    void unValorInvalidoSinTrazaSeTrataComoDeLibreria(CapturedOutput salida) {
+        IllegalArgumentException sinTraza = new IllegalArgumentException("texto que no debe salir");
+        sinTraza.setStackTrace(new StackTraceElement[0]);
+
+        ProblemDetail problema = manejador.valorInvalido(sinTraza);
+
+        assertThat(problema.getDetail()).isEqualTo("Revisa los datos enviados.");
+        assertThat(salida.getOut()).contains("origen=desconocido").doesNotContain("texto que no debe salir");
+    }
+
+    @Test
+    void unCuerpoIlegibleRegistraLaClaseDeLaCausaMasProfundaSinSuMensaje(CapturedOutput salida) {
+        HttpMessageNotReadableException error = new HttpMessageNotReadableException("lectura",
+                new IllegalStateException("frase secreta larga", new java.io.EOFException("ana@cameia.tech")),
+                new MockHttpInputMessage(new byte[0]));
+
+        ProblemDetail problema = manejador.cuerpoIlegible(error);
+
+        assertThat(problema.getProperties()).containsEntry("code", "REQUEST_BODY_INVALID_FORMAT");
+        assertThat(salida.getOut()).contains("causa=EOFException")
+                .doesNotContain("frase secreta larga").doesNotContain("ana@cameia.tech");
+    }
+
+    @Test
+    void unaCadenaDeCausasCiclicaNoDejaElHiloEnUnBucle(CapturedOutput salida) {
+        IllegalStateException primera = new IllegalStateException("a");
+        IllegalStateException segunda = new IllegalStateException("b", primera);
+        primera.initCause(segunda);
+
+        ProblemDetail problema = manejador.integridadDeDatos(new DataIntegrityViolationException("x", primera));
+
+        assertThat(problema.getProperties()).containsEntry("code", "INTERNAL_ERROR");
+        assertThat(salida.getOut()).contains("constraint=desconocida");
+    }
+
+    @Test
+    void unaRestriccionDeHibernateSinNombreSeRegistraComoDesconocida(CapturedOutput salida) {
+        manejador.integridadDeDatos(new DataIntegrityViolationException("x",
+                new ConstraintViolationException("sin nombre", new SQLException("Ana Pérez"), null)));
 
         assertThat(salida.getOut()).contains("constraint=desconocida").doesNotContain("Ana Pérez");
     }

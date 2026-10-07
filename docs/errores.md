@@ -2,36 +2,75 @@
 
 ## Formato
 
-Las respuestas de error siguen la [sección 6 del estándar](estandar-backend.md#6-errores). Esta página lista lo que el servicio emite hoy.
+Las respuestas de error siguen la [sección 6 del estándar](estandar-backend.md#6-errores): `ProblemDetail` (RFC 9457) con
+`Content-Type: application/problem+json; charset=UTF-8`, el código estable en `code` y el identificador de la petición en
+`requestId` (el `X-Request-Id` recibido si cumple `^[A-Za-z0-9._-]{1,64}$`; si no, un UUID v4 nuevo, que también se devuelve en el
+encabezado `X-Request-Id`). Los errores de validación agregan `errors`, con un elemento `field`, `code` y `message` por campo
+rechazado; en ellos `code` es `VALIDATION_FAILED` y `detail` es siempre «Revisa los campos marcados.». La decisión está en el
+[ADR 0001](adr/0001-codigo-de-error-y-request-id.md).
+
+Todas las respuestas las produce `BusinessExceptionHandler`. Cada error se registra una sola vez: los 4xx en `WARN` sin traza, con
+`code`, `requestId` y, en validación, los nombres de campo y sus códigos; los 5xx en `ERROR` con traza. Nunca se registran el valor de
+un campo, el correo, la contraseña ni el mensaje de una excepción de deserialización o de base de datos.
 
 ## Códigos que el servicio emite
 
-Todavía no emite el campo `code`; se adopta en la primera tarea de código del servicio (ver [ADR 0001](adr/0001-codigo-de-error-y-request-id.md)).
+Rutas: **registro** es `POST /api/v1/users`; **activación** es `POST /api/v1/users/me/verification`; **cualquiera** es toda ruta del
+servicio. Las pruebas citadas están en `src/test/java/tech/cameia/cuentas/`.
 
-## Respuestas sin código
+| Código | HTTP | Endpoints | Campo | Mensaje | Origen | Prueba |
+|---|---|---|---|---|---|---|
+| `VALIDATION_FAILED` | 422 | registro | — (lista `errors`) | Revisa los campos marcados. | Lista `errors` no vacía | `UserRegistrationControllerTest` |
+| `FIRST_NAME_REQUIRED` | 422 | registro | `firstName` | Los nombres son obligatorios | `@NotBlank` | `UserRegistrationControllerTest` |
+| `FIRST_NAME_TOO_LONG` | 422 | registro | `firstName` | Los nombres no pueden superar los 120 caracteres | `@Size(max = 120)` | `UserRegistrationControllerTest` |
+| `LAST_NAME_REQUIRED` | 422 | registro | `lastName` | Los apellidos son obligatorios | `@NotBlank` | `UserRegistrationControllerTest` |
+| `LAST_NAME_TOO_LONG` | 422 | registro | `lastName` | Los apellidos no pueden superar los 120 caracteres | `@Size(max = 120)` | `UserRegistrationControllerTest` |
+| `BIRTH_DATE_REQUIRED` | 422 | registro | `birthDate` | La fecha de nacimiento es obligatoria | `@NotNull` | `UserRegistrationControllerTest` |
+| `BIRTH_DATE_IN_THE_FUTURE` | 422 | registro | `birthDate` | Fecha de nacimiento inválida | `AgePolicy` (`InvalidBirthDateException`) | `AgePolicyTest` |
+| `BIRTH_DATE_UNDERAGE` | 422 | registro | `birthDate` | Debes ser mayor de edad | `AgePolicy` (`InvalidBirthDateException`) | `AgePolicyTest`, `UserRegistrationControllerTest` |
+| `BIRTH_DATE_OUT_OF_RANGE` | 422 | registro | `birthDate` | La fecha de nacimiento no es plausible, por favor verifícala | `AgePolicy` (`InvalidBirthDateException`) | `AgePolicyTest` |
+| `EMAIL_REQUIRED` | 422 | registro | `email` | El correo electrónico es obligatorio | `@NotBlank` | `UserRegistrationControllerTest` |
+| `EMAIL_ALREADY_REGISTERED` | 409 | registro | — | Este correo ya se encuentra registrado | `EmailAlreadyRegisteredException` | `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest` |
+| `PASSWORD_REQUIRED` | 422 | registro | `password` | La contraseña es obligatoria | `@NotBlank` | `UserRegistrationControllerTest` |
+| `PASSWORD_TOO_SHORT` | 422 | registro | `password` | La contraseña debe tener al menos 12 caracteres | `PasswordPolicy` (`WeakPasswordException`) | `PasswordPolicyTest`, `UserRegistrationControllerTest` |
+| `PASSWORD_TOO_LONG` | 422 | registro | `password` | La contraseña no puede superar los 64 caracteres | `PasswordPolicy` (`WeakPasswordException`) | `PasswordPolicyTest` |
+| `PASSWORD_TOO_COMMON` | 422 | registro | `password` | La contraseña es demasiado común brother, cambiala si no quieres que te terminen robando la cuenta | `PasswordPolicy` (`WeakPasswordException`) | `PasswordPolicyTest` |
+| `REQUEST_BODY_INVALID_FORMAT` | 422 | registro | — | Revisa el formato de los datos enviados. La fecha de nacimiento usa el formato DD/MM/AAAA | Cuerpo ilegible (`HttpMessageNotReadableException`) | `UserRegistrationControllerTest` |
+| `REQUEST_INVALID_VALUE` | 422 | registro | — | El texto del objeto de valor que rechazó el dato, o «Revisa los datos enviados.» si la excepción no nació en el dominio | `IllegalArgumentException` (respaldo temporal) | `BusinessExceptionHandlerTest`, `UserRegistrationControllerTest` |
+| `IDENTITY_REQUIRED` | 400 | activación | — | La petición no incluye los datos que exige esta ruta | Falta `X-User-Id` (`ServletRequestBindingException`) | `AccountActivationControllerTest` |
+| `EMAIL_NOT_VERIFIED` | 403 | activación | — | Primero debes verificar tu correo con el enlace que te enviamos | `EmailNotVerifiedException` | `AccountActivationControllerTest` |
+| `ACCOUNT_NOT_FOUND` | 404 | activación | — | No encontramos una cuenta para este usuario | `AccountNotFoundException` | `AccountActivationControllerTest` |
+| `DEPENDENCY_UNAVAILABLE` | 503 | registro | — | Ocurrió un error. Inténtalo de nuevo. | `DependencyUnavailableException`: Firebase no respondió o falló de su lado (`UNAVAILABLE`, `DEADLINE_EXCEEDED`, `INTERNAL` o causa de E/S) | `FirebaseUserDirectoryAdapterTest`, `UserRegistrationControllerTest`, `RegisterUserServiceTest` |
+| `ROUTE_NOT_FOUND` | 404 | cualquiera | — | No existe la ruta solicitada. | `NoResourceFoundException` | `FrameworkErrorsTest` |
+| `METHOD_NOT_ALLOWED` | 405 | cualquiera | — | Método no permitido. | `HttpRequestMethodNotSupportedException` (con `Allow`) | `FrameworkErrorsTest` |
+| `MEDIA_TYPE_NOT_ALLOWED` | 415 | cualquiera | — | Tipo de contenido no admitido. | `HttpMediaTypeNotSupportedException` (con `Accept`) | `FrameworkErrorsTest` |
+| `INTERNAL_ERROR` | 500 | cualquiera | — | Ocurrió un error. Inténtalo de nuevo. | Cualquier fallo imprevisto, incluida la violación de una restricción de la base | `BusinessExceptionHandlerTest` |
 
-Todas las produce `BusinessExceptionHandler` como `ProblemDetail` con `Content-Type: application/problem+json`. Las de validación agregan `errors`, con un elemento `field` y `message` por campo rechazado.
+Un rechazo de Firebase por un dato que pasó la validación propia (por ejemplo, un correo que Firebase considera inválido) no es
+indisponibilidad: responde `INTERNAL_ERROR` y queda en el log como defecto de validación.
 
-| HTTP | Título | Cuándo |
-|---|---|---|
-| 400 | Petición incompleta | A la ruta le falta un encabezado o un parámetro que exige |
-| 403 | Correo sin verificar | La cuenta aún no verificó su correo |
-| 404 | Cuenta no encontrada | El usuario autenticado no tiene cuenta local |
-| 409 | Correo ya registrado | Se intenta registrar un correo que ya tiene cuenta |
-| 422 | Datos no válidos | Un campo incumple las validaciones del contrato (con `errors`), el cuerpo no se puede interpretar o el dominio rechaza un valor al construirlo |
-| 422 | Fecha de nacimiento no válida | La fecha de nacimiento no permite registrarse (`errors` con el campo `birthDate`) |
-| 422 | Contraseña no válida | La contraseña incumple la política (`errors` con el campo `password`) |
-| 500 | Error interno | Cualquier fallo no previsto; el detalle va solo al log y al cliente le llega «No pudimos completar la operación. Inténtalo de nuevo en unos minutos» |
+**Restricciones de la tabla `cuenta`.** Ninguna se viola por una entrada de la persona, porque la validación del contrato y del dominio
+actúa antes; todas están clasificadas como invariantes internas (`cuenta_pkey`, `uq_cuenta_firebase_uid`, `ck_cuenta_nombre`,
+`ck_cuenta_apellido`, `ck_cuenta_estado`, `ck_cuenta_version`, `ck_cuenta_telefono_e164`, `ck_cuenta_pronombres_no_vacio`,
+`ck_cuenta_fecha_actualizacion`, `ck_cuenta_fecha_eliminacion` y `ck_cuenta_anonimizacion`). Una violación es un defecto: responde
+`INTERNAL_ERROR` y el log lleva solo el nombre de la restricción, nunca la fila. `CuentaConstraintsClassificationTest` falla si
+aparece una restricción sin clasificar. `uq_cuenta_firebase_uid` solo se alcanza con dos registros simultáneos del mismo usuario; su
+código lo fija la tarea del registro repetido.
 
-Respuestas publicadas que difieren del [estándar](estandar-backend.md#6-errores). Se conservan porque Frontend ya las consume, y cada una tiene su destino:
+## Respuestas publicadas que difieren del estándar
+
+Se conservan porque Frontend ya las consume o porque su corrección es de otra tarea; cada una tiene su destino.
 
 | Respuesta actual | Qué pide el estándar | Destino |
 |---|---|---|
-| 422 cuando el cuerpo no se puede interpretar | 400 para un cuerpo ilegible | Se conserva (decisión de contrato); la tarea de validaciones del registro le agrega el código `REQUEST_BODY_INVALID_FORMAT`. Pasarlo a 400 sería un cambio de contrato con Frontend, con su propia spec |
-| 422 con el mensaje de cualquier `IllegalArgumentException` | Ninguna respuesta lleva el mensaje de una excepción de librería | La tarea de validaciones del registro le asigna el código de respaldo `REQUEST_INVALID_VALUE` y, al terminar, cada objeto de valor lanza su excepción de negocio con su código |
-| 500 al activar una cuenta bloqueada o anonimizada | Un caso previsible tiene su excepción de negocio, su código y su estado | La tarea de verificación de correo: 403 `ACCOUNT_DISABLED` para la cuenta bloqueada y 404 `ACCOUNT_NOT_FOUND` para la anonimizada |
-| `Content-Type: application/problem+json`, sin `charset` | `application/problem+json; charset=UTF-8` | La tarea de validaciones del registro, en su primer PR |
+| 422 cuando el cuerpo no se puede interpretar | 400 para un cuerpo ilegible | Se conserva (decisión de contrato). Pasarlo a 400 sería un cambio de contrato con Frontend, con su propia spec |
+| 422 `REQUEST_INVALID_VALUE` sin `field` cuando un objeto de valor rechaza un dato (correo mal formado, celular sin indicativo o vacío) | Un código específico y su campo por cada causa | La tarea de validaciones del registro: cada objeto de valor lanza su excepción de negocio con su código y su campo, y el respaldo desaparece |
+| 500 `INTERNAL_ERROR` al activar una cuenta bloqueada o anonimizada | Un caso previsible tiene su excepción de negocio, su código y su estado | La tarea de verificación de correo: 403 `ACCOUNT_DISABLED` para la cuenta bloqueada y 404 `ACCOUNT_NOT_FOUND` para la anonimizada |
+| 500 `INTERNAL_ERROR` en la activación cuando `X-User-Email-Verified` no es `true` ni `false` (por ejemplo `abc`) | Un encabezado inválido es un error del cliente con su código | La tarea de verificación de correo, que define cómo se trata ese encabezado |
+| 500 `INTERNAL_ERROR` ante una violación de restricción de la base | El estándar pide traducirla a su código específico | Se conserva por decisión de la spec de validaciones del registro: ninguna restricción es alcanzable por una entrada, y una tabla de traducción sería código sin camino que la active |
 
 ## Cómo se agrega un código
 
-Un código nuevo se agrega aquí con la spec que lo introduce, junto a su excepción de negocio, su estado, su mensaje y su prueba. Un código publicado no se reutiliza ni se renombra.
+Un código nuevo se agrega aquí con la spec que lo introduce, junto a su excepción de negocio, su estado, su mensaje y su prueba. Un
+código publicado no se reutiliza ni se renombra. `ErrorCodeDocumentationTest` falla si un valor de `ErrorCode` no aparece en esta
+página.

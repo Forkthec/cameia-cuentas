@@ -12,8 +12,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.LocalDate;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -147,6 +151,42 @@ class UserRegistrationControllerTest {
                         .value(org.hamcrest.Matchers.contains("Los nombres son obligatorios")));
 
         verify(servicio, never()).register(any(RegisterUserCommand.class));
+    }
+
+    @ParameterizedTest(name = "{0} -> {1}")
+    @MethodSource("restriccionesDelContrato")
+    void cadaRestriccionDelContratoDevuelveSuCodigoYSuMensaje(String campo, String codigo, String mensaje,
+            String cuerpo) throws Exception {
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value(campo))
+                .andExpect(jsonPath("$.errors[0].code").value(codigo))
+                .andExpect(jsonPath("$.errors[0].message").value(mensaje));
+
+        verify(servicio, never()).register(any(RegisterUserCommand.class));
+    }
+
+    static Stream<Arguments> restriccionesDelContrato() {
+        String valido = """
+                {"firstName":"Ana","lastName":"Pérez","birthDate":"12/04/1995",
+                 "email":"ana@cameia.tech","password":"frase secreta larga",
+                 "phoneNumber":"+573001234567","pronoun":"SHE"}
+                """;
+        return Stream.of(
+                Arguments.of("firstName", "FIRST_NAME_TOO_LONG", "Los nombres no pueden superar los 120 caracteres",
+                        valido.replace("\"Ana\"", "\"" + "a".repeat(121) + "\"")),
+                Arguments.of("lastName", "LAST_NAME_TOO_LONG", "Los apellidos no pueden superar los 120 caracteres",
+                        valido.replace("\"Pérez\"", "\"" + "b".repeat(121) + "\"")),
+                Arguments.of("lastName", "LAST_NAME_REQUIRED", "Los apellidos son obligatorios",
+                        valido.replace("\"Pérez\"", "null")),
+                Arguments.of("birthDate", "BIRTH_DATE_REQUIRED", "La fecha de nacimiento es obligatoria",
+                        valido.replace("\"birthDate\":\"12/04/1995\",", "")),
+                Arguments.of("email", "EMAIL_REQUIRED", "El correo electrónico es obligatorio",
+                        valido.replace("\"ana@cameia.tech\"", "\"\"")),
+                Arguments.of("password", "PASSWORD_REQUIRED", "La contraseña es obligatoria",
+                        valido.replace("\"frase secreta larga\"", "\"   \"")));
     }
 
     @Test

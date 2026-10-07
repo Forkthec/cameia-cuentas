@@ -104,6 +104,24 @@ class FirebaseUserDirectoryAdapterTest {
                 .hasMessageNotContaining("ana@cameia.tech");
     }
 
+    @Test
+    void eliminaLaCredencialDelUsuario() throws Exception {
+        adaptador.deleteUser(UID);
+
+        verify(firebaseAuth).deleteUser(UID);
+    }
+
+    @Test
+    void siNoPuedeConsultarElCorreoFallaSinInventarUnEstado() throws Exception {
+        when(firebaseAuth.getUser(anyString()))
+                .thenThrow(new FirebaseAuthException(ErrorCode.NOT_FOUND, "sin usuario", null, null,
+                        AuthErrorCode.USER_NOT_FOUND));
+
+        assertThatThrownBy(() -> adaptador.isEmailVerified(UID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Firebase no pudo confirmar el estado del correo");
+    }
+
     @ParameterizedTest
     @EnumSource(value = ErrorCode.class, names = {"UNAVAILABLE", "DEADLINE_EXCEEDED", "INTERNAL"})
     void firebaseNoDisponibleAlCrearElUsuarioEsIndisponibilidad(ErrorCode codigo) throws Exception {
