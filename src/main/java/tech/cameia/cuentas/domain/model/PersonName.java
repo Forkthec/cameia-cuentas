@@ -71,7 +71,7 @@ public final class PersonName {
     }
 
     /** Máximo de caracteres, el mismo de la columna de la base. */
-    private static final int MAX_LENGTH = 120;
+    public static final int MAX_LENGTH = 120;
 
     /**
      * Letras Unicode, marcas combinantes, espacio, apóstrofo recto y tipográfico y guion. Es una

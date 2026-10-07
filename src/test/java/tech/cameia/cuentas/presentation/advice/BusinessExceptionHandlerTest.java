@@ -46,6 +46,7 @@ import org.springframework.web.bind.annotation.RestController;
 import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.Pronoun;
+import tech.cameia.cuentas.presentation.dto.DomainRule;
 import tech.cameia.cuentas.presentation.dto.RegisterUserRequest;
 import tools.jackson.core.exc.StreamReadException;
 import tools.jackson.databind.exc.MismatchedInputException;
@@ -76,7 +77,9 @@ class BusinessExceptionHandlerTest {
             // Las restricciones de un record se propagan al campo privado del componente.
             for (Annotation anotacion : RegisterUserRequest.class.getDeclaredField(componente.getName())
                     .getAnnotations()) {
-                if (anotacion.annotationType().isAnnotationPresent(Constraint.class)) {
+                // Una regla de forma del dominio trae su código en la excepción del dominio.
+                if (anotacion.annotationType().isAnnotationPresent(Constraint.class)
+                        && !(anotacion instanceof DomainRule)) {
                     restricciones.add(componente.getName() + "." + anotacion.annotationType().getSimpleName());
                 }
             }

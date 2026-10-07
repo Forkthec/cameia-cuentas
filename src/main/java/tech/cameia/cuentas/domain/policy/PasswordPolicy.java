@@ -66,10 +66,26 @@ public class PasswordPolicy {
      *                               o figura entre las contraseñas conocidas
      */
     public void verify(RawPassword password) {
-        String value = password.value();
+        requireValidLength(password);
+        if (isCommon(password.value())) {
+            throw new WeakPasswordException(ErrorCode.PASSWORD_TOO_COMMON, COMMON_PASSWORD_MESSAGE);
+        }
+    }
+
+    /**
+     * Comprueba solo la longitud, que no necesita la lista de contraseñas comunes.
+     *
+     * <p>Es una regla de forma: el contrato HTTP la aplica junto con las demás reglas de forma
+     * de la petición, para responder todos los campos inválidos a la vez (REQ-RV-64). La lista
+     * común es una regla del dominio y se consulta después, en {@link #verify(RawPassword)}.</p>
+     *
+     * @param password contraseña recibida en el registro
+     * @throws WeakPasswordException si es más corta que el mínimo o más larga que el máximo
+     */
+    public static void requireValidLength(RawPassword password) {
         // La longitud se mide sobre la forma NFC para que un acento escrito con carácter combinante
         // cuente igual que el mismo acento precompuesto; la contraseña en sí no se modifica.
-        String normalized = Normalizer.normalize(value, Normalizer.Form.NFC);
+        String normalized = Normalizer.normalize(password.value(), Normalizer.Form.NFC);
         int length = normalized.codePointCount(0, normalized.length());
 
         if (length < MINIMUM_LENGTH) {
@@ -80,9 +96,6 @@ public class PasswordPolicy {
             throw new WeakPasswordException(ErrorCode.PASSWORD_TOO_LONG,
                     "La contraseña no puede superar los " + MAXIMUM_LENGTH + " caracteres.");
         }
-        if (esConocida(value)) {
-            throw new WeakPasswordException(ErrorCode.PASSWORD_TOO_COMMON, COMMON_PASSWORD_MESSAGE);
-        }
     }
 
     /**
@@ -92,7 +105,7 @@ public class PasswordPolicy {
      * @return {@code true} si coincide con una de la lista, ignorando mayúsculas y
      *         espacios alrededor
      */
-    private boolean esConocida(String value) {
+    private boolean isCommon(String value) {
         // Mismo recorte y misma forma Unicode que el resto del servicio: un espacio duro alrededor
         // o un acento combinante no convierten una contraseña común en otra.
         return commonPasswords.contains(SingleLineText.normalize(value).toLowerCase(Locale.ROOT));
