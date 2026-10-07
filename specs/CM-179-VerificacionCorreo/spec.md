@@ -3,7 +3,7 @@
 - **Tarea:** CM-179 · Subtarea «HU-1.2 – Backend: verificación de correo» · padre CM-178 «HU-1.2 Verificación de Correo Electrónico» (subtareas CM-179 Backend, CM-180 Frontend, CM-255 configuración de Firebase) · Sprint 2 · responsable: Paula Andrea Muñoz Delgado
 - **Repositorios:** `cameia-cuentas` (esta spec, `908112c`) y `cameia-gateway` (bloque 3, `4c79b6e`; su spec corta está en `cameia-gateway/specs/CM-179-VerificacionCorreo/` y remite a esta)
 - **Backlog vigente:** `05102026_01_Backlog.xlsx`, hoja `HE-01`, HU-1.2 (CA-1.2.1 a 1.2.14), 9 h para toda la HU
-- **Estado:** spec de **toda la tarea**; pendiente de aprobación de Paula (13 preguntas abiertas en la sección 14). Plan y tarjetas hechos para el bloque 1 (Cuentas) y el bloque 3 (Gateway); los bloques 2 y 4 se planean antes de ejecutarlos.
+- **Estado:** spec de **toda la tarea**; pendiente de aprobación de Paula. Sus preguntas (4 a 8 y 11 a 13) están respondidas desde el 6-oct-2026; las abiertas son de Vela (1, 2, 3, 10) y de DevOps (9). Plan y tarjetas hechos para el bloque 1 (Cuentas) y el bloque 3 (Gateway); los bloques 2 y 4 se planean antes de ejecutarlos.
 - **Atributos de calidad que toca:** seguridad (token estricto, bloqueo en el Gateway, borrado de datos personales), fiabilidad (idempotencia, concurrencia, un fallo no detiene a los demás), observabilidad (resumen de la purga), compatibilidad de contrato (códigos y textos nuevos), privacidad (sin datos personales en logs).
 
 ## 1. Contexto y objetivo
@@ -43,7 +43,7 @@ Una cuenta registrada queda `PENDING_VERIFICATION` y no se puede usar. Al abrir 
 | 2 | Con el encabezado en `false` o ausente se consulta a Firebase (`estaVerificado`) y se puede activar contra el token | `ActivateAccountService.java:87-92`; la prueba `noSeFiaDeUnEncabezadoEnFalsoSiFirebaseDiceQueSiEstaVerificado` lo fija | Bloque 1 |
 | 3 | `isEmailVerified` lanza `IllegalStateException` si el usuario no existe o Firebase falla: 500 | `FirebaseUserDirectoryAdapter.java` | Bloque 1 (se deja de usar en la activación) y bloque 2 (nuevo método tipado) |
 | 4 | `X-User-Id` sin límite de longitud ni validación de contenido (la columna es `VARCHAR(128)`) | `AccountActivationController.java:44` | Bloque 1 |
-| 5 | Un valor de `X-User-Email-Verified` que no sea `true`/`false` (por ejemplo `abc`) produce un error de conversión de tipo → 500 | `@RequestHeader(...) Boolean` | Bloque 1 |
+| 5 | Un valor de `X-User-Email-Verified` que no sea `true`/`false` (por ejemplo `abc`) produce un error de conversión de tipo → 500 | `@RequestHeader(...) Boolean` lanza `MethodArgumentTypeMismatchException`; `BusinessExceptionHandler` no la atiende (no es `ServletRequestBindingException` ni `IllegalArgumentException`) y cae en `@ExceptionHandler(Exception.class)` → 500. La primera prueba del bloque 1 lo confirma antes de corregir | Bloque 1 |
 | 6 | Dos activaciones simultáneas: `ObjectOptimisticLockingFailureException` sin manejador → 500 (inferido; se confirma con prueba) | `@Transactional` en `ActivateAccountService.activate` | Bloque 1 |
 | 7 | El Gateway no rechaza `email_verified=false` | `FirebaseAuthGlobalFilter` y `AGENTS.md` del Gateway (GW-TBD-17) | Bloque 3 |
 
@@ -51,14 +51,14 @@ Una cuenta registrada queda `PENDING_VERIFICATION` y no se puede usar. Al abrir 
 
 ### Bloque 1 — activación robusta (Cuentas)
 
-- **REQ-VC-01 (CA-1.2.6).** Cuando llegue `POST /api/v1/users/me/verification` con `X-User-Email-Verified` distinto de `true` (`false`, ausente, vacío o cualquier otro valor), el servicio debe responder 403 con `code` `EMAIL_NOT_VERIFIED`, no debe activar la cuenta, no debe consultar a Firebase y debe ignorar el cuerpo de la petición.
+- **REQ-VC-01 (CA-1.2.6).** Cuando llegue `POST /api/v1/users/me/verification` con `X-User-Email-Verified` distinto de `true` (`false`, ausente, vacío o cualquier otro valor; la comparación es exacta y distingue mayúsculas, así que `TRUE` también se rechaza: el Gateway siempre escribe `true` en minúsculas), el servicio debe responder 403 con `code` `EMAIL_NOT_VERIFIED`, no debe activar la cuenta, no debe consultar a Firebase y debe ignorar el cuerpo de la petición.
 - **REQ-VC-02 (CA-1.2.14).** Cuando llegue la petición con `X-User-Email-Verified: true` y la cuenta esté `PENDING_VERIFICATION`, el servicio debe pasarla a `ACTIVE`, actualizar `fecha_actualizacion`, conservar el plan y responder 200 con `{id, status:"ACTIVE"}`.
 - **REQ-VC-03 (CA-1.2.4).** Cuando la cuenta ya esté `ACTIVE`, el servicio debe responder 200 con `{id, status:"ACTIVE"}` sin escribir: `fecha_actualizacion` y `version` no cambian.
 - **REQ-VC-04.** Cuando `X-User-Id` no tenga cuenta local, el servicio debe responder 404 con `code` `ACCOUNT_NOT_FOUND`.
 - **REQ-VC-05.** Cuando la cuenta esté `DISABLED`, el servicio debe responder 403 con `code` `ACCOUNT_DISABLED` y el mensaje «Esta cuenta está deshabilitada.» (texto de CA-1.3.11; **pregunta 2**), sin cambiar la cuenta.
 - **REQ-VC-06.** Cuando la cuenta esté `ANONYMIZED`, el servicio debe responder lo mismo que si no existiera (404 `ACCOUNT_NOT_FOUND`), para no revelar que existió (**pregunta 2**), sin cambiar la cuenta.
 - **REQ-VC-07.** Cuando falte `X-User-Id`, el servicio debe responder 400 con `code` `IDENTITY_REQUIRED`; cuando esté vacío, solo con espacios o supere 128 caracteres, 400 con `code` `IDENTITY_INVALID_VALUE`; ninguna de las dos debe consultar la base ni Firebase.
-- **REQ-VC-08.** Cuando dos activaciones de la misma cuenta lleguen a la vez, ambas deben terminar con 200 y estado `ACTIVE` y la cuenta debe escribirse una sola vez con efecto; si la segunda pierde la carrera, debe volver a leer y, si la cuenta ya está `ACTIVE`, responder 200; si no, 409 con `code` `ACCOUNT_CONFLICT` y el mensaje «La cuenta se está actualizando. Inténtalo de nuevo.». Nunca 500.
+- **REQ-VC-08.** Cuando dos activaciones de la misma cuenta lleguen a la vez, la cuenta debe escribirse una sola vez con efecto y ninguna debe responder 500. La que gana responde 200. La que pierde la carrera de versiones debe volver a leer la cuenta **una vez**: si la relectura la encuentra `ACTIVE` (el caso esperado), responde 200 con `{id, status:"ACTIVE"}`; si la encuentra en cualquier otro estado (caso muy improbable: la otra escritura no llegó a confirmarse o el estado cambió entre medias), responde 409 con `code` `ACCOUNT_CONFLICT` y el mensaje «La cuenta se está actualizando. Inténtalo de nuevo.». La prueba de dos activaciones simultáneas espera 200 y 200.
 - **REQ-VC-09.** Mientras Firebase no responda, la activación con `X-User-Email-Verified: true` debe seguir funcionando (el servicio no consulta a Firebase).
 - **REQ-VC-10.** El servicio debe registrar la activación en `INFO` y cada rechazo en `WARN` con `code` y `firebaseUid`, sin correo ni otros datos personales.
 - **REQ-VC-11.** La documentación OpenAPI de la ruta debe describir las respuestas 200, 400, 403, 404, 409 y 500 con sus códigos y el significado del encabezado.
@@ -158,11 +158,11 @@ Se reutilizan y amplían: `ActivateAccountService`, `ActivateAccountCommand`, `A
 |---|---|---|---|---|
 | D1 | Token estricto: se elimina la consulta de respaldo a Firebase en la activación | C-16 / K-08 (PO): el estado se toma solo del token; la consulta permitía activar contra lo que dice el token | Mantener la consulta (contradice el CA-1.2.6) | PO (5-oct-2026); técnica: PENDIENTE (Paula) |
 | D2 | `ANONYMIZED` responde como «sin cuenta» (404) y `DISABLED` 403 con texto propio | No revelar que existió la cuenta; el texto de `DISABLED` es el de CA-1.3.11 | 409 para ambas; 500 (defecto actual) | PENDIENTE (Vela), pregunta 2 |
-| D3 | Se quita `@Transactional` de `activate` y el adaptador traduce el conflicto de versión a una excepción de dominio | El fallo de versión ocurre al confirmar la transacción, fuera del método; sin transacción en el servicio, el servicio puede capturarlo, releer y responder 200 | Capturar la excepción en el manejador global (no permite releer ni responder 200); bloqueo pesimista (innecesario para una sola fila) | PENDIENTE (Paula) |
+| D3 | Se quita `@Transactional` de `activate` y el adaptador traduce el conflicto de versión a una excepción de dominio | El fallo de versión ocurre al confirmar la transacción, fuera del método; sin transacción en el servicio, el servicio puede capturarlo, releer y responder 200 | Capturar la excepción en el manejador global (no permite releer ni responder 200); bloqueo pesimista (innecesario para una sola fila) | Aprobada por Paula (6-oct-2026), pregunta 5 |
 | D4 | La purga es un servicio de aplicación que se ejecuta una vez por invocación; el disparo es de infraestructura | Cloud Run no garantiza instancia viva para `@Scheduled`; el Job se dispara por Cloud Scheduler | `@Scheduled` (descartado por el PO y por Paula el 5-oct); endpoint HTTP interno (excepción al contrato de entrada) | Decidido (5-oct-2026, Paula) |
-| D5 | Tope de 1000 cuentas por ejecución | Acota el tiempo y el consumo; el resto se procesa al día siguiente | Sin tope (riesgo de ejecución larga); paginar hasta agotar (no acota) | PENDIENTE (Paula), pregunta 6 |
-| D6 | Se acepta la ventana entre la consulta y el borrado | Milisegundos; la consecuencia es un nuevo registro | Verificar de nuevo justo antes de borrar (reduce, no elimina, la ventana; agrega una llamada) | PENDIENTE (Paula), pregunta 8 |
-| D7 | Bloques en cuatro PR: 1 (Cuentas, activación), 2 (Cuentas, purga), 3 (Gateway), 4 (Cuentas, Job) | Cada uno es revisable y desplegable solo | Un PR por repositorio | PENDIENTE (Paula) |
+| D5 | Tope de 1000 cuentas por ejecución | Acota el tiempo y el consumo; el resto se procesa al día siguiente | Sin tope (riesgo de ejecución larga); paginar hasta agotar (no acota) | Aprobada por Paula (6-oct-2026), pregunta 6 |
+| D6 | Se acepta la ventana entre la consulta y el borrado | Milisegundos; la consecuencia es un nuevo registro | Verificar de nuevo justo antes de borrar (reduce, no elimina, la ventana; agrega una llamada) | Aprobada por Paula (6-oct-2026), pregunta 8 |
+| D7 | Bloques en cuatro PR: 1 (Cuentas, activación), 2 (Cuentas, purga), 3 (Gateway), 4 (Cuentas, Job) | Cada uno es revisable y desplegable solo | Un PR por repositorio | Aprobada por Paula (6-oct-2026) |
 
 ## 12. Pruebas (resumen por bloque; el detalle va en `tasks.md`)
 
@@ -185,21 +185,21 @@ Plantilla del correo y DNS (CM-255) · pantallas y llamadas de `cameia-web` · e
 | 1 | El Gateway responde 403 en vez de propagar: la decisión GW-TBD-26 (18-sep, «propagar») ¿queda sin efecto frente a CA-1.2.13? | **PENDIENTE de Vela** | Sí: CA-1.2.13 (v4) es posterior y explícito | Bloque 3 |
 | 2 | Estado, código y texto de `DISABLED` (403 `ACCOUNT_DISABLED`, «Esta cuenta está deshabilitada.») y de `ANONYMIZED` (404 como «sin cuenta») en la activación | **PENDIENTE de Vela** | Los propuestos | Bloque 1 |
 | 3 | ¿El 403 `EMAIL_NOT_VERIFIED` de Cuentas usa el mismo texto que el del Gateway, «Tu correo aún no está verificado.»? | **PENDIENTE de Vela** | Sí: un código, un mensaje | Texto del bloque 1 |
-| 4 | V-04: ¿la respuesta de `applyActionCode` con usuario inexistente o deshabilitado y la vigencia del enlace se verifican con el emulador de Firebase (puede diferir del real) o con un proyecto de prueba real? | **PENDIENTE de Paula** | Emulador primero y confirmar en staging con un proyecto real | Textos de errores de Frontend (CA-1.2.2) |
-| 5 | D3: ¿se aprueba quitar `@Transactional` de la activación y traducir el conflicto de versión en el adaptador? | **PENDIENTE de Paula** | Sí | Tarjetas T-1.3 y T-1.4 |
-| 6 | D5: ¿tope de 1000 cuentas por ejecución? | **PENDIENTE de Paula** | Sí, con aviso en el resumen | Bloque 2 |
+| 4 | V-04: ¿la respuesta de `applyActionCode` con usuario inexistente o deshabilitado y la vigencia del enlace se verifican con el emulador de Firebase (puede diferir del real) o con un proyecto de prueba real? | **Respondida (Paula, 6-oct): sí, la recomendación** | Emulador primero y confirmar en staging con un proyecto real | Textos de errores de Frontend (CA-1.2.2) |
+| 5 | D3: ¿se aprueba quitar `@Transactional` de la activación y traducir el conflicto de versión en el adaptador? | **Respondida (Paula, 6-oct): sí, la recomendación** | Sí | Tarjetas T-1.3 y T-1.4 |
+| 6 | D5: ¿tope de 1000 cuentas por ejecución? | **Respondida (Paula, 6-oct): sí, la recomendación** | Sí, con aviso en el resumen | Bloque 2 |
 
 **Ronda 2**
 
 | # | Pregunta | A quién | Recomendación | Bloquea |
 |---|---|---|---|---|
-| 7 | Índice parcial `ix_cuenta_pendiente_fecha_creacion` (migración nueva): ¿se aprueba o se difiere hasta que haya un problema medido? | **PENDIENTE de Paula** | Aprobarlo: es un filtro diario fijo y el estándar lo pide | Bloque 2 |
-| 8 | D6: ¿se acepta la ventana entre «¿verificada?» y el borrado? | **PENDIENTE de Paula** | Sí | Bloque 2 |
+| 7 | Índice parcial `ix_cuenta_pendiente_fecha_creacion` (migración nueva): ¿se aprueba o se difiere hasta que haya un problema medido? | **Respondida (Paula, 6-oct): sí, la recomendación** | Aprobarlo: es un filtro diario fijo y el estándar lo pide | Bloque 2 |
+| 8 | D6: ¿se acepta la ventana entre «¿verificada?» y el borrado? | **Respondida (Paula, 6-oct): sí, la recomendación** | Sí | Bloque 2 |
 | 9 | Crear el Cloud Run Job de la purga y su Cloud Scheduler (03:00 America/Bogota) y su cuenta de servicio | **PENDIENTE de Juan Diego Gomez**, por una tarea que abre Vela | Pedirlo en el documento a DevOps ya existente (pedido del 5-oct) | Prueba en staging del bloque 4 |
 | 10 | Estimación: Backend suma ≈ 16 h (bloque 1: 4 h; bloque 2: 6 h; bloque 3: 3 h; bloque 4: 3 h) frente a 9 h de toda la HU | **PENDIENTE de Vela** | Informar el sobrecosto y repartir | — |
-| 11 | D7: ¿cuatro PR (1, 2, 3, 4)? | **PENDIENTE de Paula** | Sí | Orden de entrega |
-| 12 | Orden: el bloque 3 (Gateway) depende de CM-260 (charset); ¿se hace CM-260 antes? | **PENDIENTE de Paula** | Sí, CM-260 primero (≈ 1 h) | Bloque 3 |
-| 13 | ¿Los bloques 1 y 2 de Cuentas se ejecutan después de los PR de CM-36 y CM-251, que tocan el mismo manejador de errores? | **PENDIENTE de Paula** | Sí, CM-36 (1A a 3) y CM-251 antes | Orden del bloque 1 |
+| 11 | D7: ¿cuatro PR (1, 2, 3, 4)? | **Respondida (Paula, 6-oct): sí, la recomendación** | Sí | Orden de entrega |
+| 12 | Orden: el bloque 3 (Gateway) depende de CM-260 (charset); ¿se hace CM-260 antes? | **Respondida (Paula, 6-oct): sí, la recomendación** | Sí, CM-260 primero (≈ 1 h) | Bloque 3 |
+| 13 | ¿Los bloques 1 y 2 de Cuentas se ejecutan después de los PR de CM-36 y CM-251, que tocan el mismo manejador de errores? | **Respondida (Paula, 6-oct): sí, la recomendación** | Solo el PR 1A de CM-36 antes (no CM-251) | Orden del bloque 1 |
 
 ## 15. Estimación
 

@@ -1,6 +1,6 @@
 # Plan — CM-179-VerificacionCorreo (cameia-cuentas)
 
-Base: `develop` después de fusionar los PR 1A a 3 de CM-36 y el PR de CM-251 (pregunta 13 de la spec; se revalidan rutas y líneas al empezar: las que se citan son de `908112c`). Estado: pendiente de aprobación de Paula. Este plan contiene el **bloque 1** (activación robusta, un PR, ≈ 4 h, ≈ 450 líneas con pruebas). Los planes de los bloques 2 (purga) y 4 (modo de tarea) se agregan antes de ejecutarlos; el bloque 3 (Gateway) tiene su plan en `cameia-gateway/specs/CM-179-VerificacionCorreo/`.
+Base: `develop` después de fusionar el PR 1A de CM-36 (pregunta 13 de la spec, respondida por Paula el 6-oct-2026: no espera a 1B, 2, 3 ni a CM-251; lo que se fusione antes obliga a un rebase; se revalidan rutas y líneas al empezar: las que se citan son de `908112c`). Estado: pendiente de aprobación de Paula. Este plan contiene el **bloque 1** (activación robusta, un PR, ≈ 4 h, ≈ 450 líneas con pruebas). Los planes de los bloques 2 (purga) y 4 (modo de tarea) se agregan antes de ejecutarlos; el bloque 3 (Gateway) tiene su plan en `cameia-gateway/specs/CM-179-VerificacionCorreo/`.
 
 ## 1. Cómo se aborda el bloque 1
 
