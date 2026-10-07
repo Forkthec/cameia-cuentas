@@ -71,70 +71,70 @@ public @interface DomainRule {
     enum Rule {
 
         /** Nombre: solo letras, espacios, apóstrofo y guion. */
-        FIRST_NAME(texto -> comprobarNombre(texto, PersonName.Part.FIRST_NAME),
+        FIRST_NAME(text -> requireValidName(text, PersonName.Part.FIRST_NAME),
                 Set.of(ErrorCode.FIRST_NAME_INVALID_CHARACTERS)),
 
         /** Apellido: solo letras, espacios, apóstrofo y guion. */
-        LAST_NAME(texto -> comprobarNombre(texto, PersonName.Part.LAST_NAME),
+        LAST_NAME(text -> requireValidName(text, PersonName.Part.LAST_NAME),
                 Set.of(ErrorCode.LAST_NAME_INVALID_CHARACTERS)),
 
         /** Correo con forma de correo. */
         EMAIL(EmailAddress::new, Set.of(ErrorCode.EMAIL_INVALID_FORMAT)),
 
         /** Contraseña de 12 a 64 caracteres; la lista común se consulta después, en el dominio. */
-        PASSWORD_LENGTH(texto -> PasswordPolicy.verifyLength(new RawPassword(texto)),
+        PASSWORD_LENGTH(text -> PasswordPolicy.requireValidLength(new RawPassword(text)),
                 Set.of(ErrorCode.PASSWORD_TOO_SHORT, ErrorCode.PASSWORD_TOO_LONG)),
 
         /**
          * Celular válido para el país de su indicativo, en E.164. Se recorta como lo hace
          * {@link RegisterUserRequest#toCommand()}: lo que queda vacío es «sin celular».
          */
-        PHONE_NUMBER(texto -> {
-            String celular = SingleLineText.normalize(texto);
-            if (!celular.isEmpty()) {
-                PhoneNumber.fromInput(celular);
+        PHONE_NUMBER(text -> {
+            String phoneNumber = SingleLineText.normalize(text);
+            if (!phoneNumber.isEmpty()) {
+                PhoneNumber.fromInput(phoneNumber);
             }
         }, Set.of(ErrorCode.PHONE_NUMBER_INVALID_FORMAT)),
 
         /** Pronombre: una de las opciones del contrato. */
-        PRONOUN(Pronoun::fromContract, Set.of(ErrorCode.PRONOUN_INVALID_VALUE));
+        PRONOUN(Pronoun::of, Set.of(ErrorCode.PRONOUN_INVALID_VALUE));
 
-        private final Consumer<String> comprobacion;
-        private final Set<ErrorCode> codigos;
+        private final Consumer<String> validation;
+        private final Set<ErrorCode> reportedCodes;
 
         /**
          * Aplica la regla de caracteres a un nombre que cabe en el máximo. El que no cabe lo
          * reporta {@code @CodePointSize}: el objeto de valor lo rechazaría como invariante.
          */
-        private static void comprobarNombre(String texto, PersonName.Part parte) {
-            if (texto.codePointCount(0, texto.length()) <= PersonName.MAX_LENGTH) {
-                new PersonName(texto, parte);
+        private static void requireValidName(String text, PersonName.Part part) {
+            if (text.codePointCount(0, text.length()) <= PersonName.MAX_LENGTH) {
+                new PersonName(text, part);
             }
         }
 
-        Rule(Consumer<String> comprobacion, Set<ErrorCode> codigos) {
-            this.comprobacion = comprobacion;
-            this.codigos = codigos;
+        Rule(Consumer<String> validation, Set<ErrorCode> reportedCodes) {
+            this.validation = validation;
+            this.reportedCodes = reportedCodes;
         }
 
         /**
          * Aplica la regla del dominio.
          *
-         * @param texto valor recibido, presente y no en blanco
+         * @param text valor recibido, presente y no en blanco
          * @throws tech.cameia.cuentas.domain.exception.InvalidFieldException si el dominio lo rechaza
          */
-        void comprobar(String texto) {
-            comprobacion.accept(texto);
+        void requireValid(String text) {
+            validation.accept(text);
         }
 
         /**
          * Indica si el código pertenece a esta regla y no a otra restricción del campo.
          *
-         * @param codigo código de la excepción del dominio
+         * @param code código de la excepción del dominio
          * @return {@code true} si esta regla lo reporta
          */
-        boolean reporta(ErrorCode codigo) {
-            return codigos.contains(codigo);
+        boolean canReport(ErrorCode code) {
+            return reportedCodes.contains(code);
         }
     }
 }

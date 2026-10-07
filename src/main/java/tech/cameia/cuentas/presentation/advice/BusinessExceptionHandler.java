@@ -214,7 +214,7 @@ class BusinessExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ProblemDetail cuerpoIlegible(HttpMessageNotReadableException error) {
         if (CAMPO_PRONOMBRE.equals(campoIlegible(error))) {
-            return campoDeDominioInvalido(new InvalidPronounException());
+            return invalidDomainField(new InvalidPronounException());
         }
         // Solo el tipo de fallo. El mensaje de Jackson suele citar el fragmento de JSON que
         // no pudo leer, y en el registro ese fragmento puede ser la contraseña.
@@ -410,9 +410,9 @@ class BusinessExceptionHandler {
      */
     private ErrorCode codigoDe(FieldError fallo) {
         if (fallo.contains(ConstraintViolation.class)
-                && fallo.unwrap(ConstraintViolation.class) instanceof HibernateConstraintViolation<?> violacion
-                && violacion.getDynamicPayload(ErrorCode.class) != null) {
-            return violacion.getDynamicPayload(ErrorCode.class);
+                && fallo.unwrap(ConstraintViolation.class) instanceof HibernateConstraintViolation<?> violation
+                && violation.getDynamicPayload(ErrorCode.class) != null) {
+            return violation.getDynamicPayload(ErrorCode.class);
         }
         String clave = fallo.getField() + "." + fallo.getCode();
         ErrorCode codigo = FIELD_ERROR_CODES.get(clave);

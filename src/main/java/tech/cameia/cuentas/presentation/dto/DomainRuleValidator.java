@@ -17,16 +17,16 @@ import tech.cameia.cuentas.domain.exception.InvalidFieldException;
  */
 public class DomainRuleValidator implements ConstraintValidator<DomainRule, String> {
 
-    private DomainRule.Rule regla;
+    private DomainRule.Rule rule;
 
     /**
      * Toma la regla de la anotación.
      *
-     * @param anotacion restricción declarada en el campo
+     * @param annotation restricción declarada en el campo
      */
     @Override
-    public void initialize(DomainRule anotacion) {
-        this.regla = anotacion.value();
+    public void initialize(DomainRule annotation) {
+        this.rule = annotation.value();
     }
 
     /**
@@ -43,16 +43,16 @@ public class DomainRuleValidator implements ConstraintValidator<DomainRule, Stri
             return true;
         }
         try {
-            regla.comprobar(value);
+            rule.requireValid(value);
             return true;
-        } catch (InvalidFieldException rechazo) {
-            if (!regla.reporta(rechazo.getErrorCode())) {
+        } catch (InvalidFieldException rejection) {
+            if (!rule.canReport(rejection.getErrorCode())) {
                 return true;
             }
             context.disableDefaultConstraintViolation();
             context.unwrap(HibernateConstraintValidatorContext.class)
-                    .withDynamicPayload(rechazo.getErrorCode())
-                    .buildConstraintViolationWithTemplate(literal(rechazo.getMessage()))
+                    .withDynamicPayload(rejection.getErrorCode())
+                    .buildConstraintViolationWithTemplate(literal(rejection.getMessage()))
                     .addConstraintViolation();
             return false;
         }
@@ -61,7 +61,7 @@ public class DomainRuleValidator implements ConstraintValidator<DomainRule, Stri
     }
 
     /** Escapa el texto para que la plantilla de mensajes no interprete llaves ni expresiones. */
-    private static String literal(String mensaje) {
-        return mensaje.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}").replace("$", "\\$");
+    private static String literal(String message) {
+        return message.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}").replace("$", "\\$");
     }
 }

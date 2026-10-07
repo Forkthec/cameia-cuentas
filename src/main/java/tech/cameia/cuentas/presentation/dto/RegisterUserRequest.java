@@ -112,12 +112,13 @@ public record RegisterUserRequest(
      *                                          validado el pronombre
      */
     public RegisterUserCommand toCommand() {
-        LocalDate fecha = BirthDateFormatValidator.parse(birthDate).orElseThrow();
+        LocalDate parsedBirthDate = BirthDateFormatValidator.parse(birthDate).orElseThrow();
         // Un celular vacío o en blanco es «sin celular»: el formulario envía el campo aunque la
         // persona no lo llene.
-        String celular = SingleLineText.normalize(phoneNumber);
-        String celularDeclarado = celular == null || celular.isEmpty() ? null : celular;
-        return new RegisterUserCommand(firstName, lastName, fecha, email, password, celularDeclarado,
-                Pronoun.fromContract(pronoun));
+        String trimmedPhoneNumber = SingleLineText.normalize(phoneNumber);
+        String declaredPhoneNumber =
+                trimmedPhoneNumber == null || trimmedPhoneNumber.isEmpty() ? null : trimmedPhoneNumber;
+        return new RegisterUserCommand(firstName, lastName, parsedBirthDate, email, password, declaredPhoneNumber,
+                Pronoun.of(pronoun));
     }
 }

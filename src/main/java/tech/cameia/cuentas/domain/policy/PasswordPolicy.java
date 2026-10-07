@@ -66,8 +66,8 @@ public class PasswordPolicy {
      *                               o figura entre las contraseñas conocidas
      */
     public void verify(RawPassword password) {
-        verifyLength(password);
-        if (esConocida(password.value())) {
+        requireValidLength(password);
+        if (isCommon(password.value())) {
             throw new WeakPasswordException(ErrorCode.PASSWORD_TOO_COMMON, COMMON_PASSWORD_MESSAGE);
         }
     }
@@ -82,7 +82,7 @@ public class PasswordPolicy {
      * @param password contraseña recibida en el registro
      * @throws WeakPasswordException si es más corta que el mínimo o más larga que el máximo
      */
-    public static void verifyLength(RawPassword password) {
+    public static void requireValidLength(RawPassword password) {
         // La longitud se mide sobre la forma NFC para que un acento escrito con carácter combinante
         // cuente igual que el mismo acento precompuesto; la contraseña en sí no se modifica.
         String normalized = Normalizer.normalize(password.value(), Normalizer.Form.NFC);
@@ -105,7 +105,7 @@ public class PasswordPolicy {
      * @return {@code true} si coincide con una de la lista, ignorando mayúsculas y
      *         espacios alrededor
      */
-    private boolean esConocida(String value) {
+    private boolean isCommon(String value) {
         // Mismo recorte y misma forma Unicode que el resto del servicio: un espacio duro alrededor
         // o un acento combinante no convierten una contraseña común en otra.
         return commonPasswords.contains(SingleLineText.normalize(value).toLowerCase(Locale.ROOT));

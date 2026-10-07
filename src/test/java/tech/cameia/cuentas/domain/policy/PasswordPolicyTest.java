@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -67,15 +68,16 @@ class PasswordPolicyTest {
     }
 
     @Test
-    void laLongitudSeCompruebaSinLaListaDeContraseniasComunes() {
+    @DisplayName("La longitud se comprueba sin la lista de contraseñas comunes")
+    void requireValidLength_shouldCheckOnlyLength_whenCalledWithoutTheCommonList() {
         // El contrato HTTP la aplica junto con las demás reglas de forma; la lista se consulta después.
-        assertThatThrownBy(() -> PasswordPolicy.verifyLength(new RawPassword("frase secre")))
+        assertThatThrownBy(() -> PasswordPolicy.requireValidLength(new RawPassword("frase secre")))
                 .isInstanceOfSatisfying(WeakPasswordException.class,
                         error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.PASSWORD_TOO_SHORT));
-        assertThatThrownBy(() -> PasswordPolicy.verifyLength(new RawPassword("a".repeat(65))))
+        assertThatThrownBy(() -> PasswordPolicy.requireValidLength(new RawPassword("a".repeat(65))))
                 .isInstanceOfSatisfying(WeakPasswordException.class,
                         error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.PASSWORD_TOO_LONG));
-        assertThatCode(() -> PasswordPolicy.verifyLength(new RawPassword("password1234"))).doesNotThrowAnyException();
+        assertThatCode(() -> PasswordPolicy.requireValidLength(new RawPassword("password1234"))).doesNotThrowAnyException();
     }
 
     @Test

@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -238,10 +239,11 @@ class UserRegistrationControllerTest {
     }
 
     @Test
-    void lasReglasDeFormaDelDominioSeRespondenJuntoConLasDelContrato() throws Exception {
+    @DisplayName("Las reglas de forma del dominio se responden junto con las del contrato")
+    void register_shouldReturnAllShapeErrorsAtOnce_whenContractAndDomainRulesFail() throws Exception {
         // REQ-RV-64: toda regla de forma sale a la vez, un elemento por campo, con el código y el
         // mensaje del dominio; antes, cada regla del dominio salía sola y después del contrato.
-        String cuerpo = cuerpoValido()
+        String body = cuerpoValido()
                 .replace("\"Ana\"", "\"\"")
                 .replace("\"Pérez\"", "\"Pérez_\"")
                 .replace("\"12/04/1995\"", "\"31/02/2000\"")
@@ -249,7 +251,7 @@ class UserRegistrationControllerTest {
                 .replace("\"frase secreta larga\"", "\"corta\"")
                 .replace("\"pronoun\":\"SHE\"", "\"pronoun\":\"OTRO\",\"phoneNumber\":\"12345\"");
 
-        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.errors.length()").value(7))

@@ -12,6 +12,7 @@ import jakarta.validation.ValidatorFactory;
 import org.hibernate.validator.engine.HibernateConstraintViolation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -28,97 +29,104 @@ import tech.cameia.cuentas.domain.exception.ErrorCode;
  */
 class DomainRuleValidatorTest {
 
-    private static ValidatorFactory fabrica;
-    private static Validator validador;
+    private static ValidatorFactory factory;
+    private static Validator validator;
 
     /** Un campo por regla, para validarlas aisladas del resto del contrato. */
-    record Caso(@DomainRule(DomainRule.Rule.FIRST_NAME) String nombre,
-            @DomainRule(DomainRule.Rule.LAST_NAME) String apellido,
-            @DomainRule(DomainRule.Rule.EMAIL) String correo,
-            @DomainRule(DomainRule.Rule.PASSWORD_LENGTH) String contrasenia,
-            @DomainRule(DomainRule.Rule.PHONE_NUMBER) String celular,
-            @DomainRule(DomainRule.Rule.PRONOUN) String pronombre) {
+    record Sample(@DomainRule(DomainRule.Rule.FIRST_NAME) String firstName,
+            @DomainRule(DomainRule.Rule.LAST_NAME) String lastName,
+            @DomainRule(DomainRule.Rule.EMAIL) String email,
+            @DomainRule(DomainRule.Rule.PASSWORD_LENGTH) String password,
+            @DomainRule(DomainRule.Rule.PHONE_NUMBER) String phoneNumber,
+            @DomainRule(DomainRule.Rule.PRONOUN) String pronoun) {
     }
 
     @BeforeAll
-    static void crearValidador() {
-        fabrica = Validation.buildDefaultValidatorFactory();
-        validador = fabrica.getValidator();
+    static void createValidator() {
+        factory = Validation.buildDefaultValidatorFactory();
+        validator = factory.getValidator();
     }
 
     @AfterAll
-    static void cerrarFabrica() {
-        fabrica.close();
+    static void closeFactory() {
+        factory.close();
     }
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
-        "nombre      | Ana3            | FIRST_NAME_INVALID_CHARACTERS | El nombre solo puede contener letras, espacios, apóstrofo y guion.",
-        "apellido    | Pérez_          | LAST_NAME_INVALID_CHARACTERS  | El apellido solo puede contener letras, espacios, apóstrofo y guion.",
-        "correo      | ana@@correo.co  | EMAIL_INVALID_FORMAT          | Ingresa un correo electrónico válido.",
-        "contrasenia | frase secre     | PASSWORD_TOO_SHORT            | La contraseña debe tener al menos 12 caracteres.",
-        "celular     | 12345           | PHONE_NUMBER_INVALID_FORMAT   | Revisa el número, no coincide con el formato del país elegido.",
-        "pronombre   | he              | PRONOUN_INVALID_VALUE         | Selecciona una opción."})
-    void cadaReglaReportaElCodigoYElMensajeDelDominio(String campo, String valor, ErrorCode codigo, String mensaje) {
-        Set<ConstraintViolation<Caso>> violaciones = validador.validate(conCampo(campo, valor));
+        "firstName   | Ana3            | FIRST_NAME_INVALID_CHARACTERS | El nombre solo puede contener letras, espacios, apóstrofo y guion.",
+        "lastName    | Pérez_          | LAST_NAME_INVALID_CHARACTERS  | El apellido solo puede contener letras, espacios, apóstrofo y guion.",
+        "email       | ana@@correo.co  | EMAIL_INVALID_FORMAT          | Ingresa un correo electrónico válido.",
+        "password    | frase secre     | PASSWORD_TOO_SHORT            | La contraseña debe tener al menos 12 caracteres.",
+        "phoneNumber | 12345           | PHONE_NUMBER_INVALID_FORMAT   | Revisa el número, no coincide con el formato del país elegido.",
+        "pronoun     | he              | PRONOUN_INVALID_VALUE         | Selecciona una opción."})
+    @DisplayName("Cada regla reporta el código y el mensaje del dominio")
+    void validate_shouldReportDomainCodeAndMessage_whenDomainRejectsTheValue(String field, String value,
+            ErrorCode code, String message) {
+        Set<ConstraintViolation<Sample>> violations = validator.validate(withField(field, value));
 
-        assertThat(violaciones).singleElement().satisfies(violacion -> {
-            assertThat(violacion.getPropertyPath().toString()).isEqualTo(campo);
-            assertThat(violacion.getMessage()).isEqualTo(mensaje);
-            assertThat(codigoDe(violacion)).isEqualTo(codigo);
+        assertThat(violations).singleElement().satisfies(violation -> {
+            assertThat(violation.getPropertyPath().toString()).isEqualTo(field);
+            assertThat(violation.getMessage()).isEqualTo(message);
+            assertThat(codeOf(violation)).isEqualTo(code);
         });
     }
 
     @ParameterizedTest
-    @CsvSource({"contrasenia, 65", "contrasenia, 64"})
-    void laContraseniaMuyLargaTambienEsDeForma(String campo, int largo) {
-        Set<ConstraintViolation<Caso>> violaciones = validador.validate(conCampo(campo, "a".repeat(largo)));
+    @CsvSource({"password, 65", "password, 64"})
+    @DisplayName("La contraseña muy larga también es una regla de forma")
+    void validate_shouldReportTooLongOnlyAbove64_whenPasswordIsLong(String field, int length) {
+        Set<ConstraintViolation<Sample>> violations = validator.validate(withField(field, "a".repeat(length)));
 
-        if (largo > 64) {
-            assertThat(violaciones).singleElement()
-                    .extracting(DomainRuleValidatorTest::codigoDe).isEqualTo(ErrorCode.PASSWORD_TOO_LONG);
+        if (length > 64) {
+            assertThat(violations).singleElement()
+                    .extracting(DomainRuleValidatorTest::codeOf).isEqualTo(ErrorCode.PASSWORD_TOO_LONG);
         } else {
-            assertThat(violaciones).isEmpty();
+            assertThat(violations).isEmpty();
         }
     }
 
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"", "   "})
-    void laAusenciaYLosBlancosLosReportaOtraRestriccion(String valor) {
-        assertThat(validador.validate(new Caso(valor, valor, valor, valor, valor, valor))).isEmpty();
+    @DisplayName("La ausencia y los blancos los reporta otra restricción")
+    void validate_shouldReportNothing_whenValueIsMissingOrBlank(String value) {
+        assertThat(validator.validate(new Sample(value, value, value, value, value, value))).isEmpty();
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"nombre", "apellido"})
-    void unNombreDeMasDe120LoReportaLaRestriccionDeLongitud(String campo) {
-        assertThat(validador.validate(conCampo(campo, "a".repeat(121)))).isEmpty();
+    @ValueSource(strings = {"firstName", "lastName"})
+    @DisplayName("Un nombre de más de 120 caracteres lo reporta la restricción de longitud")
+    void validate_shouldReportNothing_whenNameIsLongerThan120(String field) {
+        assertThat(validator.validate(withField(field, "a".repeat(121)))).isEmpty();
     }
 
     @Test
-    void unCorreoDeMasDe254LoReportaLaRestriccionDeLongitud() {
-        assertThat(validador.validate(conCampo("correo", "a".repeat(250) + "@correo.co"))).isEmpty();
+    @DisplayName("Un correo de más de 254 caracteres lo reporta la restricción de longitud")
+    void validate_shouldReportNothing_whenEmailIsLongerThan254() {
+        assertThat(validator.validate(withField("email", "a".repeat(250) + "@correo.co"))).isEmpty();
     }
 
     @Test
-    void unMensajeConLlavesNoSeInterpretaComoPlantilla() {
+    @DisplayName("Un mensaje con llaves no se interpreta como plantilla")
+    void validate_shouldKeepMessageLiteral_whenValueContainsTemplateSyntax() {
         // Ningún mensaje del dominio tiene llaves hoy; si alguno las tuviera, saldría tal cual.
-        assertThat(validador.validate(conCampo("correo", "${1+1}@@x"))).singleElement()
+        assertThat(validator.validate(withField("email", "${1+1}@@x"))).singleElement()
                 .extracting(ConstraintViolation::getMessage).isEqualTo("Ingresa un correo electrónico válido.");
     }
 
-    private static ErrorCode codigoDe(ConstraintViolation<?> violacion) {
-        HibernateConstraintViolation<?> hibernate = violacion.unwrap(HibernateConstraintViolation.class);
+    private static ErrorCode codeOf(ConstraintViolation<?> violation) {
+        HibernateConstraintViolation<?> hibernate = violation.unwrap(HibernateConstraintViolation.class);
         return hibernate.getDynamicPayload(ErrorCode.class);
     }
 
-    private static Caso conCampo(String campo, String valor) {
-        return new Caso(
-                campo.equals("nombre") ? valor : "Ana",
-                campo.equals("apellido") ? valor : "Pérez",
-                campo.equals("correo") ? valor : "ana@correo.co",
-                campo.equals("contrasenia") ? valor : "frase secreta larga",
-                campo.equals("celular") ? valor : null,
-                campo.equals("pronombre") ? valor : "SHE");
+    private static Sample withField(String field, String value) {
+        return new Sample(
+                field.equals("firstName") ? value : "Ana",
+                field.equals("lastName") ? value : "Pérez",
+                field.equals("email") ? value : "ana@correo.co",
+                field.equals("password") ? value : "frase secreta larga",
+                field.equals("phoneNumber") ? value : null,
+                field.equals("pronoun") ? value : "SHE");
     }
 }

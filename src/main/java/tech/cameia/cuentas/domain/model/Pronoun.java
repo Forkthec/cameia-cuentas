@@ -33,10 +33,10 @@ public enum Pronoun {
      * @return el pronombre elegido
      * @throws InvalidPronounException si el texto no es exactamente una de las opciones
      */
-    public static Pronoun fromContract(String value) {
-        for (Pronoun opcion : values()) {
-            if (opcion.name().equals(value)) {
-                return opcion;
+    public static Pronoun of(String value) {
+        for (Pronoun option : values()) {
+            if (option.name().equals(value)) {
+                return option;
             }
         }
         throw new InvalidPronounException();
