@@ -25,7 +25,7 @@ public class InvalidEmailException extends InvalidFieldException {
      *
      * @return excepción con {@code EMAIL_INVALID_FORMAT}
      */
-    public static InvalidEmailException invalidFormat() {
+    public static InvalidEmailException createInvalidFormat() {
         return new InvalidEmailException(ErrorCode.EMAIL_INVALID_FORMAT, "Ingresa un correo electrónico válido.");
     }
 }

@@ -7,6 +7,7 @@ import java.util.List;
 
 import com.jayway.jsonpath.JsonPath;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -74,29 +75,31 @@ class FrameworkErrorsTest {
     }
 
     @Test
-    void unTipoDeRespuestaNoAdmitidoDevuelveSuCodigoYUn406() {
-        HttpHeaders encabezados = new HttpHeaders();
-        encabezados.setAccept(List.of(MediaType.IMAGE_PNG));
+    @DisplayName("Un tipo de respuesta no admitido devuelve su código y un 406")
+    void anyRoute_shouldReturn406WithItsCode_whenAcceptedResponseTypeIsNotSupported() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(List.of(MediaType.IMAGE_PNG));
 
-        ResponseEntity<String> respuesta = cliente.exchange("/api/v1/users/health", HttpMethod.GET,
-                new HttpEntity<>(encabezados), String.class);
+        ResponseEntity<String> response = cliente.exchange("/api/v1/users/health", HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
 
-        assertThat(respuesta.getStatusCode().value()).isEqualTo(406);
-        assertEsErrorDelServicio(respuesta, "MEDIA_TYPE_NOT_ACCEPTABLE", "Tipo de respuesta no admitido.");
+        assertThat(response.getStatusCode().value()).isEqualTo(406);
+        assertEsErrorDelServicio(response, "MEDIA_TYPE_NOT_ACCEPTABLE", "Tipo de respuesta no admitido.");
     }
 
     @Test
-    void elServicioNoRespondeEnXml() {
+    @DisplayName("El servicio no responde en XML")
+    void anyRoute_shouldReturn406_whenClientAsksForXml() {
         // El contrato es solo JSON. Una dependencia de Firebase traía un convertidor XML con el
         // que el servicio respondía en XML a quien lo pidiera.
-        HttpHeaders encabezados = new HttpHeaders();
-        encabezados.setAccept(List.of(MediaType.APPLICATION_XML));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(List.of(MediaType.APPLICATION_XML));
 
-        ResponseEntity<String> respuesta = cliente.exchange("/api/v1/users/health", HttpMethod.GET,
-                new HttpEntity<>(encabezados), String.class);
+        ResponseEntity<String> response = cliente.exchange("/api/v1/users/health", HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
 
-        assertThat(respuesta.getStatusCode().value()).isEqualTo(406);
-        assertEsErrorDelServicio(respuesta, "MEDIA_TYPE_NOT_ACCEPTABLE", "Tipo de respuesta no admitido.");
+        assertThat(response.getStatusCode().value()).isEqualTo(406);
+        assertEsErrorDelServicio(response, "MEDIA_TYPE_NOT_ACCEPTABLE", "Tipo de respuesta no admitido.");
     }
 
     @Test

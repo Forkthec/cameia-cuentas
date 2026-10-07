@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.ClassPathResource;
@@ -60,18 +61,20 @@ class CommonPasswordsLoaderTest {
     }
 
     @Test
-    void unaEntradaDe65CaracteresNoArrancaNiRevelaLaEntrada() {
-        String larga = "a".repeat(65);
+    @DisplayName("Una entrada de 65 caracteres no arranca ni revela la entrada")
+    void load_shouldFailWithoutRevealingTheEntry_whenAnEntryHas65Characters() {
+        String tooLong = "a".repeat(65);
 
-        assertThatThrownBy(() -> CommonPasswordsLoader.load(recurso("a".repeat(64) + "\n" + larga + "\n"), 1))
+        assertThatThrownBy(() -> CommonPasswordsLoader.load(recurso("a".repeat(64) + "\n" + tooLong + "\n"), 1))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("línea 2")
                 .hasMessageContaining("más de 64 caracteres")
-                .hasMessageNotContaining(larga);
+                .hasMessageNotContaining(tooLong);
     }
 
     @Test
-    void unaEntradaDe64CaracteresSeAdmite() {
+    @DisplayName("Una entrada de 64 caracteres se admite")
+    void load_shouldAcceptTheEntry_whenItHas64Characters() {
         assertThat(CommonPasswordsLoader.load(recurso("a".repeat(64) + "\n"), 1)).containsExactly("a".repeat(64));
     }
 

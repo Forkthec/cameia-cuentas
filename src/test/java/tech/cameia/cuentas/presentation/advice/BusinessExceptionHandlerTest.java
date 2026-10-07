@@ -18,6 +18,7 @@ import jakarta.validation.Constraint;
 
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.hibernate.exception.ConstraintViolationException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.ProblemDetail;
@@ -231,18 +232,20 @@ class BusinessExceptionHandlerTest {
     }
 
     @Test
-    void unaViolacionSinNombreRegistraElSqlStateParaDiagnosticarlaSinElMensaje(CapturedOutput salida) {
+    @DisplayName("Una violación sin nombre registra el SQLState para diagnosticarla sin el mensaje")
+    void dataIntegrityViolation_shouldLogSqlStateWithoutMessage_whenConstraintHasNoName(CapturedOutput output) {
         manejador.integridadDeDatos(new DataIntegrityViolationException("x",
                 new ConstraintViolationException("sin nombre", new SQLException("Ana Pérez", "23502"), null)));
 
-        assertThat(salida.getOut()).contains("constraint=desconocida, sqlState=23502").doesNotContain("Ana Pérez");
+        assertThat(output.getOut()).contains("constraint=desconocida, sqlState=23502").doesNotContain("Ana Pérez");
     }
 
     @Test
-    void sinExcepcionDeJdbcElSqlStateEsDesconocido(CapturedOutput salida) {
+    @DisplayName("Sin excepción de JDBC el SQLState es desconocido")
+    void dataIntegrityViolation_shouldLogUnknownSqlState_whenThereIsNoJdbcException(CapturedOutput output) {
         manejador.integridadDeDatos(new DataIntegrityViolationException("x"));
 
-        assertThat(salida.getOut()).contains("sqlState=desconocido");
+        assertThat(output.getOut()).contains("sqlState=desconocido");
     }
 
     @Test

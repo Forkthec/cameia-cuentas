@@ -15,6 +15,7 @@ import com.google.firebase.FirebaseOptions;
 import com.google.firebase.auth.FirebaseAuth;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -38,17 +39,18 @@ class FirebaseRejectionsWithSdkTest {
     private FirebaseApp app;
 
     @AfterEach
-    void cerrarApp() {
+    void closeApp() {
         if (app != null) {
             app.delete();
         }
     }
 
     @Test
-    void unCorreoQueFirebaseRechazaEsUnCorreoInvalidoEnSuCampo() {
-        FirebaseUserDirectoryAdapter adaptador = adaptadorQueResponde(400, "INVALID_EMAIL");
+    @DisplayName("Un correo que Firebase rechaza es un correo inválido en su campo")
+    void createUser_shouldThrowInvalidEmail_whenFirebaseRejectsTheEmail() {
+        FirebaseUserDirectoryAdapter adapter = adapterRespondingWith(400, "INVALID_EMAIL");
 
-        assertThatThrownBy(() -> adaptador.createUser(new EmailAddress("ana..perez@correo.co"),
+        assertThatThrownBy(() -> adapter.createUser(new EmailAddress("ana..perez@correo.co"),
                 new RawPassword("frase secreta larga")))
                 .isInstanceOfSatisfying(InvalidEmailException.class, error -> {
                     assertThat(error.getErrorCode()).isEqualTo(ErrorCode.EMAIL_INVALID_FORMAT);
@@ -62,68 +64,72 @@ class FirebaseRejectionsWithSdkTest {
         "PASSWORD_DOES_NOT_MEET_REQUIREMENTS : Missing password requirements: [Password must contain a numeric character]",
         "OPERATION_NOT_ALLOWED : Password sign-in is disabled for this project",
         "INVALID_EMAIL_DOMAIN"})
-    void otroRechazoEsUnDefectoDeConfiguracionConSuCodigoEnElMensajeTecnico(String mensajeDelServicio) {
-        FirebaseUserDirectoryAdapter adaptador = adaptadorQueResponde(400, mensajeDelServicio);
-        String codigo = mensajeDelServicio.split(" ")[0];
+    @DisplayName("Otro rechazo es un defecto de configuración con su código en el mensaje técnico")
+    void createUser_shouldThrowIllegalStateWithServiceCode_whenFirebaseRejectsForAnotherReason(String serviceMessage) {
+        FirebaseUserDirectoryAdapter adapter = adapterRespondingWith(400, serviceMessage);
+        String code = serviceMessage.split(" ")[0];
 
-        assertThatThrownBy(() -> adaptador.createUser(new EmailAddress("ana@correo.co"),
+        assertThatThrownBy(() -> adapter.createUser(new EmailAddress("ana@correo.co"),
                 new RawPassword("frase secreta larga")))
                 .isInstanceOf(IllegalStateException.class)
                 .isNotInstanceOf(InvalidEmailException.class)
-                .hasMessage("Firebase rechazó la creación del usuario [codigoDelServicio=" + codigo + "]")
+                .hasMessage("Firebase rechazó la creación del usuario [serviceCode=" + code + "]")
                 .hasMessageNotContaining("ana@correo.co");
     }
 
     @Test
-    void unCuerpoSinCodigoLegibleSeRegistraComoDesconocido() {
-        FirebaseUserDirectoryAdapter adaptador = adaptadorQueRespondeCuerpo(400, "no es json");
+    @DisplayName("Un cuerpo sin código legible se registra como desconocido")
+    void createUser_shouldReportUnknownCode_whenResponseBodyHasNoReadableCode() {
+        FirebaseUserDirectoryAdapter adapter = adapterRespondingWithBody(400, "no es json");
 
-        assertThatThrownBy(() -> adaptador.createUser(new EmailAddress("ana@correo.co"),
+        assertThatThrownBy(() -> adapter.createUser(new EmailAddress("ana@correo.co"),
                 new RawPassword("frase secreta larga")))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Firebase rechazó la creación del usuario [codigoDelServicio=desconocido]");
+                .hasMessage("Firebase rechazó la creación del usuario [serviceCode=desconocido]");
     }
 
     @Test
-    void unRechazoAlBorrarConRespuestaHttpNoEsIndisponibilidad() {
+    @DisplayName("Un rechazo al borrar con respuesta HTTP no es indisponibilidad")
+    void deleteUser_shouldNotThrowDependencyUnavailable_whenFirebaseAnswersWithHttpRejection() {
         // El SDK adjunta la respuesta HTTP como causa de E/S; no es una conexión fallida.
-        FirebaseUserDirectoryAdapter adaptador = adaptadorQueResponde(400, "USER_NOT_FOUND");
+        FirebaseUserDirectoryAdapter adapter = adapterRespondingWith(400, "USER_NOT_FOUND");
 
-        assertThatThrownBy(() -> adaptador.deleteUser("uid-inexistente"))
+        assertThatThrownBy(() -> adapter.deleteUser("uid-inexistente"))
                 .isInstanceOf(IllegalStateException.class)
                 .isNotInstanceOf(DependencyUnavailableException.class);
     }
 
     @ParameterizedTest
     @ValueSource(ints = {500, 503})
-    void unErrorDelServidorSiEsIndisponibilidad(int estado) {
-        FirebaseUserDirectoryAdapter adaptador = adaptadorQueResponde(estado, "BACKEND_ERROR");
+    @DisplayName("Un error del servidor de Firebase sí es indisponibilidad")
+    void createUser_shouldThrowDependencyUnavailable_whenFirebaseAnswersWithServerError(int status) {
+        FirebaseUserDirectoryAdapter adapter = adapterRespondingWith(status, "BACKEND_ERROR");
 
-        assertThatThrownBy(() -> adaptador.createUser(new EmailAddress("ana@correo.co"),
+        assertThatThrownBy(() -> adapter.createUser(new EmailAddress("ana@correo.co"),
                 new RawPassword("frase secreta larga")))
                 .isInstanceOf(DependencyUnavailableException.class);
     }
 
-    private FirebaseUserDirectoryAdapter adaptadorQueResponde(int estado, String mensajeDelServicio) {
-        String cuerpo = "{\"error\":{\"code\":" + estado + ",\"message\":\"" + mensajeDelServicio
-                + "\",\"errors\":[{\"message\":\"" + mensajeDelServicio + "\",\"domain\":\"global\",\"reason\":\"invalid\"}]}}";
-        return adaptadorQueRespondeCuerpo(estado, cuerpo);
+    private FirebaseUserDirectoryAdapter adapterRespondingWith(int status, String serviceMessage) {
+        String body = "{\"error\":{\"code\":" + status + ",\"message\":\"" + serviceMessage
+                + "\",\"errors\":[{\"message\":\"" + serviceMessage + "\",\"domain\":\"global\",\"reason\":\"invalid\"}]}}";
+        return adapterRespondingWithBody(status, body);
     }
 
-    private FirebaseUserDirectoryAdapter adaptadorQueRespondeCuerpo(int estado, String cuerpo) {
-        MockHttpTransport transporte = new MockHttpTransport.Builder()
+    private FirebaseUserDirectoryAdapter adapterRespondingWithBody(int status, String body) {
+        MockHttpTransport transport = new MockHttpTransport.Builder()
                 .setLowLevelHttpResponse(new MockLowLevelHttpResponse()
-                        .setStatusCode(estado)
+                        .setStatusCode(status)
                         .setContentType("application/json; charset=UTF-8")
-                        .setContent(cuerpo))
+                        .setContent(body))
                 .build();
-        FirebaseOptions opciones = FirebaseOptions.builder()
+        FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(GoogleCredentials.create(new AccessToken("token-de-prueba",
                         new Date(System.currentTimeMillis() + 3_600_000))))
                 .setProjectId("demo-cameia")
-                .setHttpTransport(transporte)
+                .setHttpTransport(transport)
                 .build();
-        app = FirebaseApp.initializeApp(opciones, "rechazos-" + UUID.randomUUID());
+        app = FirebaseApp.initializeApp(options, "rechazos-" + UUID.randomUUID());
         return new FirebaseUserDirectoryAdapter(FirebaseAuth.getInstance(app));
     }
 }
