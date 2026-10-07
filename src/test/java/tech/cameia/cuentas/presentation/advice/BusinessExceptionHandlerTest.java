@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.RecordComponent;
+import java.sql.SQLException;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -15,12 +16,14 @@ import com.jayway.jsonpath.JsonPath;
 
 import jakarta.validation.Constraint;
 
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -97,6 +100,31 @@ class BusinessExceptionHandlerTest {
                 .contains("ERROR")
                 .contains("code=INTERNAL_ERROR, requestId=" + requestId)
                 .contains("java.lang.IllegalStateException");
+    }
+
+    @Test
+    void unaViolacionDeRestriccionResponde500SinElValorYRegistraSoloSuNombre(CapturedOutput salida)
+            throws Exception {
+        mockMvc.perform(get("/restriccion").header("X-Request-Id", "restriccion-1"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(jsonPath("$.detail").value("Ocurrió un error. Inténtalo de nuevo."))
+                .andExpect(result -> assertThat(result.getResponse().getContentAsString())
+                        .doesNotContain("Ana Pérez")
+                        .doesNotContain("ck_cuenta_nombre"));
+
+        assertThat(salida.getOut())
+                .contains("constraint=ck_cuenta_nombre, code=INTERNAL_ERROR, requestId=restriccion-1")
+                .doesNotContain("Ana Pérez");
+    }
+
+    @Test
+    void unaViolacionSinNombreDeRestriccionSeRegistraComoDesconocida(CapturedOutput salida) throws Exception {
+        mockMvc.perform(get("/restriccion-sin-nombre"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+
+        assertThat(salida.getOut()).contains("constraint=desconocida").doesNotContain("Ana Pérez");
     }
 
     @Test
@@ -192,6 +220,19 @@ class BusinessExceptionHandlerTest {
         @GetMapping("/correo-del-dominio")
         String correoDelDominio() {
             return new EmailAddress("ana@").value();
+        }
+
+        @GetMapping("/restriccion")
+        String restriccion() {
+            throw new DataIntegrityViolationException("could not execute statement",
+                    new ConstraintViolationException(
+                            "Failing row contains (nombre)=(Ana Pérez) viola ck_cuenta_nombre",
+                            new SQLException("Failing row contains (Ana Pérez)"), "ck_cuenta_nombre"));
+        }
+
+        @GetMapping("/restriccion-sin-nombre")
+        String restriccionSinNombre() {
+            throw new DataIntegrityViolationException("duplicate key value (nombre)=(Ana Pérez)");
         }
 
         @GetMapping("/valor-de-libreria")

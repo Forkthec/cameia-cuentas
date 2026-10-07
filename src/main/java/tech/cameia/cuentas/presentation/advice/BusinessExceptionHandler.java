@@ -9,8 +9,10 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.hibernate.exception.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -268,6 +270,28 @@ class BusinessExceptionHandler {
     }
 
     /**
+     * Violación de una restricción de la base de datos.
+     *
+     * <p>Ninguna restricción de la tabla de cuentas es alcanzable por una entrada de la
+     * persona, porque la validación del contrato y del dominio actúa antes: una violación es
+     * un defecto y responde como cualquier fallo imprevisto. El mensaje de la base incluye el
+     * valor de la columna (un dato personal), así que ni se devuelve ni se registra: el log
+     * lleva solo el nombre de la restricción.</p>
+     *
+     * @param error excepción traducida por Spring
+     * @return {@code 500 Internal Server Error} con un mensaje genérico
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ProblemDetail integridadDeDatos(DataIntegrityViolationException error) {
+        ProblemDetail problema = problema(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno", DETALLE_INTERNO,
+                ErrorCode.INTERNAL_ERROR);
+        logger.error("Violación de restricción de la base [constraint={}, code={}, requestId={}, causa={}]",
+                restriccionDe(error), ErrorCode.INTERNAL_ERROR, problema.getProperties().get("requestId"),
+                claseMasEspecifica(error));
+        return problema;
+    }
+
+    /**
      * Ruta que no existe.
      *
      * @param error excepción de Spring cuando ningún controlador ni recurso atiende la ruta
@@ -421,6 +445,19 @@ class BusinessExceptionHandler {
             return "desconocido";
         }
         return traza[0].getClassName() + "." + traza[0].getMethodName();
+    }
+
+    /** Nombre de la restricción violada, buscado en la cadena de causas; nunca el mensaje. */
+    private static String restriccionDe(Throwable error) {
+        for (Throwable actual = error; actual != null; actual = actual.getCause()) {
+            if (actual instanceof ConstraintViolationException hibernate && hibernate.getConstraintName() != null) {
+                return hibernate.getConstraintName();
+            }
+            if (actual.getCause() == actual) {
+                break;
+            }
+        }
+        return "desconocida";
     }
 
     /** Nombre simple de la causa más profunda: dice qué falló sin citar el valor recibido. */
