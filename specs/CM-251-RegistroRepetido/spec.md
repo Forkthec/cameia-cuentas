@@ -117,7 +117,7 @@ Hipótesis: `httpClient.ts` de `cameia-web` aborta a los 10 s y muestra «No hay
 |---|---|---|---|---|
 | 1 | D2: ¿el 200 devuelve `id` y `firebaseUid` de la cuenta existente a quien conozca el correo (literal del CA)? | **Respondida (Paula, 6-oct): sí, literal del CA**; el riesgo se registra en la matriz de seguridad del PR | Sí, literal; el riesgo es bajo (identificadores no secretos, solo cuentas pendientes de menos de 8 días) y se registra en la matriz de seguridad del PR | La forma del cuerpo del 200 (tarjeta T-2) |
 | 2 | D3: ¿la credencial sin cuenta se registra en `ERROR` (alguien debe actuar) y la vía de carrera en `WARN`? | **Respondida (Paula, 6-oct): sí** | Sí | Solo el nivel del registro |
-| 3 | ¿CM-251 es el hogar del CA-1.1.30? (Jira no tiene una «Ajustes v4 – Backend» de Cuentas para HU-1.1) | **PENDIENTE de Vela** (es la pregunta 5 de ESTADO.md, ya hecha para CM-36) | Sí, CM-251 | Dónde se registra y cierra el trabajo; nada de código |
+| 3 | ¿CM-251 es el hogar del CA-1.1.30? (Jira no tiene una «Ajustes v4 – Backend» de Cuentas para HU-1.1) | **No era pregunta: se comunica. CA-1.1.30 se registra en CM-251; se informa a Vela** | Sí, CM-251 | Dónde se registra y cierra el trabajo; nada de código |
 
 ## 13. Fuera de alcance
 
