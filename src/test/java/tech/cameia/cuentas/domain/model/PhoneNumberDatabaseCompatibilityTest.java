@@ -4,40 +4,37 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
 import com.google.i18n.phonenumbers.PhoneNumberUtil.PhoneNumberFormat;
 import com.google.i18n.phonenumbers.PhoneNumberUtil.PhoneNumberType;
+import com.google.i18n.phonenumbers.PhoneNumberUtil.ValidationResult;
 import com.google.i18n.phonenumbers.Phonenumber;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import tech.cameia.cuentas.domain.exception.InvalidPhoneNumberException;
 
 /**
  * Comprueba la relación entre la validación por país y la restricción
- * {@code ck_cuenta_telefono_e164} de la base ({@code ^\+[1-9][0-9]{7,14}$}).
+ * {@code ck_cuenta_telefono_e164} de la base ({@code ^\+[1-9][0-9]{5,14}$}).
  *
- * <p>Se recorren los números de ejemplo de cada región para los tipos móvil, fijo y mixto. Lo
- * que no puede pasar es que un número aceptado no quepa en la base: el registro pasaría la
- * validación y fallaría al guardar con un error interno.</p>
- *
- * <p>Hay regiones con números válidos de siete dígitos, más cortos que el mínimo de la base.
- * Hoy se rechazan con el error de formato del celular; aceptarlos exige una migración que
- * relaje la restricción. La segunda prueba fija cuáles son, para que una versión nueva de la
- * librería que agregue otra región no pase sin que alguien lo decida.</p>
+ * <p>Lo que no puede pasar es que un número aceptado no quepa en la base: el registro pasaría la
+ * validación y fallaría al guardar con un error interno. Ni que un número válido se rechace por
+ * una longitud que la base no admite, porque el formulario web lo acepta con la misma
+ * librería.</p>
  */
 class PhoneNumberDatabaseCompatibilityTest {
 
     /** La misma expresión de la restricción de la base. */
-    private static final Pattern RESTRICCION_DE_LA_BASE = Pattern.compile("^\\+[1-9][0-9]{7,14}$");
+    private static final Pattern RESTRICCION_DE_LA_BASE = Pattern.compile("^\\+[1-9][0-9]{5,14}$");
 
-    /** Regiones con números válidos que no caben en la base: Tristan da Cunha, Tokelau y Niue. */
-    private static final Set<String> REGIONES_FUERA_DE_LA_BASE = Set.of("TA", "TK", "NU");
+    /** Máximo de dígitos de un número E.164, con el indicativo. */
+    private static final int MAXIMO_E164 = 15;
 
     private static final List<String> EJEMPLOS = new ArrayList<>();
 
@@ -49,43 +46,60 @@ class PhoneNumberDatabaseCompatibilityTest {
                     PhoneNumberType.FIXED_LINE_OR_MOBILE)) {
                 Phonenumber.PhoneNumber ejemplo = util.getExampleNumberForType(region, tipo);
                 if (ejemplo != null) {
-                    EJEMPLOS.add(region + " " + util.format(ejemplo, PhoneNumberFormat.E164));
+                    EJEMPLOS.add(util.format(ejemplo, PhoneNumberFormat.E164));
                 }
             }
         }
     }
 
     @Test
-    void todoNumeroQueSeAceptaCabeEnLaRestriccionDeLaBase() {
+    void todoNumeroDeEjemploSeAceptaYCabeEnLaBase() {
+        List<String> rechazados = new ArrayList<>();
         List<String> aceptadosQueNoCaben = new ArrayList<>();
-        int aceptados = 0;
-        for (String ejemplo : EJEMPLOS) {
-            String numero = ejemplo.substring(ejemplo.indexOf(' ') + 1);
+        for (String numero : EJEMPLOS) {
             try {
                 PhoneNumber.fromInput(numero);
-                aceptados++;
                 if (!RESTRICCION_DE_LA_BASE.matcher(numero).matches()) {
-                    aceptadosQueNoCaben.add(ejemplo);
+                    aceptadosQueNoCaben.add(numero);
                 }
             } catch (InvalidPhoneNumberException rechazado) {
-                // Un número rechazado nunca llega a la base: no es parte de esta comprobación.
+                rechazados.add(numero);
             }
         }
 
-        assertThat(aceptados).isGreaterThan(400);
+        assertThat(EJEMPLOS).hasSizeGreaterThan(400);
+        assertThat(rechazados).isEmpty();
         assertThat(aceptadosQueNoCaben).isEmpty();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"+2908999", "+6903101", "+6837012"})
+    void losNumerosValidosDeSieteDigitosSeAceptan(String numero) {
+        // Tristan da Cunha, Tokelau y Niue: son los que la restricción anterior, de 8 dígitos
+        // como mínimo, dejaba fuera.
+        assertThat(PhoneNumber.fromInput(numero).value()).isEqualTo(numero);
+        assertThat(RESTRICCION_DE_LA_BASE.matcher(numero).matches()).isTrue();
+    }
+
     @Test
-    void lasRegionesConNumerosValidosMasCortosQueLaBaseSonLasConocidas() {
-        Set<String> regiones = new TreeSet<>();
-        for (String ejemplo : EJEMPLOS) {
-            String numero = ejemplo.substring(ejemplo.indexOf(' ') + 1);
-            if (!RESTRICCION_DE_LA_BASE.matcher(numero).matches()) {
-                regiones.add(ejemplo.substring(0, ejemplo.indexOf(' ')));
+    void elNumeroPosibleMasCortoDeCualquierPaisCabeEnLaBase() {
+        // Recorre las longitudes posibles de cada país, no solo los ejemplos: una versión nueva
+        // de la librería con un número más corto haría fallar esta prueba antes que el registro.
+        PhoneNumberUtil util = PhoneNumberUtil.getInstance();
+        int masCorto = Integer.MAX_VALUE;
+        for (String region : util.getSupportedRegions()) {
+            int indicativo = util.getCountryCodeForRegion(region);
+            for (int largo = 1; largo <= MAXIMO_E164; largo++) {
+                Phonenumber.PhoneNumber numero = new Phonenumber.PhoneNumber().setCountryCode(indicativo)
+                        .setNationalNumber(Long.parseLong("2".repeat(largo)));
+                if (util.isPossibleNumberWithReason(numero) == ValidationResult.IS_POSSIBLE) {
+                    masCorto = Math.min(masCorto, String.valueOf(indicativo).length() + largo);
+                }
             }
         }
 
-        assertThat(regiones).containsExactlyInAnyOrderElementsOf(REGIONES_FUERA_DE_LA_BASE);
+        assertThat(masCorto).isEqualTo(6);
+        assertThat(RESTRICCION_DE_LA_BASE.matcher("+" + "1".repeat(masCorto)).matches()).isTrue();
+        assertThat(RESTRICCION_DE_LA_BASE.matcher("+" + "1".repeat(masCorto - 1)).matches()).isFalse();
     }
 }

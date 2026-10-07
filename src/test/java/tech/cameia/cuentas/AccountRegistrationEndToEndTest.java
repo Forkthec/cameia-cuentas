@@ -225,7 +225,7 @@ class AccountRegistrationEndToEndTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"+573000000000", "+34612345678"})
+    @CsvSource({"+573000000000", "+34612345678", "+6903101"})
     void unCelularValidoSeGuardaTalCual(String celular) {
         ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("+573001234567", celular));
 

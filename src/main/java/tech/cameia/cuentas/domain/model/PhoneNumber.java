@@ -26,7 +26,12 @@ import tech.cameia.cuentas.domain.exception.InvalidPhoneNumberException;
  */
 public record PhoneNumber(String value) {
 
-    private static final Pattern E164 = Pattern.compile("^\\+[1-9][0-9]{7,14}$");
+    /**
+     * Forma E.164: «+» y de 6 a 15 dígitos, el primero distinto de cero. Seis es la longitud del
+     * número posible más corto de cualquier país (contando el indicativo) y quince el máximo de
+     * E.164.
+     */
+    private static final Pattern E164 = Pattern.compile("^\\+[1-9][0-9]{5,14}$");
 
     /**
      * Valida la forma E.164 del número.
