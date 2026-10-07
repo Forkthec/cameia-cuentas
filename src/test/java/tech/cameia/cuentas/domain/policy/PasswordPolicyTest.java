@@ -67,6 +67,18 @@ class PasswordPolicyTest {
     }
 
     @Test
+    void laLongitudSeCompruebaSinLaListaDeContraseniasComunes() {
+        // El contrato HTTP la aplica junto con las demás reglas de forma; la lista se consulta después.
+        assertThatThrownBy(() -> PasswordPolicy.verifyLength(new RawPassword("frase secre")))
+                .isInstanceOfSatisfying(WeakPasswordException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.PASSWORD_TOO_SHORT));
+        assertThatThrownBy(() -> PasswordPolicy.verifyLength(new RawPassword("a".repeat(65))))
+                .isInstanceOfSatisfying(WeakPasswordException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.PASSWORD_TOO_LONG));
+        assertThatCode(() -> PasswordPolicy.verifyLength(new RawPassword("password1234"))).doesNotThrowAnyException();
+    }
+
+    @Test
     void rechazaUnaContraseniaConocidaAunqueCumplaLaLongitud() {
         // Doce caracteres, así que pasa la regla de longitud; un ataque de diccionario la
         // prueba en los primeros intentos.

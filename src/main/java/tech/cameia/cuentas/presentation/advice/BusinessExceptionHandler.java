@@ -10,7 +10,10 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import jakarta.validation.ConstraintViolation;
+
 import org.hibernate.exception.ConstraintViolationException;
+import org.hibernate.validator.engine.HibernateConstraintViolation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -38,6 +41,7 @@ import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.EmailNotVerifiedException;
 import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.InvalidFieldException;
+import tech.cameia.cuentas.domain.exception.InvalidPronounException;
 import tools.jackson.databind.exc.MismatchedInputException;
 
 /**
@@ -113,7 +117,7 @@ class BusinessExceptionHandler {
             Map.entry("email.NotBlank", ErrorCode.EMAIL_REQUIRED),
             Map.entry("email.CodePointSize", ErrorCode.EMAIL_TOO_LONG),
             Map.entry("password.NotBlank", ErrorCode.PASSWORD_REQUIRED),
-            Map.entry("pronoun.NotNull", ErrorCode.PRONOUN_REQUIRED));
+            Map.entry("pronoun.NotBlank", ErrorCode.PRONOUN_REQUIRED));
 
     /**
      * Un campo rechazado dentro de la lista {@code errors}.
@@ -194,12 +198,12 @@ class BusinessExceptionHandler {
     }
 
     /**
-     * Cuerpo que no se puede interpretar: JSON mal formado, un arreglo u objeto donde va un
-     * texto, o un pronombre fuera de la lista.
+     * Cuerpo que no se puede interpretar: JSON mal formado o un arreglo u objeto donde va un
+     * texto.
      *
-     * <p>El pronombre fuera de la lista es la única lectura fallida que tiene campo propio en
-     * el formulario (es una lista de opciones), así que sale como error de ese campo. Cualquier
-     * otra sale como cuerpo ilegible, sin campo.</p>
+     * <p>Un arreglo u objeto en el pronombre sale como error de ese campo, igual que cualquier
+     * otro valor fuera de la lista: el formulario lo muestra como una opción no válida. Cualquier
+     * otra lectura fallida sale como cuerpo ilegible, sin campo.</p>
      *
      * <p>El detalle de la excepción no se devuelve ni se registra: describe la estructura
      * interna del modelo y, en un cuerpo de registro, puede incluir el valor recibido.</p>
@@ -210,7 +214,7 @@ class BusinessExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ProblemDetail cuerpoIlegible(HttpMessageNotReadableException error) {
         if (CAMPO_PRONOMBRE.equals(campoIlegible(error))) {
-            return validacion(List.of(campo(CAMPO_PRONOMBRE, ErrorCode.PRONOUN_INVALID_VALUE, "Selecciona una opción.")));
+            return campoDeDominioInvalido(new InvalidPronounException());
         }
         // Solo el tipo de fallo. El mensaje de Jackson suele citar el fragmento de JSON que
         // no pudo leer, y en el registro ese fragmento puede ser la contraseña.
@@ -396,12 +400,20 @@ class BusinessExceptionHandler {
     /**
      * Código de una restricción del contrato.
      *
+     * <p>Una regla de forma del dominio ({@code @DomainRule}) trae su código como carga dinámica:
+     * es el de la excepción del dominio. Las demás restricciones lo toman de la tabla.</p>
+     *
      * <p>Si la restricción no está en la tabla, el elemento lleva {@code REQUEST_INVALID_VALUE}
      * y se registra un {@code ERROR}: nunca {@code VALIDATION_FAILED}, que es el código de la
      * operación entera. Una prueba impide que esto ocurra; la rama existe para que un
      * descuido no pase en silencio.</p>
      */
     private ErrorCode codigoDe(FieldError fallo) {
+        if (fallo.contains(ConstraintViolation.class)
+                && fallo.unwrap(ConstraintViolation.class) instanceof HibernateConstraintViolation<?> violacion
+                && violacion.getDynamicPayload(ErrorCode.class) != null) {
+            return violacion.getDynamicPayload(ErrorCode.class);
+        }
         String clave = fallo.getField() + "." + fallo.getCode();
         ErrorCode codigo = FIELD_ERROR_CODES.get(clave);
         if (codigo == null) {

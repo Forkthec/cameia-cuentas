@@ -1,6 +1,7 @@
 package tech.cameia.cuentas.presentation.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -45,7 +46,6 @@ import tech.cameia.cuentas.domain.exception.WeakPasswordException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.BirthDate;
 import tech.cameia.cuentas.domain.model.Pronoun;
-import tech.cameia.cuentas.infrastructure.config.JacksonConfiguration;
 import tech.cameia.cuentas.presentation.advice.ProblemDetailTestSupport;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -70,14 +70,12 @@ class UserRegistrationControllerTest {
             .build();
 
     /**
-     * Lee el JSON con las mismas reglas que la aplicación (enumerados vacíos como ausentes) y
-     * escribe los errores igual que ella: el mixin publica {@code code} y {@code requestId}
-     * en el nivel superior del documento de error.
+     * Escribe los errores igual que la aplicación: el mixin publica {@code code} y
+     * {@code requestId} en el nivel superior del documento de error.
      */
     private static JacksonJsonHttpMessageConverter convertidorComoLaAplicacion() {
         JsonMapper.Builder constructor = JsonMapper.builder()
                 .addMixIn(ProblemDetail.class, ProblemDetailJacksonMixin.class);
-        JacksonConfiguration.aplicarReglas(constructor);
         return new JacksonJsonHttpMessageConverter(constructor.build());
     }
 
@@ -235,6 +233,40 @@ class UserRegistrationControllerTest {
                         .value(org.hamcrest.Matchers.contains("LAST_NAME_REQUIRED")))
                 .andExpect(jsonPath("$.errors[?(@.field=='email')].code")
                         .value(org.hamcrest.Matchers.contains("EMAIL_REQUIRED")));
+
+        verify(servicio, never()).register(any(RegisterUserCommand.class));
+    }
+
+    @Test
+    void lasReglasDeFormaDelDominioSeRespondenJuntoConLasDelContrato() throws Exception {
+        // REQ-RV-64: toda regla de forma sale a la vez, un elemento por campo, con el código y el
+        // mensaje del dominio; antes, cada regla del dominio salía sola y después del contrato.
+        String cuerpo = cuerpoValido()
+                .replace("\"Ana\"", "\"\"")
+                .replace("\"Pérez\"", "\"Pérez_\"")
+                .replace("\"12/04/1995\"", "\"31/02/2000\"")
+                .replace("\"ana@cameia.tech\"", "\"ana@@correo.co\"")
+                .replace("\"frase secreta larga\"", "\"corta\"")
+                .replace("\"pronoun\":\"SHE\"", "\"pronoun\":\"OTRO\",\"phoneNumber\":\"12345\"");
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors.length()").value(7))
+                .andExpect(jsonPath("$.errors[?(@.field=='firstName')].code").value(contains("FIRST_NAME_REQUIRED")))
+                .andExpect(jsonPath("$.errors[?(@.field=='lastName')].code")
+                        .value(contains("LAST_NAME_INVALID_CHARACTERS")))
+                .andExpect(jsonPath("$.errors[?(@.field=='lastName')].message")
+                        .value(contains("El apellido solo puede contener letras, espacios, apóstrofo y guion.")))
+                .andExpect(jsonPath("$.errors[?(@.field=='birthDate')].code")
+                        .value(contains("BIRTH_DATE_INVALID_FORMAT")))
+                .andExpect(jsonPath("$.errors[?(@.field=='email')].code").value(contains("EMAIL_INVALID_FORMAT")))
+                .andExpect(jsonPath("$.errors[?(@.field=='password')].code").value(contains("PASSWORD_TOO_SHORT")))
+                .andExpect(jsonPath("$.errors[?(@.field=='password')].message")
+                        .value(contains("La contraseña debe tener al menos 12 caracteres.")))
+                .andExpect(jsonPath("$.errors[?(@.field=='phoneNumber')].code")
+                        .value(contains("PHONE_NUMBER_INVALID_FORMAT")))
+                .andExpect(jsonPath("$.errors[?(@.field=='pronoun')].code").value(contains("PRONOUN_INVALID_VALUE")));
 
         verify(servicio, never()).register(any(RegisterUserCommand.class));
     }

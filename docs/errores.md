@@ -9,6 +9,11 @@ encabezado `X-Request-Id`). Los errores de validación agregan `errors`, con un 
 rechazado; en ellos `code` es `VALIDATION_FAILED` y `detail` es siempre «Revisa los campos marcados.». La decisión está en el
 [ADR 0001](adr/0001-codigo-de-error-y-request-id.md).
 
+Los errores de forma de cada campo salen todos a la vez, un elemento por campo: los de Bean Validation (`@NotBlank`,
+`@CodePointSize`, `@BirthDateFormat`) y las reglas de forma del dominio (caracteres del nombre, formato del correo y del celular,
+longitud de la contraseña, opción del pronombre), que `@DomainRule` ejecuta en el borde tomando el código y el mensaje de la
+excepción del dominio. Las reglas de negocio (edad, contraseña común, correo repetido) se aplican después y de una en una.
+
 Todas las respuestas las produce `BusinessExceptionHandler`. Cada error se registra una sola vez: los 4xx en `WARN` sin traza, con
 `code`, `requestId` y, en validación, los nombres de campo y sus códigos; los 5xx en `ERROR` con traza. Nunca se registran el valor de
 un campo, el correo, la contraseña ni el mensaje de una excepción de deserialización o de base de datos.
@@ -40,7 +45,7 @@ servicio. Las pruebas citadas están en `src/test/java/tech/cameia/cuentas/`.
 | `PASSWORD_TOO_SHORT` | 422 | registro | `password` | La contraseña debe tener al menos 12 caracteres. | `PasswordPolicy` (`WeakPasswordException`) | `PasswordPolicyTest`, `UserRegistrationControllerTest` |
 | `PASSWORD_TOO_LONG` | 422 | registro | `password` | La contraseña no puede superar los 64 caracteres. | `PasswordPolicy` (`WeakPasswordException`) | `PasswordPolicyTest` |
 | `PASSWORD_TOO_COMMON` | 422 | registro | `password` | Esta contraseña es demasiado común, elige otra. | `PasswordPolicy` (`WeakPasswordException`) | `PasswordPolicyTest`, `UserRegistrationControllerTest` |
-| `PRONOUN_REQUIRED` | 422 | registro | `pronoun` | Selecciona una opción. | `@NotNull` (ausente, `null`, vacío o en blanco) | `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest` |
+| `PRONOUN_REQUIRED` | 422 | registro | `pronoun` | Selecciona una opción. | `@NotBlank` (ausente, `null`, vacío o en blanco) | `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest` |
 | `PRONOUN_INVALID_VALUE` | 422 | registro | `pronoun` | Selecciona una opción. | Un valor que no es `HE`, `SHE` ni `THEY` escrito igual (otro texto, otras mayúsculas, número, booleano, arreglo u objeto); un número no se lee como la posición de la opción | `BusinessExceptionHandlerTest`, `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest` |
 | `PHONE_NUMBER_INVALID_FORMAT` | 422 | registro | `phoneNumber` | Revisa el número, no coincide con el formato del país elegido. | `PhoneNumber.fromInput` (`InvalidPhoneNumberException`): no cumple E.164 sin espacios (de 6 a 15 dígitos con el indicativo, la misma regla de `ck_cuenta_telefono_e164`) o no es un número válido para su país según `libphonenumber`. Vacío o en blanco es «sin celular» | `ValueObjectsTest`, `PhoneNumberDatabaseCompatibilityTest`, `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest` |
 | `REQUEST_BODY_INVALID_FORMAT` | 422 | registro | — | Revisa el formato de los datos enviados. | Cuerpo ilegible (`HttpMessageNotReadableException`): JSON mal formado o un arreglo u objeto donde va un texto, salvo en `pronoun`, que responde `PRONOUN_INVALID_VALUE` | `BusinessExceptionHandlerTest`, `UserRegistrationControllerTest` |

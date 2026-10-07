@@ -1,7 +1,7 @@
 # Entrada 02 · Errores conocidos que terminaban en el respaldo `INTERNAL_ERROR`
 
 - **Fecha:** 2026-10-07 · **Herramienta:** Claude Code · **Responsable:** Backend
-- **Salida:** [Spec de CM-36](../../specs/CM-36-ValidacionesRegistro/spec.md), sección 13 (D14 a D17) y sección 15 (preguntas 36 a 42)
+- **Salida:** [Spec de CM-36](../../specs/CM-36-ValidacionesRegistro/spec.md), sección 13 (D14 a D18) y sección 15 (preguntas 36 a 43)
 
 ## Qué cambió el rumbo
 
