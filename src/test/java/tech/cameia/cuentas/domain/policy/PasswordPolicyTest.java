@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
 
+import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
 import tech.cameia.cuentas.domain.model.RawPassword;
 
@@ -76,6 +77,30 @@ class PasswordPolicyTest {
     void admiteUnaFraseLargaQueNoEstaEnLaLista() {
         assertThatCode(() -> policy.verify(new RawPassword("dos gatos duermen en la ventana")))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void laContraseniaCortaLlevaElCodigoDeContraseniaMuyCorta() {
+        assertThatThrownBy(() -> policy.verify(new RawPassword("corta")))
+                .isInstanceOf(WeakPasswordException.class)
+                .extracting(excepcion -> ((WeakPasswordException) excepcion).getErrorCode())
+                .isEqualTo(ErrorCode.PASSWORD_TOO_SHORT);
+    }
+
+    @Test
+    void laContraseniaLargaLlevaElCodigoDeContraseniaMuyLarga() {
+        assertThatThrownBy(() -> policy.verify(new RawPassword("a".repeat(65))))
+                .isInstanceOf(WeakPasswordException.class)
+                .extracting(excepcion -> ((WeakPasswordException) excepcion).getErrorCode())
+                .isEqualTo(ErrorCode.PASSWORD_TOO_LONG);
+    }
+
+    @Test
+    void laContraseniaConocidaLlevaElCodigoDeContraseniaComun() {
+        assertThatThrownBy(() -> policy.verify(new RawPassword("123456789012")))
+                .isInstanceOf(WeakPasswordException.class)
+                .extracting(excepcion -> ((WeakPasswordException) excepcion).getErrorCode())
+                .isEqualTo(ErrorCode.PASSWORD_TOO_COMMON);
     }
 
     @Test

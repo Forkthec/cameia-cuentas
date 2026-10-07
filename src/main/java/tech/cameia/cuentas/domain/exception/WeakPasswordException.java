@@ -9,11 +9,12 @@ package tech.cameia.cuentas.domain.exception;
 public class WeakPasswordException extends BusinessException {
 
     /**
-     * Crea la excepción con la regla incumplida.
+     * Crea la excepción con el código de la regla incumplida y su texto.
      *
+     * @param errorCode código estable de la regla incumplida (muy corta, muy larga o común)
      * @param mensaje texto en español que explica qué exige la política
      */
-    public WeakPasswordException(String mensaje) {
-        super(mensaje);
+    public WeakPasswordException(ErrorCode errorCode, String mensaje) {
+        super(errorCode, mensaje);
     }
 }

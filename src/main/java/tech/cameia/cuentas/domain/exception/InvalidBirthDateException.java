@@ -13,13 +13,28 @@ public class InvalidBirthDateException extends BusinessException {
     public enum Reason {
 
         /** La persona todavía no cumple 18 años. */
-        UNDERAGE,
+        UNDERAGE(ErrorCode.BIRTH_DATE_UNDERAGE),
 
         /** La fecha está en el futuro, así que es un dato erróneo. */
-        IN_THE_FUTURE,
+        IN_THE_FUTURE(ErrorCode.BIRTH_DATE_IN_THE_FUTURE),
 
         /** La fecha implica una edad que ninguna persona alcanza. */
-        IMPLAUSIBLE
+        IMPLAUSIBLE(ErrorCode.BIRTH_DATE_OUT_OF_RANGE);
+
+        private final ErrorCode code;
+
+        Reason(ErrorCode code) {
+            this.code = code;
+        }
+
+        /**
+         * Indica el código estable de esta causa.
+         *
+         * @return código que acompaña a la excepción
+         */
+        ErrorCode code() {
+            return code;
+        }
     }
 
     private final transient Reason reason;
@@ -31,7 +46,7 @@ public class InvalidBirthDateException extends BusinessException {
      * @param mensaje texto en español que el modal de registro muestra tal cual
      */
     public InvalidBirthDateException(Reason reason, String mensaje) {
-        super(mensaje);
+        super(reason.code(), mensaje);
         this.reason = reason;
     }
 

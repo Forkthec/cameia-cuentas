@@ -13,6 +13,6 @@ public class AccountNotFoundException extends BusinessException {
 
     /** Crea la excepción con el mensaje que ve la persona. */
     public AccountNotFoundException() {
-        super(MENSAJE);
+        super(ErrorCode.ACCOUNT_NOT_FOUND, MENSAJE);
     }
 }
