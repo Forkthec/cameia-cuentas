@@ -77,6 +77,8 @@ class BusinessExceptionHandlerTest {
         mockMvc.perform(get("/falla"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(header().string("Content-Type",
+                        org.hamcrest.Matchers.containsStringIgnoringCase("charset=UTF-8")))
                 .andExpect(jsonPath("$.title").value("Error interno"))
                 .andExpect(jsonPath("$.detail").value("Ocurrió un error. Inténtalo de nuevo."))
                 .andExpect(jsonPath("$.errors").doesNotExist())
