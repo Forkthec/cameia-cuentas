@@ -64,6 +64,18 @@ public class FirebaseConfiguration {
 
     private static final String DEPLOY_PROFILE = "prod";
 
+    /**
+     * Máximo para abrir la conexión con Firebase, en milisegundos. El SDK no trae límite: sin
+     * él, una red caída dejaría el hilo de la petición esperando hasta que el cliente se rinda.
+     */
+    static final int CONNECT_TIMEOUT_MS = 5_000;
+
+    /**
+     * Máximo de espera de cada respuesta de Firebase, en milisegundos. Vencido, el registro
+     * responde que el servicio no está disponible y la persona puede reintentar.
+     */
+    static final int READ_TIMEOUT_MS = 10_000;
+
     private final String projectId;
     private final String keyPath;
     private final Environment environment;
@@ -100,6 +112,8 @@ public class FirebaseConfiguration {
             FirebaseOptions opciones = FirebaseOptions.builder()
                     .setCredentials(resolverCredenciales())
                     .setProjectId(projectId)
+                    .setConnectTimeout(CONNECT_TIMEOUT_MS)
+                    .setReadTimeout(READ_TIMEOUT_MS)
                     .build();
 
             return FirebaseApp.getApps().stream()
