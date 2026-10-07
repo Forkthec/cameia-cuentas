@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -18,7 +21,10 @@ import tech.cameia.cuentas.domain.model.RawPassword;
  */
 class PasswordPolicyTest {
 
-    private final PasswordPolicy policy = new PasswordPolicy();
+    /** Lista de prueba con las tres contraseñas comunes del criterio de aceptación. */
+    static final Set<String> COMUNES = Set.of("123456789012", "password1234", "qwertyuiop123");
+
+    private final PasswordPolicy policy = new PasswordPolicy(COMUNES);
 
     @Test
     void rechazaUnaContraseniaDeOnceCaracteres() {
@@ -142,6 +148,41 @@ class PasswordPolicyTest {
         policy.verify(original);
 
         assertThat(original.value()).isEqualTo("é".repeat(12));
+    }
+
+    @Test
+    void unaContraseniaParecidaQueNoEstaEnLaListaSeAcepta() {
+        assertThatCode(() -> policy.verify(new RawPassword("password12345"))).doesNotThrowAnyException();
+    }
+
+    @Test
+    void conLaListaVaciaSoloRigeLaLongitud() {
+        PasswordPolicy sinLista = new PasswordPolicy(Set.of());
+
+        assertThatCode(() -> sinLista.verify(new RawPassword("123456789012"))).doesNotThrowAnyException();
+    }
+
+    @Test
+    void unaContraseniaComunRodeadaDeEspaciosDurosOConAcentoCombinanteSigueSiendoComun() {
+        PasswordPolicy conAcento = new PasswordPolicy(Set.of("contraseñacomún"));
+
+        assertThatThrownBy(() -> policy.verify(new RawPassword(" password1234 ")))
+                .isInstanceOf(WeakPasswordException.class)
+                .hasMessage("Esta contraseña es demasiado común, elige otra.");
+        assertThatThrownBy(() -> conAcento.verify(new RawPassword("contraseñacomún")))
+                .isInstanceOf(WeakPasswordException.class)
+                .hasMessage("Esta contraseña es demasiado común, elige otra.");
+    }
+
+    @Test
+    void laListaRecibidaSeCopiaYNoCambiaSiQuienLaEntregoLaModifica() {
+        Set<String> lista = new HashSet<>(Set.of("123456789012"));
+        PasswordPolicy copiada = new PasswordPolicy(lista);
+
+        lista.clear();
+
+        assertThatThrownBy(() -> copiada.verify(new RawPassword("123456789012")))
+                .isInstanceOf(WeakPasswordException.class);
     }
 
     @Test
