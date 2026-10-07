@@ -4,31 +4,33 @@ Reglas de calidad comunes a los microservicios de Backend (Cuentas, Perfil, Entr
 
 ## 1. Alcance y precedencia
 
-Aplica a todo código, prueba, migración y documento de un microservicio de Backend. Cuando dos fuentes chocan, manda la primera de esta lista:
+Aplica a todo código, prueba, migración y documento nuevo o modificado de un microservicio de Backend. Esta es la única lista de precedencia del repositorio; cuando dos fuentes chocan, manda la primera:
 
 1. La seguridad y los contratos ya publicados que consume otro equipo. Un cambio de contrato es aditivo y se avisa a Frontend.
-2. Este estándar, en calidad de código.
-3. `CONTRIBUTING.md`, en rama, commit, título de PR, revisión y merge.
-4. `docs/constitution.md`, en los principios no negociables.
+2. `docs/constitution.md`, en los principios no negociables.
+3. Este estándar, en calidad de código.
+4. `CONTRIBUTING.md`, en rama, commit, título de PR, revisión y merge.
 5. `CLAUDE.md`, en lo propio del servicio (estructura, rutas, datos, seguridad).
 
-Si dos fuentes de esta lista se contradicen, o el código contradice su documento, el trabajo se detiene, se reporta qué choca y dónde, y se corrige el documento en un PR. Nunca se elige en silencio.
+Si dos documentos de esta lista se contradicen, el trabajo se detiene, se reporta qué choca y dónde, y se corrige el documento en un PR. Nunca se elige en silencio.
+
+**Código existente.** Una diferencia entre el código que ya existe y este estándar no detiene el trabajo: se registra como hallazgo en la spec de la tarea que la encuentra, con su destino, y se corrige cuando una tarea modifica ese archivo. El código nuevo y el modificado cumplen el estándar completo.
 
 ## 2. Idioma y nombres
 
 - **Identificadores en inglés** (paquetes, clases, métodos, variables, constantes). **Documentación en español:** Javadoc, OpenAPI, comentarios, logs, mensajes de error, `@DisplayName`, commits y PR.
 - Tablas y columnas en `snake_case` español y en singular (`cuenta`, `experiencia_laboral`); las constantes, en `UPPER_SNAKE_CASE`.
-- Sin abreviaturas, salvo siglas técnicas establecidas: `dto`, `id`, `uid`, `url`, `api`, `jwt`.
+- Sin abreviaturas, salvo siglas técnicas establecidas (`dto`, `id`, `uid`, `url`, `api`, `jwt`) y el sufijo `AppService`.
 - Sin prefijo `I` en las interfaces ni sufijo `Impl` en las clases.
 
-**Sufijo por capa**
+**Sufijo por capa.** Rige para las clases nuevas; una clase existente con otra forma conserva su nombre.
 
 | Pieza | Forma | Ejemplo |
 |---|---|---|
 | Controlador | `<Concept>Controller` | `ProfileController` |
 | DTO | `<UseCase>Request` / `<Concept>Response` | `CreateProfileRequest` |
 | Manejador de errores | `<Scope>ExceptionHandler` | `BusinessExceptionHandler` |
-| Servicio de aplicación | `<Concept>AppService` | `RegisterUserAppService` |
+| Servicio de aplicación | `<Concept>AppService`, que lo distingue de un servicio de `domain.service` | `ProfileAppService` |
 | Comando | `<UseCase>Command` | `RegisterUserCommand` |
 | Modelo de dominio | sin sufijo | `Account` |
 | Política | `<Concept>Policy` | `PasswordPolicy` |
@@ -36,10 +38,10 @@ Si dos fuentes de esta lista se contradicen, o el código contradice su document
 | Evento de dominio | hecho en pasado | `AccountDeleted` |
 | Excepción de negocio | `<Rule>Exception` | `EmailAlreadyRegisteredException` |
 | Entidad JPA | `<Concept>Entity` | `AccountEntity` |
-| Spring Data / adaptador | `<Entity>JpaRepository` / `<Port>JpaAdapter` | `AccountJpaRepository` |
+| Spring Data / adaptador | `<Entity>JpaRepository` / `<Port>Adapter` | `AccountJpaRepository` / `AccountRepositoryAdapter` |
 | Consumidor de mensajes | `<Event>Listener` | `AccountDeletedListener` |
 | Contrato de mensaje | `<Event>PayloadV<n>` | `AccountDeletedPayloadV1` |
-| Configuración | `<Topic>Config` | `OpenApiConfig` |
+| Configuración | `<Topic>Configuration` | `FirebaseConfiguration` |
 
 **Verbos**
 
@@ -57,7 +59,7 @@ Si dos fuentes de esta lista se contradicen, o el código contradice su document
 ## 3. Arquitectura y dependencias
 
 - Cuatro capas: `presentation`, `application`, `domain` e `infrastructure`. `domain` no importa Spring, JPA, Rabbit ni Google. `application` depende de `domain` solo por puertos. `infrastructure` implementa los puertos. `presentation` no accede a `infrastructure`.
-- La prueba de arquitectura (ArchUnit) del repositorio vigila esas reglas y debe quedar en verde.
+- La prueba de arquitectura (ArchUnit) del repositorio debe quedar en verde. Una regla de esta sección que la prueba todavía no vigila se comprueba en la revisión del PR.
 - **Persistencia en tres piezas:** el puerto en `domain.port` (sin una importación de Spring ni de JPA), la interfaz de Spring Data y el adaptador que implementa el puerto con ella. El servicio de aplicación inyecta el puerto, nunca el `JpaRepository` ni el adaptador.
 - El mapeo entre dominio y entidad se escribe a mano; no se usan generadores de mapeo.
 - `@Transactional` solo en `application.service`: `@Transactional(readOnly = true)` en lecturas y `@Transactional` en escrituras, con el alcance mínimo. Ninguna llamada externa (Firebase, LLM, RabbitMQ, otro servicio) dentro de una transacción, salvo con compensación explícita y probada.
@@ -89,7 +91,7 @@ Si dos fuentes de esta lista se contradicen, o el código contradice su document
 **Estilo**
 
 - Inyección por constructor, con dependencias `private final` y sin `@Autowired`.
-- Visibilidad de paquete por defecto en controladores y sus métodos, clases `@Configuration`, métodos `@Bean`, servicios, `JpaRepository` y adaptadores. Públicos solo el modelo de dominio, los puertos, los DTO y los comandos, porque cruzan el paquete a propósito.
+- Visibilidad de paquete por defecto en controladores y sus métodos, clases `@Configuration`, métodos `@Bean`, `JpaRepository` y adaptadores. Públicos el modelo de dominio, los puertos, los servicios de aplicación, los DTO y los comandos, porque otro paquete los usa a propósito (el controlador llama al servicio de aplicación).
 - Objetos de valor inmutables (`record`); sin setters públicos en el dominio (el estado cambia con métodos de negocio); los agregados no exponen sus colecciones (copia o vista de solo lectura).
 - Los controladores devuelven `ResponseEntity<T>` con el estado explícito (201 en una creación). La raíz de todo JSON es un objeto, nunca un arreglo. Toda colección sin cota se pagina.
 - Sin `TODO` en el código: lo pendiente va a la spec o a Jira.
@@ -144,7 +146,7 @@ Toda respuesta de error de un microservicio Spring usa `application/problem+json
 - `code`: la causa de la operación. `VALIDATION_FAILED` cuando hay `errors`; en los demás casos, el código específico (`EMAIL_ALREADY_REGISTERED` con 409).
 - `requestId`: el `X-Request-Id` que pone el Gateway; si falta, el servicio genera uno y lo devuelve en el encabezado. Es el hilo para depurar entre el Gateway, el servicio y el log.
 - `errors[]`: un elemento por campo rechazado, con `field` (nombre del contrato JSON), `code` y `message`.
-- Un fallo técnico responde 500 con `INTERNAL_ERROR` y el mensaje «Ocurrió un error. Inténtalo de nuevo.»; la causa y la traza van solo al log. Ninguna respuesta lleva traza, SQL, nombre de clase ni el mensaje de una excepción de librería.
+- Un fallo técnico responde 500 con `INTERNAL_ERROR` y un mensaje genérico, sin detalle técnico, que cada servicio fija en su `docs/errores.md`; la causa y la traza van solo al log. Ninguna respuesta lleva traza, SQL, nombre de clase ni el mensaje de una excepción de librería.
 - `code`, `requestId` y `errors[].code` son miembros de extensión que la norma admite; se agregan sin reemplazar nada de lo publicado y se avisan a Frontend. La decisión está en el [ADR 0001](adr/0001-codigo-de-error-y-request-id.md).
 
 **Nombre de los códigos.** `UPPER_SNAKE_CASE` en inglés con la forma `<SUJETO>_<CAUSA>`. El sujeto es el campo o el recurso (`EMAIL`, `PASSWORD`, `BIRTH_DATE`, `PROFILE`, `SKILL`, `ACCOUNT`). La causa sale de un vocabulario cerrado: `REQUIRED`, `TOO_SHORT`, `TOO_LONG`, `INVALID_FORMAT`, `INVALID_CHARACTERS`, `INVALID_VALUE`, `OUT_OF_RANGE`, `IN_THE_FUTURE`, `UNDERAGE`, `NOT_FOUND`, `ALREADY_EXISTS` (o `ALREADY_REGISTERED`), `LIMIT_REACHED`, `NOT_ALLOWED`, `NOT_VERIFIED`, `DISABLED`, `CONFLICT`, `UNAVAILABLE` y `TIMEOUT`. Una causa nueva se agrega con su spec.
@@ -154,7 +156,7 @@ Toda respuesta de error de un microservicio Spring usa `application/problem+json
 1. Un código corresponde a un estado HTTP, un mensaje, una excepción de negocio y al menos una prueba. Un código publicado no se reutiliza ni se renombra.
 2. Cada servicio documenta su catálogo en `docs/errores.md`.
 3. El manejador de errores no inventa códigos: los toma de la excepción. Una violación de restricción de base de datos se traduce a su código específico, nunca a `INTERNAL_ERROR`.
-4. Mapa base de estados: 400 cuerpo ilegible o encabezado faltante · 401 sin identidad · 403 sin permiso o recurso ajeno donde el servicio lo defina · 404 inexistente · 409 duplicado o conflicto de estado · 422 validación · 429 límite de uso · 502, 503 y 504 dependencia · 500 genérico.
+4. Mapa base de estados para lo nuevo (un estado ya publicado que difiere se conserva y se anota en `docs/errores.md`): 400 cuerpo ilegible o encabezado faltante · 401 sin identidad · 403 sin permiso o recurso ajeno donde el servicio lo defina · 404 inexistente · 409 duplicado o conflicto de estado · 422 validación · 429 límite de uso · 502, 503 y 504 dependencia · 500 genérico.
 5. Sin `catch` vacío ni excepciones tragadas. `catch (Exception)` solo en el manejador y en los consumidores de mensajes; `catch (RuntimeException)` solo para compensar y relanzar. Si la respuesta es un error, el estado final queda coherente.
 6. El Gateway conserva su formato `{"code","message"}` con un catálogo cerrado. `EMAIL_NOT_VERIFIED`, `PLAN_LIMIT` y `LLM_UNAVAILABLE` son códigos reservados por el contrato del proyecto y todavía ningún servicio los emite; se publican cuando el código los emita.
 
@@ -179,7 +181,7 @@ Cada endpoint y cada cambio se revisan contra el nivel 1 de ASVS (matriz de segu
 | Riesgo | Qué se comprueba |
 |---|---|
 | API1 Autorización por objeto | Cada lectura o escritura de un recurso propio comprueba el dueño con la identidad del Gateway; recurso ajeno → 403 o 404 según el servicio |
-| API2 Autenticación rota | Solo se acepta la identidad que pone el Gateway; ningún dato de identidad sale del cuerpo ni de la ruta |
+| API2 Autenticación rota | Solo se acepta la identidad que pone el Gateway; ningún dato de identidad sale del cuerpo ni de la ruta, salvo en las rutas sin identidad del `CLAUDE.md` |
 | API3 Propiedades del objeto | DTO explícitos de entrada y salida; sin enlazar entidades; `id`, `estado` y `plan` no se aceptan del cliente |
 | API4 Consumo de recursos | Límites de longitud, de cuerpo, de elementos y de página; tiempo de espera en toda llamada externa |
 | API5 Autorización por función | Cada operación declara quién la ejecuta; un rol no equivale a un permiso de negocio |
@@ -189,7 +191,7 @@ Cada endpoint y cada cambio se revisan contra el nivel 1 de ASVS (matriz de segu
 | API9 Inventario | Rutas solo bajo `/api/v1/...`; ningún endpoint sin documentar |
 | API10 Consumo inseguro | Se valida lo que responde Firebase, otro servicio o el LLM antes de usarlo |
 
-- La identidad del usuario llega solo en los encabezados `X-User-*` que pone el Gateway; nunca en el cuerpo ni en la ruta.
+- La identidad del usuario llega solo en los encabezados `X-User-*` que pone el Gateway; nunca en el cuerpo ni en la ruta. La única excepción son las rutas sin identidad que el `CLAUDE.md` del servicio declara con su spec, como el registro, que crea la identidad en vez de afirmarla.
 - Consultas parametrizadas; ningún SQL concatenado; sin deserializar tipos arbitrarios; respuestas siempre por DTO.
 - `Content-Type` con `charset` en toda respuesta.
 - Actuator público solo en `health` e `info`; el resto exige autenticación.
@@ -245,7 +247,7 @@ Cada endpoint y cada cambio se revisan contra el nivel 1 de ASVS (matriz de segu
    - `tasks.md`: tarjetas autosuficientes de 30 minutos o menos, con archivos exactos, pruebas con valores literales y qué hacer si algo no cuadra; cada una se marca `[x]` al terminarla.
 3. Toda decisión de arquitectura, seguridad, datos, costo o contrato queda en la spec con la decisión humana, su porqué y las alternativas descartadas.
 4. **Lo que no se sabe se pregunta**, en rondas de hasta 6 preguntas, y lo que siga sin respuesta queda en la spec como pendiente con su responsable. No se asume nada en silencio.
-5. Un PR cubre una pieza reconocible y verificada. El umbral de 1000 líneas entre agregadas y eliminadas existe para que cada línea se lea de verdad, y una excepción se documenta en la spec.
+5. Un PR cubre una pieza reconocible y verificada y no pasa de 1000 líneas entre agregadas y eliminadas, tampoco cuando solo cambia documentos: el límite existe para que cada línea se lea de verdad. Un cambio mayor se parte en piezas.
 
 ## 13. Contribución y entrega
 

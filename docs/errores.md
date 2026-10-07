@@ -21,7 +21,16 @@ Todas las produce `BusinessExceptionHandler` como `ProblemDetail` con `Content-T
 | 422 | Datos no válidos | Un campo incumple las validaciones del contrato (con `errors`), el cuerpo no se puede interpretar o el dominio rechaza un valor al construirlo |
 | 422 | Fecha de nacimiento no válida | La fecha de nacimiento no permite registrarse (`errors` con el campo `birthDate`) |
 | 422 | Contraseña no válida | La contraseña incumple la política (`errors` con el campo `password`) |
-| 500 | Error interno | Cualquier fallo no previsto; el detalle va solo al log y al cliente le llega un mensaje genérico |
+| 500 | Error interno | Cualquier fallo no previsto; el detalle va solo al log y al cliente le llega «No pudimos completar la operación. Inténtalo de nuevo en unos minutos» |
+
+Respuestas publicadas que difieren del [estándar](estandar-backend.md#6-errores). Se conservan porque Frontend ya las consume, y cada una tiene su destino:
+
+| Respuesta actual | Qué pide el estándar | Destino |
+|---|---|---|
+| 422 cuando el cuerpo no se puede interpretar | 400 para un cuerpo ilegible | Se conserva; pasarlo a 400 es una decisión de contrato con Frontend, con su propia spec |
+| 422 con el mensaje de cualquier `IllegalArgumentException` | Ninguna respuesta lleva el mensaje de una excepción de librería | Primera tarea de código que modifique el manejador: cada caso de negocio pasa a su excepción y su código |
+| 500 al activar una cuenta bloqueada o anonimizada | Un caso previsible tiene su excepción de negocio, su código y su estado | Primera tarea de código que modifique el manejador o la activación |
+| `Content-Type: application/problem+json`, sin `charset` | `application/problem+json; charset=UTF-8` | Primera tarea de código del servicio |
 
 ## Cómo se agrega un código
 
