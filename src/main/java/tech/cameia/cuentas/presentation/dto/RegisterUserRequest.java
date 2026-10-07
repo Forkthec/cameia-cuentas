@@ -43,33 +43,33 @@ public record RegisterUserRequest(
 
         @Schema(description = "Nombres de la persona: letras, espacios, apóstrofo y guion", example = "María José",
                 minLength = 1, maxLength = 120, requiredMode = RequiredMode.REQUIRED)
-        @NotBlank(message = "Los nombres son obligatorios")
-        @CodePointSize(max = 120, message = "Los nombres no pueden superar los 120 caracteres")
+        @NotBlank(message = "Ingresa tu nombre.")
+        @CodePointSize(max = 120, message = "El nombre no puede superar los 120 caracteres.")
         String firstName,
 
         @Schema(description = "Apellidos de la persona: letras, espacios, apóstrofo y guion", example = "Gómez-Ruiz",
                 minLength = 1, maxLength = 120, requiredMode = RequiredMode.REQUIRED)
-        @NotBlank(message = "Los apellidos son obligatorios")
-        @CodePointSize(max = 120, message = "Los apellidos no pueden superar los 120 caracteres")
+        @NotBlank(message = "Ingresa tu apellido.")
+        @CodePointSize(max = 120, message = "El apellido no puede superar los 120 caracteres.")
         String lastName,
 
         @Schema(description = "Fecha de nacimiento con formato dd/MM/yyyy; debe ser una fecha real y la persona debe "
                 + "tener entre 18 y 110 años cumplidos en UTC", example = "12/04/1995",
                 pattern = "^\\d{2}/\\d{2}/\\d{4}$", requiredMode = RequiredMode.REQUIRED)
-        @NotBlank(message = "La fecha de nacimiento es obligatoria")
+        @NotBlank(message = "Ingresa tu fecha de nacimiento.")
         @BirthDateFormat
         String birthDate,
 
         @Schema(description = "Correo con el que iniciará sesión; se guarda recortado y en minúsculas",
                 example = "ana@correo.co", maxLength = 254, format = "email", requiredMode = RequiredMode.REQUIRED)
-        @NotBlank(message = "El correo electrónico es obligatorio")
+        @NotBlank(message = "Ingresa tu correo electrónico.")
         @CodePointSize(max = 254, message = "El correo no puede superar los 254 caracteres.")
         String email,
 
         @Schema(description = "Contraseña de 12 a 64 caracteres, sin reglas de composición; no puede ser una "
                 + "contraseña común. No se recorta ni se devuelve nunca", minLength = 12, maxLength = 64,
                 format = "password", requiredMode = RequiredMode.REQUIRED)
-        @NotBlank(message = "La contraseña es obligatoria")
+        @NotBlank(message = "Ingresa tu contraseña.")
         String password,
 
         @Schema(description = "Opcional; formato internacional E.164 sin espacios", example = "+573000000000",

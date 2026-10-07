@@ -68,7 +68,7 @@ class RegisterUserServiceTest {
 
         assertThatThrownBy(() -> servicio.register(comando()))
                 .isInstanceOf(EmailAlreadyRegisteredException.class)
-                .hasMessage("Este correo ya se encuentra registrado");
+                .hasMessage("Ese correo ya tiene una cuenta.");
         assertThat(repositorio.guardadas).hasSize(1);
     }
 
@@ -138,7 +138,7 @@ class RegisterUserServiceTest {
 
         assertThat(repositorio.guardadas).isEmpty();
         // La credencial se borró, así que el correo vuelve a estar libre: el segundo
-        // intento no choca con "este correo ya se encuentra registrado".
+        // intento no choca con el correo ya registrado.
         directorio.dejarDeFallar();
         assertThat(servicio.register(comando()).getFirebaseUid()).isNotBlank();
     }

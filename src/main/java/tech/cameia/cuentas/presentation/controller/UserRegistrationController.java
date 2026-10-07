@@ -61,8 +61,10 @@ class UserRegistrationController {
                 + "FIRST_NAME_TOO_LONG, FIRST_NAME_INVALID_CHARACTERS, LAST_NAME_REQUIRED, LAST_NAME_TOO_LONG, "
                 + "LAST_NAME_INVALID_CHARACTERS, BIRTH_DATE_REQUIRED, "
                 + "BIRTH_DATE_INVALID_FORMAT, BIRTH_DATE_IN_THE_FUTURE, BIRTH_DATE_UNDERAGE, BIRTH_DATE_OUT_OF_RANGE, "
-                + "EMAIL_REQUIRED, EMAIL_TOO_LONG, PASSWORD_REQUIRED, PASSWORD_TOO_SHORT, PASSWORD_TOO_LONG, PASSWORD_TOO_COMMON, "
-                + "PRONOUN_REQUIRED, PHONE_NUMBER_INVALID_FORMAT; o REQUEST_BODY_INVALID_FORMAT y REQUEST_INVALID_VALUE sin errors",
+                + "EMAIL_REQUIRED, EMAIL_TOO_LONG, EMAIL_INVALID_FORMAT, PASSWORD_REQUIRED, PASSWORD_TOO_SHORT, "
+                + "PASSWORD_TOO_LONG, PASSWORD_TOO_COMMON, "
+                + "PRONOUN_REQUIRED, PRONOUN_INVALID_VALUE, PHONE_NUMBER_INVALID_FORMAT; o REQUEST_BODY_INVALID_FORMAT sin "
+                + "errors cuando el cuerpo no se puede interpretar",
                 content = @Content(mediaType = "application/problem+json",
                         schema = @Schema(implementation = ProblemDetail.class))),
         @ApiResponse(responseCode = "500", description = "INTERNAL_ERROR: fallo imprevisto; el detalle va solo al log",

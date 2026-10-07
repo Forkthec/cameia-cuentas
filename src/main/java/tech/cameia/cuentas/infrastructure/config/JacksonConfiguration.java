@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 
 import tools.jackson.databind.cfg.CoercionAction;
 import tools.jackson.databind.cfg.CoercionInputShape;
+import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.type.LogicalType;
 
@@ -18,7 +19,7 @@ import tools.jackson.databind.type.LogicalType;
  * igual que la ausencia o el {@code null}, que es lo que la persona dejó sin elegir.</p>
  *
  * <p>El ajuste es solo para enumerados: un valor que no está en la lista sigue siendo
- * inválido.</p>
+ * inválido, y un número tampoco se acepta como la posición de un valor.</p>
  */
 @Configuration
 public class JacksonConfiguration {
@@ -43,5 +44,8 @@ public class JacksonConfiguration {
         constructor.withCoercionConfig(LogicalType.Enum, regla -> regla
                 .setAcceptBlankAsEmpty(true)
                 .setCoercion(CoercionInputShape.EmptyString, CoercionAction.AsNull));
+        // Sin esto, un número se lee como la posición del valor en el enumerado: "pronoun": 1
+        // se guardaría como el segundo pronombre sin que nadie lo haya elegido.
+        constructor.enable(EnumFeature.FAIL_ON_NUMBERS_FOR_ENUMS);
     }
 }

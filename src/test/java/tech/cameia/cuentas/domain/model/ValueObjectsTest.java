@@ -11,6 +11,7 @@ import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import tech.cameia.cuentas.domain.exception.ErrorCode;
+import tech.cameia.cuentas.domain.exception.InvalidEmailException;
 import tech.cameia.cuentas.domain.exception.InvalidPhoneNumberException;
 
 /**
@@ -32,16 +33,27 @@ class ValueObjectsTest {
             assertThat(correo.value()).isEqualTo("ana.perez@cameia.tech");
         }
 
-        @Test
-        void rechazaUnValorSinArroba() {
-            assertThatThrownBy(() -> new EmailAddress("ana.cameia.tech"))
-                    .isInstanceOf(IllegalArgumentException.class);
+        @ParameterizedTest
+        @ValueSource(strings = {"ana", "ana.cameia.tech", "ana@correo", "ana@cameia", "ana@@correo.co",
+            "ana@correo..co", "ana @correo.co", "@correo.co", "ana@.co", "ana@correo.co.",
+            "ana\u00A0@correo.co", "ana\u200B@correo.co", "ana@corr\u0007eo.co", "ana@correo.co\u2028x"})
+        void rechazaUnValorSinFormaDeCorreoConSuCodigoYSinRepetirlo(String recibido) {
+            assertThatThrownBy(() -> new EmailAddress(recibido))
+                    .isInstanceOf(InvalidEmailException.class)
+                    .hasMessage("Ingresa un correo electrónico válido.")
+                    .extracting(fallo -> ((InvalidEmailException) fallo).getErrorCode())
+                    .isEqualTo(ErrorCode.EMAIL_INVALID_FORMAT);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"ana@correo.co", "ana.perez+cameia@correo.com", "o'neil@correo.co", "josé@correo.co"})
+        void admiteDireccionesValidas(String recibido) {
+            assertThat(new EmailAddress(recibido).value()).isEqualTo(recibido);
         }
 
         @Test
-        void rechazaUnValorSinDominio() {
-            assertThatThrownBy(() -> new EmailAddress("ana@cameia"))
-                    .isInstanceOf(IllegalArgumentException.class);
+        void elErrorDeCorreoSenialaSuCampo() {
+            assertThat(new InvalidEmailException(ErrorCode.EMAIL_INVALID_FORMAT, "x").getField()).isEqualTo("email");
         }
 
         @Test
@@ -52,13 +64,13 @@ class ValueObjectsTest {
         }
 
         @ParameterizedTest
-        @ValueSource(strings = {"  Ana@Correo.CO ", " ana@correo.co ", "﻿ANA@CORREO.CO\t"})
+        @ValueSource(strings = {"  Ana@Correo.CO ", "\u00A0ana@correo.co\u00A0", "\uFEFFANA@CORREO.CO\t"})
         void quitaLosEspaciosQueQuitaElClienteYPasaAMinusculas(String recibido) {
             assertThat(new EmailAddress(recibido).value()).isEqualTo("ana@correo.co");
         }
 
         @ParameterizedTest
-        @ValueSource(strings = {" ", "﻿", "\t"})
+        @ValueSource(strings = {"\u00A0", "\uFEFF", "\t"})
         void soloEspaciosDelClienteEsObligatorio(String recibido) {
             assertThatThrownBy(() -> new EmailAddress(recibido))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -76,8 +88,10 @@ class ValueObjectsTest {
         void admiteExactamente254PuntosDeCodigoYRechaza255() {
             assertThat(new EmailAddress("a".repeat(248) + "@b.com").value()).hasSize(254);
             assertThatThrownBy(() -> new EmailAddress("a".repeat(249) + "@b.com"))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("El correo electrónico es demasiado largo");
+                    .isInstanceOf(InvalidEmailException.class)
+                    .hasMessage("El correo no puede superar los 254 caracteres.")
+                    .extracting(fallo -> ((InvalidEmailException) fallo).getErrorCode())
+                    .isEqualTo(ErrorCode.EMAIL_TOO_LONG);
         }
 
         @Test
@@ -90,7 +104,7 @@ class ValueObjectsTest {
 
         @Test
         void dosCorreosQueSoloDifierenEnLaFormaUnicodeSonElMismo() {
-            assertThat(new EmailAddress("josé@correo.co").value())
+            assertThat(new EmailAddress("jose\u0301@correo.co").value())
                     .isEqualTo(new EmailAddress("josé@correo.co").value());
         }
 
@@ -100,7 +114,7 @@ class ValueObjectsTest {
             String valor = new EmailAddress("İris@correo.co").value();
 
             assertThat(valor).isEqualTo(java.text.Normalizer.normalize(valor, java.text.Normalizer.Form.NFC));
-            assertThat(valor).isEqualTo("i̇ris@correo.co");
+            assertThat(valor).isEqualTo("i\u0307ris@correo.co");
         }
     }
 

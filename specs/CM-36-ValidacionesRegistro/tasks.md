@@ -12,7 +12,7 @@ agregan aquí antes de ejecutar cada bloque. Se marca `[x]` solo con la salida r
 - **Detenerse y reportar** si: la tarjeta contradice el código real, falta un dato, una prueba existente se rompe sin causa clara, el comportamiento de una librería difiere de lo que la tarjeta afirma, o hace falta algo no listado. No improvisar el diseño.
 - Definición de terminado de cada tarjeta: pruebas nuevas en verde, suite completa en verde, `LayeredArchitectureTest` en verde, diff dentro de lo estimado.
 - Rama: `CM-36-validaciones-registro` desde `origin/develop`. PR 1B sale de una rama nueva `CM-36-validaciones-registro-fecha-pronombre` creada desde `develop` **después** de fusionar 1A (o apilada sobre 1A si Paula lo autoriza).
-- Mensaje de commit: `CM-36 | <tipo>(cuentas): <resultado> [IA-ASISTIDO]`.
+- Mensaje de commit: `CM-36 | <tipo>(cuentas): <resultado>`, sin `[IA-ASISTIDO]` (lo lleva solo el título del PR, como pide el `CLAUDE.md` del repositorio) y con el trailer `Co-Authored-By` del modelo.
 
 ---
 
@@ -283,7 +283,7 @@ Decidido por Paula (6-oct-2026): el `requestId` entra desde 1A, sin filtro ni `M
 - **Verificación:** `./mvnw.cmd -B clean verify` con salida real; número de pruebas; cobertura JaCoCo de `BusinessExceptionHandler`, `ErrorCode`, `BusinessException`, `InvalidBirthDateException`, `WeakPasswordException`, `PasswordPolicy`: líneas y ramas reales (meta ≥ 90 %), cada una sin cubrir con su razón; la cobertura global del repo no baja.
 - Revisión (`backend-estandar` §6): `/simplify`, `/code-review high`, autochequeo (¿algún `getMessage()` de librería llega al cliente? ¿algún log con dato personal? ¿algún comentario con `CM-NNN`?).
 - Aviso a Frontend (documento por rol de `comunicaciones/`): el cuerpo de error agrega `code`, `requestId` y `errors[].code`; el `detail` de los 422 con `errors` pasa a ser fijo; el 500 cambia de texto; Firebase no disponible responde 503 en lugar de 500; nada se elimina.
-- Entrega: commits `CM-36 | feat(cuentas): código de error en las respuestas de registro [IA-ASISTIDO]`; PR con el título `CM-36 | feat(cuentas): código de error estable en las respuestas de error de Cuentas [IA-ASISTIDO]`; descripción con la plantilla completa, atributos de calidad (seguridad, compatibilidad de contrato, mantenibilidad, observabilidad), qué es mecánico (cambios de constructor en las excepciones y pruebas) y qué importa revisar (`BusinessExceptionHandler`, `ErrorCode`). Tarjeta de Jira a «En revisión» solo al abrir el PR.
+- Entrega: commit `CM-36 | feat(cuentas): código de error en las respuestas de registro`; PR con el título `CM-36 | feat(cuentas): código de error estable en las respuestas de error de Cuentas [IA-ASISTIDO]`; descripción con la plantilla completa, atributos de calidad (seguridad, compatibilidad de contrato, mantenibilidad, observabilidad), qué es mecánico (cambios de constructor en las excepciones y pruebas) y qué importa revisar (`BusinessExceptionHandler`, `ErrorCode`). Tarjeta de Jira a «En revisión» solo al abrir el PR.
 
 ---
 
@@ -449,7 +449,7 @@ Decidido por Paula (6-oct-2026): el `requestId` entra desde 1A, sin filtro ni `M
 
 # PR 2 — recorte, NFC y un mensaje por campo
 
-Se ejecuta **después de fusionar 1A y 1B**; revalidar las rutas y líneas contra `origin/develop` ese día. Rama: `CM-36-recorte-nfc-registro` desde `develop`. Mensaje de commit: `CM-36 | fix(cuentas): <resultado> [IA-ASISTIDO]`. Aplican las reglas del inicio de este archivo.
+Se ejecuta **después de fusionar 1A y 1B**; revalidar las rutas y líneas contra `origin/develop` ese día. Rama: `CM-36-recorte-nfc-registro` desde `develop`. Mensaje de commit: `CM-36 | fix(cuentas): <resultado>`. Aplican las reglas del inicio de este archivo.
 **Pregunta 13 respondida (Paula, 6-oct-2026): «espacio» es el conjunto de `trim` de JavaScript (opción a), que es lo que se escribe aquí.** Este bloque y el 3 van en el mismo PR.
 
 ## [ ] T-2.1 · Objeto de valor `SingleLineText` — ≤ 30 min, ≈ 140 líneas
@@ -753,7 +753,7 @@ Rama `CM-36-contrasenas-comunes` desde `develop`. **Fuente decidida (pregunta 3)
 - **Cubre:** REQ-RV-40, 42; CA-1.1.27. **Crear:** `src/main/resources/security/common-passwords.txt` y `src/main/resources/security/common-passwords.README.md`; **Crear (prueba):** `src/test/.../infrastructure/config/CommonPasswordsFileTest.java`.
 - **Procedimiento (en una carpeta temporal vacía, fuera del repositorio; la fuente es un archivo no confiable: se lee, nunca se ejecuta):** (1) descargar la fuente elegida y registrar URL, fecha y licencia; (2) filtrar las entradas de 12 o más puntos de código, pasar a minúsculas, recortar, quitar repetidas y conservar el orden de popularidad de la fuente; (3) tomar las primeras 3000; si hay menos, completar con la segunda fuente y registrarla; (4) comprobar que están `123456789012`, `password1234` y `qwertyuiop123` (si falta alguna, **detenerse y reportar**); (5) escribir el archivo con saltos de línea `\n`, UTF-8 sin BOM. El `README` registra: fuente(s), URL, licencia, fecha, el comando exacto con que se generó y la frase «La lista se entrega a `cameia-web` de la forma decidida en la pregunta 9».
 - **Prueba** (`CommonPasswordsFileTest`, sin contexto): cargar el recurso real con `CommonPasswordsLoader.load(..., 3000)`; exactamente 3000 entradas; las tres del CA presentes; `PasswordPolicy` con esa lista rechaza `123456789012`, `PASSWORD1234` y `  qwertyuiop123  ` con `PASSWORD_TOO_COMMON`.
-- **Entrega:** commit aparte `CM-36 | chore(cuentas): lista de 3000 contraseñas comunes [IA-ASISTIDO]`; en el PR, decir qué es dato (no se revisa línea por línea) y qué es código.
+- **Entrega:** commit aparte `CM-36 | chore(cuentas): lista de 3000 contraseñas comunes`; en el PR, decir qué es dato (no se revisa línea por línea) y qué es código.
 - **Verificación:** `./mvnw.cmd -B test` en verde, contexto completo incluido.
 
 ## [ ] T-4.4 · Cierre del PR 4 — ≤ 30 min
@@ -818,14 +818,18 @@ Rama `CM-36-celular-libphonenumber` desde `develop`. **Dependencia aprobada (pre
 
 Rama `CM-36-etiquetas-textos-registro` desde `develop`, al final. Estado base: después de los PR 1A a 5.
 
-## [ ] T-6.1 · `EmailAddress` con excepción tipada — ≤ 30 min, ≈ 80 líneas
+## [x] T-6.1 · `EmailAddress` con excepción tipada — ≤ 30 min, ≈ 80 líneas
+
+- **Resultado (7-oct):** hecha. Además de la tarjeta, el correo rechaza los caracteres invisibles (separadores, de control y de formato). Pruebas en `ValueObjectsTest` (14 formas inválidas, 4 válidas, límite 254/255), `BusinessExceptionHandlerTest`, `UserRegistrationControllerTest` y `AccountRegistrationEndToEndTest`.
 
 - **Cubre:** REQ-RV-60; CA-1.1.20. **Crear:** `domain/exception/InvalidEmailException.java` (con `getField()` = `email`; constructor `(ErrorCode code, String mensaje)`). **Modificar:** `domain/exception/ErrorCode.java` (`EMAIL_INVALID_FORMAT`), `domain/model/EmailAddress.java`, `presentation/advice/BusinessExceptionHandler.java`, `ValueObjectsTest`.
 - **Cambio:** en `EmailAddress`, el formato inválido lanza `new InvalidEmailException(ErrorCode.EMAIL_INVALID_FORMAT, "Ingresa un correo electrónico válido.")` y el exceso de longitud `new InvalidEmailException(ErrorCode.EMAIL_TOO_LONG, "El correo no puede superar los 254 caracteres.")`; vacío o nulo sigue siendo `IllegalArgumentException` defensiva (el borde responde antes). El manejador: 422, `VALIDATION_FAILED`, un elemento con el campo, el código y el mensaje de la excepción.
 - **Pruebas:** `ana`, `ana@correo`, `ana@@correo.co`, `ana@correo..co`, `ana @correo.co` → `InvalidEmailException` con `EMAIL_INVALID_FORMAT`; 255 puntos de código → `EMAIL_TOO_LONG`; válidos `ana@correo.co`, `ana.perez+cameia@correo.com`, `ANA@Correo.CO` (queda `ana@correo.co`); controlador: servicio simulado que lanza la excepción → 422, `field` = `email`. Ajustar las pruebas existentes de `ValueObjectsTest` que esperaban `IllegalArgumentException` por formato.
 - **Verificación:** `./mvnw.cmd -B -Dtest='ValueObjectsTest,UserRegistrationControllerTest' test` en verde.
 
-## [ ] T-6.2 · Cuerpo ilegible, pronombre inválido y fin del manejador genérico — ≤ 30 min, ≈ 110 líneas
+## [x] T-6.2 · Cuerpo ilegible, pronombre inválido y fin del manejador genérico — ≤ 30 min, ≈ 110 líneas
+
+- **Resultado (7-oct):** hecha. V-06: en Jackson 3 no se usa la propiedad de `application.properties` de la tarjeta; la regla va en `JacksonConfiguration` con `EnumFeature.FAIL_ON_NUMBERS_FOR_ENUMS`, y `"pronoun":1`, `0`, `-1` y `1.5` ya responden `PRONOUN_INVALID_VALUE` (prueba del controlador con el mismo `JsonMapper` y prueba de punta a punta con la aplicación real). Corrección sobre la tarjeta: la ruta del campo se lee solo de `MismatchedInputException`; un JSON mal formado dentro del pronombre (`{"pronoun": SHE}`) trae la misma ruta y debe seguir siendo `REQUEST_BODY_INVALID_FORMAT`.
 
 - **Cubre:** REQ-RV-30, 61, 65. **Modificar:** `presentation/advice/BusinessExceptionHandler.java`, `domain/exception/ErrorCode.java` (`PRONOUN_INVALID_VALUE`), `src/main/resources/application.properties`, `BusinessExceptionHandlerTest`, `UserRegistrationControllerTest`.
 - **`cuerpoIlegible`:** si `error.getCause()` es `tools.jackson.databind.exc.MismatchedInputException` y el último elemento de `getPath()` tiene `getPropertyName()` igual a `"pronoun"` → 422, `VALIDATION_FAILED`, un elemento `campo("pronoun", PRONOUN_INVALID_VALUE, <texto de la pregunta 10 de la spec>)`; en cualquier otro caso → 422, `REQUEST_BODY_INVALID_FORMAT`, `detail` «Revisa el formato de los datos enviados.» (sin la mención a la fecha). El `logger.warn` sigue registrando solo el nombre de la clase de la excepción. (Si la pregunta 6 de la spec resulta en 400, el estado cambia solo en la rama «cualquier otro caso».)
@@ -834,7 +838,9 @@ Rama `CM-36-etiquetas-textos-registro` desde `develop`, al final. Estado base: d
 - **Pruebas:** `"pronoun":"OTRO"`, `"he"`, `1`, `true` → 422, `field` = `pronoun`, `code` = `PRONOUN_INVALID_VALUE`; `"pronoun":""` y `"   "` → 422 `PRONOUN_REQUIRED` (pregunta 15); JSON mal formado (`{"firstName":`), `birthDate` como `[]` y como `{}` → 422 `REQUEST_BODY_INVALID_FORMAT` y `detail` sin la palabra «fecha»; un `IllegalArgumentException("secreto de librería")` lanzado por un controlador de prueba → 500, `INTERNAL_ERROR`, sin el texto.
 - **Verificación:** `./mvnw.cmd -B -Dtest='BusinessExceptionHandlerTest,UserRegistrationControllerTest' test` en verde.
 
-## [ ] T-6.3 · Textos del catálogo — ≤ 30 min, ≈ 90 líneas
+## [x] T-6.3 · Textos del catálogo — ≤ 30 min, ≈ 90 líneas
+
+- **Resultado (7-oct):** hecha, con `docs/errores.md` al día. Textos de la columna «Antes» que siguen en `cameia-web` (solo lectura, se avisa a Frontend): `src/mocks/handlers/auth.handlers.ts` líneas 82 y 163.
 
 - **Cubre:** REQ-RV-62, 63; CA-1.1.2, 1.1.3, 1.1.6, 1.1.7, 1.1.9 a 1.1.13, 1.1.17, 1.1.19, 1.1.23, 1.1.26. **Modificar:** `RegisterUserRequest.java`, `PasswordPolicy.java`, `AgePolicy.java`, `EmailAlreadyRegisteredException.java` y las pruebas que comparan texto.
 - **Tabla antes → después (solo cambia el texto; códigos y estados no):**
@@ -858,19 +864,25 @@ Rama `CM-36-etiquetas-textos-registro` desde `develop`, al final. Estado base: d
 - **Pruebas:** actualizar cada expectativa de texto de `UserRegistrationControllerTest`, `PasswordPolicyTest`, `AgePolicyTest`, `AccountRegistrationEndToEndTest`; agregar una prueba por texto de la tabla en el controlador (una por campo). **Detenerse** si una prueba de Frontend o un documento del repo citan un texto de la columna «Antes» y reportarlo.
 - **Verificación:** `./mvnw.cmd -B test` en verde.
 
-## [ ] T-6.4 · Pruebas de edad con reloj fijo — ≤ 30 min, ≈ 90 líneas
+## [x] T-6.4 · Pruebas de edad con reloj fijo — ≤ 30 min, ≈ 90 líneas
+
+- **Resultado (7-oct):** hecha: 12 filas en `AgePolicyTest.cadaLimiteDeEdadSeEvaluaConElDiaExacto` y la prueba de la hora de Colombia.
 
 - **Cubre:** CA-1.1.3 a 1.1.7. **Modificar:** `domain/policy/AgePolicyTest.java` (reloj `Clock.fixed(... UTC)` como en la línea 32).
 - **Casos** (hoy = 2026-10-06 UTC; cada uno con su `Reason` o aceptación): nacido 2008-10-06 (cumple 18 hoy) → acepta; 2008-10-07 (mañana) → `UNDERAGE`; 1915-10-07 (cumple 111 mañana) → acepta; 1915-10-06 (111 hoy) → `IMPLAUSIBLE` (código `BIRTH_DATE_OUT_OF_RANGE`); 2026-10-07 → `IN_THE_FUTURE`; 2026-10-06 → `UNDERAGE`; nacido el 2000-02-29 con hoy 2018-02-28 → `UNDERAGE` y con hoy 2018-03-01 → acepta (cumple el 1 de marzo en año no bisiesto); nacido el 2000-12-31 con hoy 2018-12-31 → acepta y con hoy 2018-12-30 → `UNDERAGE`; nacido el 2000-01-01 con hoy 2017-12-31 → `UNDERAGE` y con hoy 2018-01-01 → acepta; entre las 19:00 y las 24:00 de Colombia (`Instant.parse("2026-10-07T01:30:00Z")`) la fecha es 2026-10-07 (prueba existente `laEdadSeCalculaEnUtc…`, mantenerla). Una fila `@ParameterizedTest @CsvSource` para los pares de fecha de nacimiento y reloj.
 - **Verificación:** `./mvnw.cmd -q -B -Dtest=AgePolicyTest test` en verde.
 
-## [ ] T-6.5 · Casos que cumplen sin prueba (1.1.41, 1.1.42, 1.1.29, cumpleaños) — ≤ 30 min, ≈ 90 líneas
+## [x] T-6.5 · Casos que cumplen sin prueba (1.1.41, 1.1.42, 1.1.29, cumpleaños) — ≤ 30 min, ≈ 90 líneas
+
+- **Resultado (7-oct):** hechas (1), (3), (4) y (5); el doble de Firebase ahora guarda la contraseña recibida para comprobar que llega sin recortar. **(2) no se escribió contra el 200:** CM-251 no está en `develop`. La prueba de bloque 2 (`unCorreoConEspaciosYMayusculasSeGuardaNormalizadoYBloqueaElSiguiente`) sigue esperando 409 y la tarea del registro repetido la cambia a 200 al fusionarse.
 
 - **Cubre:** CA-1.1.29, 1.1.41, 1.1.42. **Modificar:** `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest`.
 - **Pruebas:** (1) CA-1.1.41: contraseña `mi clave larga 🙂` (16 puntos de código) → 201 y el comando lleva exactamente ese texto; en el E2E, el registro se completa y la credencial se crea con esa contraseña (el doble de Firebase la recibe sin recortar). (2) CA-1.1.42: `  Ana@Correo.CO ` → 201 con `ana@correo.co` y un segundo registro con `ana@correo.co` → 200 con el mismo `id` y `firebaseUid` (la cuenta sigue pendiente: CA-1.1.30, que CM-251 ya dejó en `develop` antes de este bloque) y una sola credencial en el doble de Firebase. Si al empezar el bloque CM-251 no está fusionada, se detiene y se avisa: no se escribe la prueba contra el 409. (3) CA-1.1.29: sin celular → 201 y `telefono` `NULL`. (4) Cuerpo con `estado`:`ACTIVE` y `plan`:`PREMIUM` extra → 201, la cuenta queda `PENDING_VERIFICATION` y `FREE` (RT-01-CA06). (5) Un campo desconocido cualquiera se ignora.
 - **Verificación:** con Docker, `./mvnw.cmd -B -Dtest='UserRegistrationControllerTest,AccountRegistrationEndToEndTest' test` en verde.
 
-## [ ] T-6.6 · Verificaciones V-01 y tamaño del cuerpo — ≤ 30 min, sin cambios de producción
+## [x] T-6.6 · Verificaciones V-01 y tamaño del cuerpo — ≤ 30 min, sin cambios de producción
+
+- **Resultado (7-oct), con la aplicación empaquetada y el emulador:** correo de 254 puntos de código (parte local de 64, etiquetas de 63, 63, 58 y 2) → 201; de 255 → 422 `EMAIL_TOO_LONG`; parte local de 65 con 254 en total → 201 (el servicio y el emulador la aceptan aunque RFC 5321 limita la parte local a 64; falta confirmarlo con Firebase real en staging: si lo rechaza, hoy respondería 500). Cuerpo de 2 MB → 422 `FIRST_NAME_TOO_LONG` en 0,06 s; de 20 MB → 422 en 0,38 s y la memoria del proceso pasó de 308 a 459 MB con esa sola petición. Alimenta la pregunta 14 (límite del cuerpo, tarea aparte).
 
 - **V-01:** con el emulador de Firebase Auth (ver `CLAUDE.md` y la spec de arranque con el emulador), registrar un correo de exactamente 254 puntos de código con parte local de 64 (`"a".repeat(64) + "@" + dominio de 189 caracteres en etiquetas de hasta 63`) y anotar la respuesta. Si Firebase lo rechaza, **no recortar ni cambiar el límite**: informar a Vela (el CA-1.1.21 usa el máximo que Firebase acepte).
 - **Tamaño del cuerpo:** enviar a `POST /api/v1/users` un JSON de 2 MB y otro de 20 MB con `firstName` enorme y anotar estado, tiempo y memoria. No se corrige aquí: el resultado alimenta la pregunta 14 de la spec.

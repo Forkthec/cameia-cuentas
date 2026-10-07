@@ -23,7 +23,7 @@ class PersonNameTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"Ana3", "Pérez_", "---", "'", "’", "Ana.", "Ana@", "<script>", "12345",
-        "Ana–Luz", "Ana😀", "Ana\u0000", "Ana​Luz", "Ana/Luz", "Jr."})
+        "Ana–Luz", "Ana😀", "Ana\u0000", "Ana\u200BLuz", "Ana/Luz", "Jr."})
     void unNombreConCaracteresNoAdmitidosSeRechazaConElCodigoDelNombre(String nombre) {
         assertThatThrownBy(() -> new PersonName(nombre, PersonName.Part.FIRST_NAME))
                 .isInstanceOf(InvalidPersonNameException.class)
@@ -59,8 +59,8 @@ class PersonNameTest {
     @CsvSource(delimiter = '|', value = {
         "'María  José'|María José",
         "'  Ana  '|Ana",
-        "'José'|José",
-        "' Ana Luz '|Ana Luz"})
+        "'Jose\u0301'|José",
+        "'\u00A0Ana\u00A0Luz\u00A0'|Ana Luz"})
     void seGuardaRecortadoEnNfcYConLosEspaciosInternosUnidos(String recibido, String esperado) {
         assertThat(new PersonName(recibido, PersonName.Part.LAST_NAME).value()).isEqualTo(esperado);
     }
@@ -81,12 +81,12 @@ class PersonNameTest {
     @Test
     void unaLetraQueSoloExisteConAcentoCombinanteSeAcepta() {
         // «g» con tilde combinante no tiene forma precompuesta: sigue siendo letra + marca en NFC.
-        assertThat(new PersonName("g̃", PersonName.Part.FIRST_NAME).value()).isEqualTo("g̃");
+        assertThat(new PersonName("g\u0303", PersonName.Part.FIRST_NAME).value()).isEqualTo("g\u0303");
     }
 
     @ParameterizedTest
     @NullSource
-    @ValueSource(strings = {"", "   ", " "})
+    @ValueSource(strings = {"", "   ", "\u00A0"})
     void laAusenciaEsUnaInvarianteDefensiva(String nombre) {
         assertThatThrownBy(() -> new PersonName(nombre, PersonName.Part.FIRST_NAME))
                 .isInstanceOf(IllegalArgumentException.class)

@@ -30,7 +30,7 @@ class PasswordPolicyTest {
     void rechazaUnaContraseniaDeOnceCaracteres() {
         assertThatThrownBy(() -> policy.verify(new RawPassword("a".repeat(11))))
                 .isInstanceOf(WeakPasswordException.class)
-                .hasMessage("La contraseña debe tener al menos 12 caracteres");
+                .hasMessage("La contraseña debe tener al menos 12 caracteres.");
     }
 
     @Test
@@ -49,7 +49,7 @@ class PasswordPolicyTest {
     void rechazaMasDeSesentaYCuatroCaracteresEnVezDeRecortar() {
         assertThatThrownBy(() -> policy.verify(new RawPassword("a".repeat(65))))
                 .isInstanceOf(WeakPasswordException.class)
-                .hasMessage("La contraseña no puede superar los 64 caracteres");
+                .hasMessage("La contraseña no puede superar los 64 caracteres.");
     }
 
     @Test
@@ -127,27 +127,27 @@ class PasswordPolicyTest {
     @Test
     void unaLetraConAcentoCombinanteCuentaComoUnCaracter() {
         // "e" + acento combinante doce veces: 24 puntos de código escritos, 12 en NFC.
-        assertThatCode(() -> policy.verify(new RawPassword("é".repeat(12)))).doesNotThrowAnyException();
-        assertThatCode(() -> policy.verify(new RawPassword("é".repeat(64)))).doesNotThrowAnyException();
+        assertThatCode(() -> policy.verify(new RawPassword("e\u0301".repeat(12)))).doesNotThrowAnyException();
+        assertThatCode(() -> policy.verify(new RawPassword("e\u0301".repeat(64)))).doesNotThrowAnyException();
     }
 
     @Test
     void elLimiteEnNfcRechazaOnceYSesentaYCincoLetrasConAcentoCombinante() {
-        assertThatThrownBy(() -> policy.verify(new RawPassword("é".repeat(11))))
+        assertThatThrownBy(() -> policy.verify(new RawPassword("e\u0301".repeat(11))))
                 .extracting(excepcion -> ((WeakPasswordException) excepcion).getErrorCode())
                 .isEqualTo(ErrorCode.PASSWORD_TOO_SHORT);
-        assertThatThrownBy(() -> policy.verify(new RawPassword("é".repeat(65))))
+        assertThatThrownBy(() -> policy.verify(new RawPassword("e\u0301".repeat(65))))
                 .extracting(excepcion -> ((WeakPasswordException) excepcion).getErrorCode())
                 .isEqualTo(ErrorCode.PASSWORD_TOO_LONG);
     }
 
     @Test
     void laContraseniaNoSeModificaAlMedirla() {
-        RawPassword original = new RawPassword("é".repeat(12));
+        RawPassword original = new RawPassword("e\u0301".repeat(12));
 
         policy.verify(original);
 
-        assertThat(original.value()).isEqualTo("é".repeat(12));
+        assertThat(original.value()).isEqualTo("e\u0301".repeat(12));
     }
 
     @Test
@@ -166,10 +166,10 @@ class PasswordPolicyTest {
     void unaContraseniaComunRodeadaDeEspaciosDurosOConAcentoCombinanteSigueSiendoComun() {
         PasswordPolicy conAcento = new PasswordPolicy(Set.of("contraseñacomún"));
 
-        assertThatThrownBy(() -> policy.verify(new RawPassword(" password1234 ")))
+        assertThatThrownBy(() -> policy.verify(new RawPassword("\u00A0password1234\u00A0")))
                 .isInstanceOf(WeakPasswordException.class)
                 .hasMessage("Esta contraseña es demasiado común, elige otra.");
-        assertThatThrownBy(() -> conAcento.verify(new RawPassword("contraseñacomún")))
+        assertThatThrownBy(() -> conAcento.verify(new RawPassword("contrasen\u0303acomu\u0301n")))
                 .isInstanceOf(WeakPasswordException.class)
                 .hasMessage("Esta contraseña es demasiado común, elige otra.");
     }

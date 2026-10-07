@@ -3,6 +3,9 @@ package tech.cameia.cuentas.domain.model;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
+import tech.cameia.cuentas.domain.exception.ErrorCode;
+import tech.cameia.cuentas.domain.exception.InvalidEmailException;
+
 /**
  * Correo electrónico con el que se crea la credencial en Firebase Auth.
  *
@@ -13,7 +16,9 @@ import java.util.regex.Pattern;
  * <p>La validación comprueba la forma, no la existencia del buzón: eso lo resuelve el
  * correo de verificación. Se prefiere una regla simple y permisiva a una compleja, porque
  * una expresión estricta rechaza direcciones válidas y da una falsa sensación de
- * seguridad.</p>
+ * seguridad. Sí se rechazan los caracteres invisibles (separadores, de control y de formato,
+ * como el espacio duro o el espacio de ancho cero): ninguna dirección los admite y el
+ * directorio de usuarios los rechazaría después con un error que la persona no entiende.</p>
  *
  * <p>Este valor no se guarda en la base de datos del microservicio: pertenece a Firebase.</p>
  *
@@ -21,7 +26,11 @@ import java.util.regex.Pattern;
  */
 public record EmailAddress(String value) {
 
-    private static final Pattern FORMAT = Pattern.compile("^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$");
+    /** Un carácter admitido en cada parte: no es arroba, ni espacio, ni invisible. */
+    private static final String VISIBLE = "[^@\\s\\p{Z}\\p{Cc}\\p{Cf}";
+
+    private static final Pattern FORMAT = Pattern.compile(
+            "^" + VISIBLE + "]+@" + VISIBLE + ".]+(\\." + VISIBLE + ".]+)+$");
 
     /** Límite práctico de longitud, alineado con lo que acepta Firebase Auth. */
     private static final int MAX_LENGTH = 254;
@@ -29,8 +38,8 @@ public record EmailAddress(String value) {
     /**
      * Normaliza y valida la dirección recibida.
      *
-     * @throws IllegalArgumentException si es nula, está vacía, excede la longitud máxima
-     *                                  o no tiene forma de correo
+     * @throws IllegalArgumentException si es nula o está vacía (el contrato HTTP la rechaza antes)
+     * @throws InvalidEmailException si excede la longitud máxima o no tiene forma de correo
      */
     public EmailAddress {
         SingleLineText recortado = value == null ? null : new SingleLineText(value);
@@ -41,10 +50,10 @@ public record EmailAddress(String value) {
         // de forma al convertirlas y dejan de estar en NFC.
         value = SingleLineText.normalize(recortado.value().toLowerCase(Locale.ROOT));
         if (value.codePointCount(0, value.length()) > MAX_LENGTH) {
-            throw new IllegalArgumentException("El correo electrónico es demasiado largo");
+            throw new InvalidEmailException(ErrorCode.EMAIL_TOO_LONG, "El correo no puede superar los 254 caracteres.");
         }
         if (!FORMAT.matcher(value).matches()) {
-            throw new IllegalArgumentException("El correo electrónico no tiene un formato válido");
+            throw new InvalidEmailException(ErrorCode.EMAIL_INVALID_FORMAT, "Ingresa un correo electrónico válido.");
         }
     }
 }

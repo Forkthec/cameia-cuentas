@@ -37,9 +37,11 @@ import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.EmailNotVerifiedException;
 import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException;
+import tech.cameia.cuentas.domain.exception.InvalidEmailException;
 import tech.cameia.cuentas.domain.exception.InvalidPersonNameException;
 import tech.cameia.cuentas.domain.exception.InvalidPhoneNumberException;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
+import tools.jackson.databind.exc.MismatchedInputException;
 
 /**
  * Traduce los fallos a respuestas {@code application/problem+json} (RFC 9457).
@@ -95,8 +97,8 @@ class BusinessExceptionHandler {
      */
     private static final int MAX_CAUSAS = 32;
 
-    /** Paquete del dominio: sus excepciones traen textos escritos para la persona. */
-    private static final String PAQUETE_DOMINIO = "tech.cameia.cuentas.domain";
+    /** Campo del contrato de los pronombres, el único enumerado del registro. */
+    private static final String CAMPO_PRONOMBRE = "pronoun";
 
     /**
      * Código de cada restricción del contrato, con la clave {@code campo.Restriccion}.
@@ -171,6 +173,17 @@ class BusinessExceptionHandler {
     }
 
     /**
+     * Correo sin forma de correo o demasiado largo.
+     *
+     * @param error excepción con la causa
+     * @return {@code 422 Unprocessable Entity} con un elemento para el campo {@code email}
+     */
+    @ExceptionHandler(InvalidEmailException.class)
+    ProblemDetail correoInvalido(InvalidEmailException error) {
+        return campoDeDominioInvalido(error.getField(), error);
+    }
+
+    /**
      * Celular que no es un número válido para el país de su indicativo.
      *
      * @param error excepción con el campo rechazado
@@ -224,21 +237,27 @@ class BusinessExceptionHandler {
     }
 
     /**
-     * Cuerpo que no se puede interpretar, por ejemplo una fecha con otro formato o un
-     * pronombre fuera de la lista.
+     * Cuerpo que no se puede interpretar: JSON mal formado, un arreglo u objeto donde va un
+     * texto, o un pronombre fuera de la lista.
+     *
+     * <p>El pronombre fuera de la lista es la única lectura fallida que tiene campo propio en
+     * el formulario (es una lista de opciones), así que sale como error de ese campo. Cualquier
+     * otra sale como cuerpo ilegible, sin campo.</p>
      *
      * <p>El detalle de la excepción no se devuelve ni se registra: describe la estructura
      * interna del modelo y, en un cuerpo de registro, puede incluir el valor recibido.</p>
      *
      * @param error excepción de deserialización
-     * @return {@code 422 Unprocessable Entity} con una indicación del formato esperado
+     * @return {@code 422 Unprocessable Entity}
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ProblemDetail cuerpoIlegible(HttpMessageNotReadableException error) {
+        if (CAMPO_PRONOMBRE.equals(campoIlegible(error))) {
+            return validacion(List.of(campo(CAMPO_PRONOMBRE, ErrorCode.PRONOUN_INVALID_VALUE, "Selecciona una opción.")));
+        }
         // Solo el tipo de fallo. El mensaje de Jackson suele citar el fragmento de JSON que
         // no pudo leer, y en el registro ese fragmento puede ser la contraseña.
-        return rechazo(HttpStatus.UNPROCESSABLE_ENTITY, TITULO_VALIDACION,
-                "Revisa el formato de los datos enviados. La fecha de nacimiento usa el formato DD/MM/AAAA",
+        return rechazo(HttpStatus.UNPROCESSABLE_ENTITY, TITULO_VALIDACION, "Revisa el formato de los datos enviados.",
                 ErrorCode.REQUEST_BODY_INVALID_FORMAT, "causa=" + claseMasEspecifica(error));
     }
 
@@ -261,27 +280,6 @@ class BusinessExceptionHandler {
                 : "causa=" + error.getClass().getSimpleName();
         return rechazo(HttpStatus.BAD_REQUEST, "Petición incompleta",
                 "La petición no incluye los datos que exige esta ruta", ErrorCode.IDENTITY_REQUIRED, faltante);
-    }
-
-    /**
-     * Valores que el dominio rechaza al construirse sin indicar el campo, como un correo
-     * mal formado o un celular sin indicativo.
-     *
-     * <p>Es un respaldo temporal: cada objeto de valor pasa a lanzar su propia excepción
-     * con su campo y su código. Mientras tanto, el texto de la excepción se devuelve solo
-     * si nació en el dominio, donde se escribe para la persona; el de una librería se
-     * reemplaza por un texto fijo, porque puede citar el valor recibido o la estructura
-     * interna del servicio.</p>
-     *
-     * @param error excepción con el mensaje del objeto de valor
-     * @return {@code 422 Unprocessable Entity} con el código {@code REQUEST_INVALID_VALUE}
-     */
-    @ExceptionHandler(IllegalArgumentException.class)
-    ProblemDetail valorInvalido(IllegalArgumentException error) {
-        String origen = origenDe(error);
-        String detalle = origen.startsWith(PAQUETE_DOMINIO) ? error.getMessage() : "Revisa los datos enviados.";
-        return rechazo(HttpStatus.UNPROCESSABLE_ENTITY, TITULO_VALIDACION, detalle,
-                ErrorCode.REQUEST_INVALID_VALUE, "origen=" + origen);
     }
 
     /**
@@ -471,13 +469,21 @@ class BusinessExceptionHandler {
         return requestId;
     }
 
-    /** Clase y método donde nació la excepción, sin su mensaje. */
-    private static String origenDe(Throwable error) {
-        StackTraceElement[] traza = error.getStackTrace();
-        if (traza.length == 0) {
-            return "desconocido";
+    /**
+     * Campo del contrato cuyo valor tiene un tipo o un valor que no corresponde, según la ruta
+     * que informa Jackson.
+     *
+     * <p>Solo cuenta un JSON bien formado con un valor que no encaja: un JSON mal formado
+     * también puede traer la ruta del campo donde se cortó, pero es un cuerpo ilegible, no una
+     * opción equivocada.</p>
+     *
+     * @return nombre del último campo de la ruta, o {@code null} si el error no es de ese tipo
+     */
+    private static String campoIlegible(HttpMessageNotReadableException error) {
+        if (!(error.getCause() instanceof MismatchedInputException jackson) || jackson.getPath().isEmpty()) {
+            return null;
         }
-        return traza[0].getClassName() + "." + traza[0].getMethodName();
+        return jackson.getPath().getLast().getPropertyName();
     }
 
     /** Nombre de la restricción violada, buscado en la cadena de causas; nunca el mensaje. */

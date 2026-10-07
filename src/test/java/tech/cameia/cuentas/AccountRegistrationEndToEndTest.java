@@ -91,7 +91,7 @@ class AccountRegistrationEndToEndTest {
         ResponseEntity<String> repetido = registrar(cuerpoValido());
 
         assertThat(repetido.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-        assertThat(repetido.getBody()).contains("Este correo ya se encuentra registrado")
+        assertThat(repetido.getBody()).contains("Ese correo ya tiene una cuenta.")
                 .contains("\"code\":\"EMAIL_ALREADY_REGISTERED\"");
         assertThat(repetido.getHeaders().getContentType()).isNotNull();
         assertThat(repetido.getHeaders().getContentType().toString())
@@ -110,8 +110,56 @@ class AccountRegistrationEndToEndTest {
         // Se compara el número y no la constante: Spring tiene dos para el 422, la nueva
         // UNPROCESSABLE_CONTENT y la antigua UNPROCESSABLE_ENTITY, y no son el mismo objeto.
         assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
-        assertThat(respuesta.getBody()).contains("Debes ser mayor de edad");
+        assertThat(respuesta.getBody()).contains("Debes ser mayor de edad.");
         assertThat(cuentasGuardadas()).isZero();
+    }
+
+    @Test
+    void unaContrasenaConEspaciosYEmojiLlegaAFirebaseSinCambios() {
+        // 16 puntos de código: el emoji ocupa dos unidades de UTF-16 y cuenta como uno.
+        String contrasena = "mi clave larga 🙂";
+
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("frase secreta larga", contrasena));
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(directorio.contrasenaDe(uidGuardado())).isEqualTo(contrasena);
+    }
+
+    @Test
+    void elEstadoYElPlanDelCuerpoSeIgnoranYLaCuentaNacePendienteYGratis() {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido()
+                .replace("\"pronoun\":\"SHE\"", "\"pronoun\":\"SHE\",\"status\":\"ACTIVE\",\"estado\":\"ACTIVE\","
+                        + "\"plan\":\"PREMIUM\",\"id\":\"00000000-0000-0000-0000-000000000000\",\"otro\":1"));
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(respuesta.getBody()).contains("PENDING_VERIFICATION").contains("FREE")
+                .doesNotContain("00000000-0000-0000-0000-000000000000");
+        assertThat(estadoGuardado()).isEqualTo("PENDING_VERIFICATION");
+        assertThat(directorio.planDe(uidGuardado())).isEqualTo("FREE");
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {"1", "true", "\"OTRO\"", "\"she\""})
+    void unPronombreFueraDeLaListaNoDejaRastroNiEnFirebaseNiEnLaBase(String valor) {
+        // Comprueba la configuración real de Jackson: un número no se lee como la posición del valor.
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("\"SHE\"", valor));
+
+        assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
+        assertThat(respuesta.getBody()).contains("\"field\":\"pronoun\"").contains("\"code\":\"PRONOUN_INVALID_VALUE\"")
+                .contains("Selecciona una opción.");
+        assertThat(cuentasGuardadas()).isZero();
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
+    }
+
+    @Test
+    void unCorreoSinFormaNoDejaRastroYNoRepiteElValor() {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("ana@cameia.tech", "ana@correo..co"));
+
+        assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
+        assertThat(respuesta.getBody()).contains("\"field\":\"email\"").contains("\"code\":\"EMAIL_INVALID_FORMAT\"")
+                .doesNotContain("ana@correo..co");
+        assertThat(cuentasGuardadas()).isZero();
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
     }
 
     @Test
@@ -183,8 +231,8 @@ class AccountRegistrationEndToEndTest {
     @Test
     void unNombreEnNfdSeGuardaEnNfcYSinEspaciosSobrantes() {
         ResponseEntity<String> respuesta = registrar(cuerpoValido()
-                .replace("\"Ana\"", "\"  José  Luis \"")
-                .replace("\"Pérez\"", "\" Pérez \""));
+                .replace("\"Ana\"", "\"  Jose\u0301  Luis \"")
+                .replace("\"Pérez\"", "\"\u00A0Pe\u0301rez\u00A0\""));
 
         assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(jdbcTemplate.queryForObject("SELECT nombre FROM microcuentas.cuenta", String.class))
@@ -246,9 +294,11 @@ class AccountRegistrationEndToEndTest {
     }
 
     @ParameterizedTest
-    @CsvSource(delimiter = '|', value = {"\"phoneNumber\":\"\"", "\"phoneNumber\":\"   \"", "\"phoneNumber\":null"})
+    @CsvSource(delimiter = '|', value = {"\"phoneNumber\":\"\",", "\"phoneNumber\":\"   \",", "\"phoneNumber\":null,",
+        "''"})
     void sinCelularLaCuentaSeCreaConElTelefonoNulo(String fragmento) {
-        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("\"phoneNumber\":\"+573001234567\"",
+        // La última fila quita el campo entero: ausente es lo mismo que vacío.
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("\"phoneNumber\":\"+573001234567\",",
                 fragmento));
 
         assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);

@@ -44,7 +44,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.model.EmailAddress;
+import tech.cameia.cuentas.domain.model.Pronoun;
 import tech.cameia.cuentas.presentation.dto.RegisterUserRequest;
+import tools.jackson.core.exc.StreamReadException;
+import tools.jackson.databind.exc.MismatchedInputException;
 
 /**
  * Prueba el formato común de las respuestas de error: el código estable, el identificador
@@ -191,17 +194,6 @@ class BusinessExceptionHandlerTest {
     }
 
     @Test
-    void unValorInvalidoSinTrazaSeTrataComoDeLibreria(CapturedOutput salida) {
-        IllegalArgumentException sinTraza = new IllegalArgumentException("texto que no debe salir");
-        sinTraza.setStackTrace(new StackTraceElement[0]);
-
-        ProblemDetail problema = manejador.valorInvalido(sinTraza);
-
-        assertThat(problema.getDetail()).isEqualTo("Revisa los datos enviados.");
-        assertThat(salida.getOut()).contains("origen=desconocido").doesNotContain("texto que no debe salir");
-    }
-
-    @Test
     void unCuerpoIlegibleRegistraLaClaseDeLaCausaMasProfundaSinSuMensaje(CapturedOutput salida) {
         HttpMessageNotReadableException error = new HttpMessageNotReadableException("lectura",
                 new IllegalStateException("frase secreta larga", new java.io.EOFException("ana@cameia.tech")),
@@ -235,27 +227,31 @@ class BusinessExceptionHandlerTest {
     }
 
     @Test
-    void unValorInvalidoDelDominioTieneSuPropioCodigo() throws Exception {
+    void unCorreoSinFormaSaleComoErrorDeSuCampoConSuCodigo() throws Exception {
         mockMvc.perform(get("/correo-del-dominio"))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.code").value("REQUEST_INVALID_VALUE"))
-                .andExpect(jsonPath("$.detail").value("El correo electrónico no tiene un formato válido"))
-                .andExpect(jsonPath("$.errors").doesNotExist());
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").value("Revisa los campos marcados."))
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value("email"))
+                .andExpect(jsonPath("$.errors[0].code").value("EMAIL_INVALID_FORMAT"))
+                .andExpect(jsonPath("$.errors[0].message").value("Ingresa un correo electrónico válido."));
     }
 
     @Test
-    void unValorInvalidoDeLibreriaNoMuestraSuMensaje(CapturedOutput salida) throws Exception {
-        mockMvc.perform(get("/valor-de-libreria"))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.code").value("REQUEST_INVALID_VALUE"))
-                .andExpect(jsonPath("$.detail").value("Revisa los datos enviados."))
+    void unaIllegalArgumentExceptionInesperadaEsUnFalloInternoSinSuMensaje(CapturedOutput salida)
+            throws Exception {
+        // Ya no hay respaldo que la convierta en un 422: cada dato tiene su excepción de negocio,
+        // y una que llegue hasta aquí es un defecto del servicio, no un error de la persona.
+        mockMvc.perform(get("/valor-de-libreria").header("X-Request-Id", "libreria-1"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(jsonPath("$.detail").value("Ocurrió un error. Inténtalo de nuevo."))
+                .andExpect(jsonPath("$.errors").doesNotExist())
                 .andExpect(result -> assertThat(result.getResponse().getContentAsString())
                         .doesNotContain("No enum constant"));
 
-        assertThat(salida.getOut())
-                .contains("code=REQUEST_INVALID_VALUE")
-                .contains("origen=" + ControladorQueFalla.class.getName() + ".valorDeLibreria")
-                .doesNotContain("No enum constant");
+        assertThat(salida.getOut()).contains("ERROR").contains("code=INTERNAL_ERROR, requestId=libreria-1");
     }
 
     @Test
@@ -306,13 +302,61 @@ class BusinessExceptionHandlerTest {
 
     @Test
     void unRechazoDeLaPersonaSeRegistraEnWarnSinTraza(CapturedOutput salida) throws Exception {
-        mockMvc.perform(get("/valor-de-libreria").header("X-Request-Id", "rechazo-1"))
+        mockMvc.perform(get("/correo-del-dominio").header("X-Request-Id", "rechazo-1"))
                 .andExpect(status().isUnprocessableEntity());
 
         assertThat(salida.getOut())
                 .contains("WARN")
-                .contains("status=422, code=REQUEST_INVALID_VALUE, requestId=rechazo-1")
-                .doesNotContain("java.lang.IllegalArgumentException");
+                .contains("status=422, code=VALIDATION_FAILED, requestId=rechazo-1] campos=[email=EMAIL_INVALID_FORMAT]")
+                .doesNotContain("InvalidEmailException")
+                .doesNotContain("ana@");
+    }
+
+    @Test
+    void unValorDeTipoEquivocadoEnElPronombreEsUnaOpcionInvalida() {
+        HttpMessageNotReadableException error = new HttpMessageNotReadableException("lectura",
+                MismatchedInputException.from(null, Pronoun.class, "x").prependPath(new Object(), "pronoun"),
+                new MockHttpInputMessage(new byte[0]));
+
+        ProblemDetail problema = manejador.cuerpoIlegible(error);
+
+        assertThat(problema.getProperties()).containsEntry("code", "VALIDATION_FAILED");
+        assertThat(problema.getProperties().get("errors")).asInstanceOf(InstanceOfAssertFactories.LIST)
+                .containsExactly(new BusinessExceptionHandler.CampoRechazado("pronoun", "PRONOUN_INVALID_VALUE",
+                        "Selecciona una opción."));
+    }
+
+    @Test
+    void unValorDeTipoEquivocadoEnOtroCampoEsUnCuerpoIlegible() {
+        HttpMessageNotReadableException error = new HttpMessageNotReadableException("lectura",
+                MismatchedInputException.from(null, String.class, "x").prependPath(new Object(), "birthDate"),
+                new MockHttpInputMessage(new byte[0]));
+
+        ProblemDetail problema = manejador.cuerpoIlegible(error);
+
+        assertThat(problema.getProperties()).containsEntry("code", "REQUEST_BODY_INVALID_FORMAT");
+        assertThat(problema.getDetail()).isEqualTo("Revisa el formato de los datos enviados.");
+    }
+
+    @Test
+    void unJsonMalFormadoEnElPronombreEsUnCuerpoIlegibleAunqueTraigaSuRuta() {
+        // Un error de lectura del JSON puede traer la ruta del campo donde se cortó; no es una
+        // opción equivocada, es un cuerpo que no se puede interpretar.
+        HttpMessageNotReadableException error = new HttpMessageNotReadableException("lectura",
+                new StreamReadException(null, "x").prependPath(new Object(), "pronoun"),
+                new MockHttpInputMessage(new byte[0]));
+
+        ProblemDetail problema = manejador.cuerpoIlegible(error);
+
+        assertThat(problema.getProperties()).containsEntry("code", "REQUEST_BODY_INVALID_FORMAT");
+    }
+
+    @Test
+    void unTipoEquivocadoSinRutaEsUnCuerpoIlegible() {
+        HttpMessageNotReadableException error = new HttpMessageNotReadableException("lectura",
+                MismatchedInputException.from(null, Pronoun.class, "x"), new MockHttpInputMessage(new byte[0]));
+
+        assertThat(manejador.cuerpoIlegible(error).getProperties()).containsEntry("code", "REQUEST_BODY_INVALID_FORMAT");
     }
 
     /** Controlador de la prueba que provoca cada tipo de fallo. */

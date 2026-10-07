@@ -27,6 +27,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
 
     private final Map<String, String> correosPorUid = new HashMap<>();
     private final Map<String, String> planesPorUid = new HashMap<>();
+    private final Map<String, String> contrasenasPorUid = new HashMap<>();
     private final Set<String> correosVerificados = new HashSet<>();
 
     private boolean fallarAlEscribirElPlan;
@@ -40,6 +41,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         }
         String uid = UUID.randomUUID().toString();
         correosPorUid.put(uid, email.value());
+        contrasenasPorUid.put(uid, password.value());
         return uid;
     }
 
@@ -61,6 +63,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         }
         correosPorUid.remove(firebaseUid);
         planesPorUid.remove(firebaseUid);
+        contrasenasPorUid.remove(firebaseUid);
         correosVerificados.remove(firebaseUid);
     }
 
@@ -99,6 +102,17 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     }
 
     /**
+     * Devuelve la contraseña con la que se creó la credencial, para comprobar que llegó sin
+     * recortes ni cambios.
+     *
+     * @param firebaseUid identificador del usuario
+     * @return la contraseña recibida, o {@code null} si el usuario no existe
+     */
+    public String contrasenaDe(String firebaseUid) {
+        return contrasenasPorUid.get(firebaseUid);
+    }
+
+    /**
      * Marca el correo de un usuario como verificado.
      *
      * @param firebaseUid identificador del usuario
@@ -133,6 +147,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     public void limpiar() {
         correosPorUid.clear();
         planesPorUid.clear();
+        contrasenasPorUid.clear();
         correosVerificados.clear();
         fallarAlEscribirElPlan = false;
         indisponibleAlEscribirElPlan = false;

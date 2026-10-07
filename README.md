@@ -85,6 +85,35 @@ chocar con un PostgreSQL instalado localmente en el 5432. Dentro de la red de Co
 la aplicación sigue conectándose a `db:5432`, así que cambiar esa variable no afecta
 la configuración de la aplicación.
 
+### Reiniciar, actualizar y empezar de cero
+
+Las cuentas viven en el volumen `cuentas-db-data`. Detener, reiniciar o recrear los
+contenedores (`docker compose down`, `docker compose up --build -d`) las conserva. Al
+arrancar, Flyway aplica solo las migraciones nuevas, una vez cada una, y deja las que ya
+estaban (`Schema "microcuentas" is up to date` en el log). Las migraciones del registro
+solo agregan o relajan restricciones: ninguna cambia las cuentas que ya existen. Si una
+migración no se puede aplicar, la aplicación no arranca y el log dice cuál y por qué.
+
+Cada usuario existe en **dos lugares**: su credencial en el emulador de Firebase Auth (volumen
+`firebase-emulator-data` de `cameia-gateway`) y su cuenta en esta base. Si se borra uno y no el
+otro, quedan desalineados:
+
+| Qué se borró | Qué se ve | Por qué |
+|---|---|---|
+| Solo la base (`docker compose down -v` aquí) | Registrar ese correo responde 409 `EMAIL_ALREADY_REGISTERED`; iniciar sesión funciona, pero activar la cuenta responde 404 `ACCOUNT_NOT_FOUND` | La credencial sigue en el emulador y la cuenta ya no existe |
+| Solo el emulador (`docker compose down -v` en `cameia-gateway`, o un apagado brusco como `docker kill`, que no alcanza a guardar sus usuarios) | Iniciar sesión falla con un usuario que la base sí tiene, y ese correo se puede volver a registrar | La cuenta sigue aquí y la credencial ya no existe |
+
+Para empezar de cero, se borran los dos a la vez:
+
+```powershell
+docker compose down -v                                    # aquí: base de Cuentas
+curl.exe -X DELETE http://localhost:9099/emulator/v1/projects/demo-cameia/accounts   # usuarios del emulador
+```
+
+El segundo comando vacía el emulador sin apagarlo; con `docker compose down -v` en
+`cameia-gateway` también se borra lo guardado, junto con los demás volúmenes de ese
+proyecto.
+
 ### Sin Docker
 
 Requiere un PostgreSQL 16 accesible en `DB_HOST:DB_PORT`.

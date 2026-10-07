@@ -88,14 +88,14 @@ class CommonPasswordsLoaderTest {
     @Test
     void unArchivoConMarcaDeOrdenDeBytesNoArranca() {
         // La marca de orden de bytes quedaría pegada a la primera entrada y nunca coincidiría.
-        assertThatThrownBy(() -> CommonPasswordsLoader.load(recurso("﻿123456789012\n"), 1))
+        assertThatThrownBy(() -> CommonPasswordsLoader.load(recurso("\uFEFF123456789012\n"), 1))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("línea 1");
     }
 
     @Test
     void unaEntradaEnFormaNfdNoArranca() {
-        assertThatThrownBy(() -> CommonPasswordsLoader.load(recurso("contraseñacomún\n"), 1))
+        assertThatThrownBy(() -> CommonPasswordsLoader.load(recurso("contrasen\u0303acomu\u0301n\n"), 1))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("forma NFC");
     }
