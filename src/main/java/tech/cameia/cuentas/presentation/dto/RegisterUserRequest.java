@@ -7,10 +7,10 @@ import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 
 import tech.cameia.cuentas.application.command.RegisterUserCommand;
 import tech.cameia.cuentas.domain.model.Pronoun;
+import tech.cameia.cuentas.domain.model.SingleLineText;
 
 /**
  * Cuerpo de la solicitud de registro.
@@ -44,13 +44,13 @@ public record RegisterUserRequest(
         @Schema(description = "Nombres de la persona: letras, espacios, apóstrofo y guion", example = "María José",
                 minLength = 1, maxLength = 120, requiredMode = RequiredMode.REQUIRED)
         @NotBlank(message = "Los nombres son obligatorios")
-        @Size(max = 120, message = "Los nombres no pueden superar los 120 caracteres")
+        @CodePointSize(max = 120, message = "Los nombres no pueden superar los 120 caracteres")
         String firstName,
 
         @Schema(description = "Apellidos de la persona: letras, espacios, apóstrofo y guion", example = "Gómez-Ruiz",
                 minLength = 1, maxLength = 120, requiredMode = RequiredMode.REQUIRED)
         @NotBlank(message = "Los apellidos son obligatorios")
-        @Size(max = 120, message = "Los apellidos no pueden superar los 120 caracteres")
+        @CodePointSize(max = 120, message = "Los apellidos no pueden superar los 120 caracteres")
         String lastName,
 
         @Schema(description = "Fecha de nacimiento con formato dd/MM/yyyy; debe ser una fecha real y la persona debe "
@@ -63,6 +63,7 @@ public record RegisterUserRequest(
         @Schema(description = "Correo con el que iniciará sesión; se guarda recortado y en minúsculas",
                 example = "ana@correo.co", maxLength = 254, format = "email", requiredMode = RequiredMode.REQUIRED)
         @NotBlank(message = "El correo electrónico es obligatorio")
+        @CodePointSize(max = 254, message = "El correo no puede superar los 254 caracteres.")
         String email,
 
         @Schema(description = "Contraseña de 12 a 64 caracteres, sin reglas de composición; no puede ser una "
@@ -79,6 +80,20 @@ public record RegisterUserRequest(
                 requiredMode = RequiredMode.REQUIRED)
         @NotNull(message = "Selecciona una opción.")
         Pronoun pronoun) {
+
+    /**
+     * Normaliza los textos antes de que se validen.
+     *
+     * <p>El borde valida y el comando recibe el texto ya recortado y en NFC: una sola definición
+     * de «espacio» y de «carácter» para el contrato y el dominio. Nombre y apellido además unen
+     * sus espacios internos repetidos. Los demás campos no se tocan: la contraseña nunca se
+     * recorta, la fecha es texto exacto y el celular tiene su propia regla.</p>
+     */
+    public RegisterUserRequest {
+        firstName = SingleLineText.normalizeName(firstName);
+        lastName = SingleLineText.normalizeName(lastName);
+        email = SingleLineText.normalize(email);
+    }
 
     /**
      * Convierte el cuerpo ya validado en el comando del caso de uso.

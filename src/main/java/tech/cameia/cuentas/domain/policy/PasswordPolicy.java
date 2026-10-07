@@ -1,5 +1,6 @@
 package tech.cameia.cuentas.domain.policy;
 
+import java.text.Normalizer;
 import java.util.Locale;
 import java.util.Set;
 
@@ -55,8 +56,9 @@ public class PasswordPolicy {
     /**
      * Comprueba que la contraseña sea aceptable.
      *
-     * <p>La longitud se mide en puntos de código, no en unidades {@code char}, para que un
-     * emoji o una letra fuera del alfabeto latino cuenten como un carácter y no como dos.</p>
+     * <p>La longitud se mide en puntos de código de la forma NFC, no en unidades {@code char},
+     * para que un emoji o una letra fuera del alfabeto latino cuenten como un carácter y no
+     * como dos, y para que una letra con tilde cuente igual se escriba como se escriba.</p>
      *
      * @param password contraseña recibida en el registro
      * @throws WeakPasswordException si es más corta que el mínimo, más larga que el máximo
@@ -64,7 +66,10 @@ public class PasswordPolicy {
      */
     public void verify(RawPassword password) {
         String value = password.value();
-        int length = value.codePointCount(0, value.length());
+        // La longitud se mide sobre la forma NFC para que un acento escrito con carácter combinante
+        // cuente igual que el mismo acento precompuesto; la contraseña en sí no se modifica.
+        String normalized = Normalizer.normalize(value, Normalizer.Form.NFC);
+        int length = normalized.codePointCount(0, normalized.length());
 
         if (length < MINIMUM_LENGTH) {
             throw new WeakPasswordException(ErrorCode.PASSWORD_TOO_SHORT,

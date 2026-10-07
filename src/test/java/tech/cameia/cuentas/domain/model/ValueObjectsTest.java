@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Prueba de los objetos de valor del registro descritos en
@@ -43,6 +45,58 @@ class ValueObjectsTest {
             assertThatThrownBy(() -> new EmailAddress("   "))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("El correo electrónico es obligatorio");
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"  Ana@Correo.CO ", " ana@correo.co ", "﻿ANA@CORREO.CO\t"})
+        void quitaLosEspaciosQueQuitaElClienteYPasaAMinusculas(String recibido) {
+            assertThat(new EmailAddress(recibido).value()).isEqualTo("ana@correo.co");
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {" ", "﻿", "\t"})
+        void soloEspaciosDelClienteEsObligatorio(String recibido) {
+            assertThatThrownBy(() -> new EmailAddress(recibido))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("El correo electrónico es obligatorio");
+        }
+
+        @Test
+        void rechazaLaAusencia() {
+            assertThatThrownBy(() -> new EmailAddress(null))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("El correo electrónico es obligatorio");
+        }
+
+        @Test
+        void admiteExactamente254PuntosDeCodigoYRechaza255() {
+            assertThat(new EmailAddress("a".repeat(248) + "@b.com").value()).hasSize(254);
+            assertThatThrownBy(() -> new EmailAddress("a".repeat(249) + "@b.com"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("El correo electrónico es demasiado largo");
+        }
+
+        @Test
+        void cuentaLaLongitudEnPuntosDeCodigoYNoEnUnidadesChar() {
+            // 126 letras matemáticas son 252 unidades char pero 126 puntos de código: 132 en total.
+            String correo = "𝒜".repeat(126) + "@b.com";
+
+            assertThat(new EmailAddress(correo).value()).isEqualTo(correo);
+        }
+
+        @Test
+        void dosCorreosQueSoloDifierenEnLaFormaUnicodeSonElMismo() {
+            assertThat(new EmailAddress("josé@correo.co").value())
+                    .isEqualTo(new EmailAddress("josé@correo.co").value());
+        }
+
+        @Test
+        void unaMayusculaQueCambiaDeFormaAlPasarAMinusculasQuedaEnNfc() {
+            // «İ» (I con punto) en minúsculas de Locale.ROOT es «i» + punto combinante.
+            String valor = new EmailAddress("İris@correo.co").value();
+
+            assertThat(valor).isEqualTo(java.text.Normalizer.normalize(valor, java.text.Normalizer.Form.NFC));
+            assertThat(valor).isEqualTo("i̇ris@correo.co");
         }
     }
 

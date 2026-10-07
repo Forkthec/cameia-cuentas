@@ -51,6 +51,9 @@ public enum ErrorCode {
     /** Falta el correo. */
     EMAIL_REQUIRED,
 
+    /** El correo supera el máximo de caracteres. */
+    EMAIL_TOO_LONG,
+
     /** El correo ya tiene una cuenta. */
     EMAIL_ALREADY_REGISTERED,
 
