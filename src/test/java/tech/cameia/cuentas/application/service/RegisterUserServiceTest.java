@@ -10,6 +10,9 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import tech.cameia.cuentas.application.command.RegisterUserCommand;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
@@ -31,6 +34,7 @@ import tech.cameia.cuentas.infrastructure.client.InMemoryFirebaseUserDirectory;
  * llamadas y qué pasa cuando una falla, no el comportamiento de Firebase ni de
  * PostgreSQL.</p>
  */
+@ExtendWith(OutputCaptureExtension.class)
 class RegisterUserServiceTest {
 
     private final InMemoryFirebaseUserDirectory directorio = new InMemoryFirebaseUserDirectory();
@@ -118,6 +122,31 @@ class RegisterUserServiceTest {
         assertThatThrownBy(() -> servicio.register(comando()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("PostgreSQL");
+    }
+
+    @Test
+    void laCompensacionFallidaDejaElUidEnElLogSinElCorreoNiLaContrasenia(CapturedOutput salida) {
+        repositorio.fallarAlGuardar();
+        directorio.fallarAlBorrar();
+
+        assertThatThrownBy(() -> servicio.register(comando())).isInstanceOf(IllegalStateException.class);
+
+        assertThat(salida.getOut())
+                .contains("ERROR")
+                .contains(repositorio.ultimoUid)
+                .contains("conciliación manual")
+                .doesNotContain("ana@cameia.tech")
+                .doesNotContain("frase secreta larga");
+    }
+
+    @Test
+    void unaContraseniaDebilNoQuedaEnElLog(CapturedOutput salida) {
+        RegisterUserCommand comun = new RegisterUserCommand("Ana", "Pérez", LocalDate.of(1995, 4, 12),
+                "ana@cameia.tech", "password1234", null, Pronoun.SHE);
+
+        assertThatThrownBy(() -> servicio.register(comun)).isInstanceOf(WeakPasswordException.class);
+
+        assertThat(salida.getOut()).doesNotContain("password1234").doesNotContain("ana@cameia.tech");
     }
 
     private RegisterUserCommand comando() {
