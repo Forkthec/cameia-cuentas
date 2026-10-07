@@ -1,7 +1,7 @@
 # Plan — CM-36-ValidacionesRegistro
 
-Base: `origin/develop` `908112c`. Estado: pendiente de aprobación de Paula. Este plan contiene el **bloque 1** (dos PR: 1A y 1B, secciones 1 a 8) y el **bloque 2** (sección 9). Los planes de los bloques 3 a 6 se
-agregan a este archivo y a `tasks.md` antes de ejecutar cada uno, con el estado real del repositorio ese día; hoy solo se fijan su orden y sus dependencias (sección 7).
+Base: `origin/develop` `908112c`. Estado: pendiente de aprobación de Paula. Este plan contiene los seis bloques: el **bloque 1** (dos PR: 1A y 1B, secciones 1 a 8), el **bloque 2** (sección 9) y los **bloques 3 a 6**
+(secciones 10 a 14). El orden y las dependencias están en la sección 7. Antes de ejecutar cada bloque se revalidan rutas y líneas contra el estado real de `develop` ese día.
 
 ## 1. Cómo se aborda el bloque 1
 
@@ -85,14 +85,15 @@ Justificación del caso manual: comprobar el JSON de OpenAPI exige levantar el c
 ## 7. Orden y dependencias de toda la tarea
 
 1. **1A → 1B** (1B emite códigos nuevos y usa la tabla).
-2. Bloque 2 después de 1B (usa el orden de mensajes por campo y el `code`).
-3. Bloque 3 después de 2 (el nombre recortado y en NFC entra a `PersonName`).
-4. Bloque 4 después de V-03 (pregunta 3); es independiente de 2 y 3 y puede ir en paralelo con ellos.
-5. Bloque 5 después de la pregunta 11 (dependencia).
-6. Bloque 6 al final: usa las tablas de todos los bloques y exige la respuesta de las preguntas 2, 6 y 10.
+2. **Bloques 2 y 3 en un solo PR** (decidido por Paula el 6-oct-2026: tocan los mismos archivos y suman ≈ 650 líneas), después de 1B. Dentro del PR, primero el recorte y NFC (secciones 9) y después `PersonName` (sección 10), porque el nombre recortado y en NFC entra a `PersonName`. La parte de `PersonName` con `李` y los espacios dobles espera la pregunta 8 (Vela); si no hay respuesta al empezar, se detiene y se avisa a Paula (no se escribe la regla con la recomendación).
+3. Bloque 4 en paralelo con 2 y 3 (fuente decidida: SecLists filtrada, pregunta 3).
+4. Bloque 5 cuando se quiera (dependencia aprobada, pregunta 11); la pregunta 9 (tipos de número) es de Vela.
+5. Bloque 6 al final: usa las tablas de todos los bloques, exige la respuesta de las preguntas 2 y 10 (Vela) y que CM-251 esté fusionada (su prueba de CA-1.1.42 espera 200).
 Paralelo posible: bloque 4 con 2 y 3; el resto es secuencial porque comparten `RegisterUserRequest` y el manejador.
 
-**Marcas BLOQUEADO del bloque 1:** T-1A.5 (`requestId`) por **PD-08 / pregunta 4**; T-1B.1, T-1B.2 y T-1B.3 por **pregunta 5** (si Paula rechaza D1, se reemplazan por la receta del análisis con la distinción por mensaje, y se avisa antes de escribir código).
+**Fuera de esta tarea, pero dependen de ella:** CM-251 y el bloque 1 de CM-179 empiezan en cuanto se fusione **1A** (no esperan a 1B, 2 ni 3: decidido por Paula el 6-oct-2026). Lo que se fusione después hace un rebase pequeño.
+
+**Bloque 1 sin bloqueos:** PD-08 y la pregunta 5 (D1) quedaron respondidas por Paula el 6-oct-2026.
 
 ## 8. Estimación
 

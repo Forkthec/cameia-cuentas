@@ -3,7 +3,7 @@
 - **Tarea:** CM-36 · Subtarea · «HU-1.1 – Backend: estado inicial de la cuenta nueva» · padre CM-14 «HU-1.1 Registro de Nuevo Usuario» · Sprint 2 · responsable: Paula Andrea Muñoz Delgado
 - **Repositorio:** `cameia-cuentas`, rama `CM-36-validaciones-registro`, creada desde `origin/develop` (`908112c`)
 - **Backlog vigente:** `05102026_01_Backlog.xlsx`, hoja `HE-01`, HU-1.1 (44 criterios) y su apartado «Cambios v4» (5-oct-2026)
-- **Estado:** spec completa de la tarea; **pendiente de aprobación de Paula**. Hay 14 preguntas abiertas (sección 15): ninguna impide empezar el bloque 1, salvo lo marcado «BLOQUEADO».
+- **Estado:** spec completa de la tarea, **aprobada por Paula el 6-oct-2026** junto con el plan del bloque 1 (1A y 1B). Las preguntas de Paula están respondidas (sección 15); quedan abiertas las de Vela y DevOps, que solo afectan a textos y nombres de los bloques 3, 5 y 6 y al despliegue de 1B.
 - **Atributos de calidad que toca:** seguridad (ASVS 6.2.4, 5.1, API3 y API6), compatibilidad de contrato (aditiva, con un cambio de textos), mantenibilidad y testabilidad (códigos de error y validación por capas), fiabilidad (sin 500 por entrada inválida).
 
 ## 1. Contexto y objetivo
@@ -33,8 +33,8 @@ Una sola spec; seis bloques, cada uno un PR hacia `develop` de menos de 1000 lí
 |---|---|---|---|
 | 1A | Formato de error con `code` en toda respuesta de error y en cada elemento de `errors[]` | H-14 de CM-283, estándar §3.6 | transversal (RT-01-CA05) |
 | 1B | Fecha estricta · mensaje de contraseña común · pronombre obligatorio · restricción de la base para los pronombres · documentación OpenAPI del registro | 1, 2 (mensaje) y 3 | CA-1.1.8, 1.1.15, 1.1.27 (mensaje), 1.1.43 |
-| 2 | Recorte y NFC de nombre, apellido y correo; cuenta de caracteres por puntos de código (incluida la contraseña); `EMAIL_TOO_LONG` en el borde; un mensaje por campo en el orden fijado | 5 | CA-1.1.9 a 1.1.13 (espacios), 1.1.16 a 1.1.19, 1.1.22, 1.1.42 |
-| 3 | `PersonName` (solo letras) | 4 | CA-1.1.31, 1.1.39, 1.1.40 |
+| 2 (mismo PR que 3) | Recorte y NFC de nombre, apellido y correo; cuenta de caracteres por puntos de código (incluida la contraseña); `EMAIL_TOO_LONG` en el borde; un mensaje por campo en el orden fijado | 5 | CA-1.1.9 a 1.1.13 (espacios), 1.1.16 a 1.1.19, 1.1.22, 1.1.42 |
+| 3 (mismo PR que 2) | `PersonName` (solo letras) | 4 | CA-1.1.31, 1.1.39, 1.1.40 |
 | 4 | Lista de 3000 contraseñas comunes | 2 (lista) | CA-1.1.27 (lista) |
 | 5 | Celular con `libphonenumber` | 6 | CA-1.1.32, 1.1.37, 1.1.38, 1.1.29 |
 | 6 | Etiqueta de campo y `code` en los 422 que hoy no lo tienen; textos del catálogo; correo duplicado; pruebas de edad y de los casos 1.1.41 y 1.1.42 | 7, 8, 9 | CA-1.1.2, 1.1.3 a 1.1.7, 1.1.20 a 1.1.26, 1.1.41 |
@@ -87,7 +87,7 @@ nombre del contrato JSON. Los mensajes van entre comillas y con su punto final, 
 
 - **REQ-RV-01.** Cuando el servicio responda cualquier error (4xx o 5xx), el cuerpo debe incluir el miembro `code` de nivel superior con un valor del catálogo de la sección 6, sin reemplazar `type`, `title`, `status`, `detail` ni `instance`.
 - **REQ-RV-02.** Cuando el servicio responda 422 con una lista `errors`, cada elemento debe tener `field`, `code` y `message`, un elemento por campo (no dos para el mismo campo) y `code` de nivel superior `VALIDATION_FAILED`.
-- **REQ-RV-03.** Cuando el servicio responda un error, debe incluir el miembro `requestId` con el `X-Request-Id` recibido o, si falta o no cumple `^[A-Za-z0-9._-]{1,64}$`, un UUID v4 generado, y devolver el mismo valor en el encabezado `X-Request-Id`. **PENDIENTE de Paula (PD-08, pregunta 4).**
+- **REQ-RV-03.** Cuando el servicio responda un error, debe incluir el miembro `requestId` con el `X-Request-Id` recibido o, si falta o no cumple `^[A-Za-z0-9._-]{1,64}$`, un UUID v4 generado, y devolver el mismo valor en el encabezado `X-Request-Id`. (PD-08 respondida por Paula el 6-oct-2026: desde el PR 1A.)
 - **REQ-RV-04.** Si un fallo no es de negocio, el servicio debe responder 500 con `code` `INTERNAL_ERROR` y el `detail` «Ocurrió un error. Inténtalo de nuevo.», sin traza, SQL, nombre de clase ni mensaje de excepción; el detalle va al log. (Texto del RT-05-CA01: hoy dice «No pudimos completar la operación. Inténtalo de nuevo en unos minutos».)
 - **REQ-RV-05.** Mientras el servicio emita un código, el catálogo no debe reutilizar ni renombrar un código publicado; todo valor de `ErrorCode` debe cumplir `^[A-Z]+(_[A-Z]+)+$` y terminar en una causa del vocabulario cerrado del estándar (§A).
 - **REQ-RV-06.** Si una restricción de Bean Validation del contrato no tiene `code` asignado, una prueba debe fallar (ninguna restricción cae al código `VALIDATION_FAILED` por omisión).
@@ -102,7 +102,7 @@ nombre del contrato JSON. Los mensajes van entre comillas y con su punto final, 
 - **REQ-RV-12.** Cuando `birthDate` llegue como número, booleano, arreglo u objeto JSON, el servicio debe responder 422 sin llamar al caso de uso: los números y booleanos se leen como texto y fallan por formato (REQ-RV-10); el arreglo y el objeto fallan como cuerpo ilegible (REQ-RV-30).
 - **REQ-RV-13 (contraseña común, CA-1.1.27).** Cuando la contraseña, comparada sin mayúsculas y con los extremos recortados, figure en la lista de contraseñas comunes, el servicio debe responder 422 con `{field:"password", code:"PASSWORD_TOO_COMMON", message:"Esta contraseña es demasiado común, elige otra."}`. La lista de este bloque es la vigente (32 entradas); el bloque 4 la sustituye. Datos de prueba: `123456789012`, `password1234`, `qwertyuiop123`, `PASSWORD1234` y `  password1234  ` (mismo resultado).
 - **REQ-RV-14.** El mensaje de la excepción de contraseña común no debe contener la contraseña ni ningún texto informal.
-- **REQ-RV-15 (pronombre obligatorio, CA-1.1.15).** Cuando `pronoun` esté ausente o sea `null`, el servicio debe responder 422 con `{field:"pronoun", code:"PRONOUN_REQUIRED", message:"Selecciona una opción."}` y no debe llamar al caso de uso.
+- **REQ-RV-15 (pronombre obligatorio, CA-1.1.15).** Cuando `pronoun` esté ausente, sea `null`, una cadena vacía o solo espacios (pregunta 15), el servicio debe responder 422 con `{field:"pronoun", code:"PRONOUN_REQUIRED", message:"Selecciona una opción."}` y no debe llamar al caso de uso.
 - **REQ-RV-16 (CA-1.1.43).** Cuando `pronoun` sea `HE`, `SHE` o `THEY`, el servicio debe crear la cuenta guardando exactamente ese valor en la columna `pronombres` (una prueba por valor).
 - **REQ-RV-17.** El esquema debe repetir la regla: la columna `pronombres` solo admite `NULL`, `HE`, `SHE` o `THEY` (restricción `ck_cuenta_pronombres_valor`, migración V3). `NULL` se conserva porque la anonimización vacía el dato.
 - **REQ-RV-18.** La documentación OpenAPI de `POST /api/v1/users` debe describir cada campo (descripción, límites, ejemplo y obligatoriedad) y cada respuesta (201, 409, 422, 500) con sus códigos de error.
@@ -140,8 +140,8 @@ nombre del contrato JSON. Los mensajes van entre comillas y con su punto final, 
 
 - **REQ-RV-30.** Cuando el cuerpo no se pueda leer (JSON mal formado, un arreglo u objeto donde va un texto, `Content-Type` ilegible), el servicio debe responder 422 con `code` `REQUEST_BODY_INVALID_FORMAT` y el `detail` «Revisa el formato de los datos enviados.», sin el texto de la excepción de Jackson y sin la afirmación fija sobre el formato de la fecha que hoy incluye. (Pregunta 6: el estándar dice 400; el contrato publicado dice 422.)
 - **REQ-RV-60.** Cuando `email` no tenga formato válido, el servicio debe responder 422 con `field:"email"`, `code` `EMAIL_INVALID_FORMAT` y el texto «Ingresa un correo electrónico válido.» (la longitud la resuelve el bloque 2).
-- **REQ-RV-61.** Cuando `pronoun` sea un valor fuera de la lista (`OTRO`, `he`, `""`, `1`), el servicio debe responder 422 con `field:"pronoun"` y `code` `PRONOUN_INVALID_VALUE`. Texto: pregunta 10.
-- **REQ-RV-62.** Cuando el correo ya tenga credencial (cuenta activa, bloqueada, anonimizada o pendiente), el servicio debe responder 409 con `code` `EMAIL_ALREADY_REGISTERED` y el mensaje «Ese correo ya tiene una cuenta.», sin revelar el estado de la cuenta.
+- **REQ-RV-61.** Cuando `pronoun` sea un valor fuera de la lista (`OTRO`, `he`, `1`, `true`; la cadena vacía es REQ-RV-15), el servicio debe responder 422 con `field:"pronoun"` y `code` `PRONOUN_INVALID_VALUE`. Texto: pregunta 10.
+- **REQ-RV-62.** Cuando el correo ya tenga credencial y la cuenta esté activa, bloqueada o anonimizada, el servicio debe responder 409 con `code` `EMAIL_ALREADY_REGISTERED` y el mensaje «Ese correo ya tiene una cuenta.», sin revelar el estado de la cuenta. La cuenta **pendiente de verificación no** responde 409: responde 200 con la cuenta existente (CA-1.1.30, tarea CM-251).
 - **REQ-RV-63.** Los mensajes de los demás campos deben ser los del catálogo de la sección 6 (pregunta 2).
 - **REQ-RV-64.** Cuando se envíen varios campos inválidos a la vez, el servicio debe responder un elemento por campo para los campos que fallan en la validación del borde (sintaxis, longitud, formato, caracteres); las reglas del dominio (edad, contraseña común, correo duplicado) se aplican después y de una en una (decisión D3, pregunta 7).
 - **REQ-RV-65.** El valor numérico de un enumerado no debe aceptarse (hoy `"pronoun":1` se lee como `SHE`): el servicio debe responder 422 `PRONOUN_INVALID_VALUE`.
@@ -155,7 +155,7 @@ nombre del contrato JSON. Los mensajes van entre comillas y con su punto final, 
 | `birthDate` | Sí | ninguna (texto exacto `dd/MM/uuuu`) | vacía · formato · futura · menor de 18 · más de 110 | `BIRTH_DATE_REQUIRED` «Ingresa tu fecha de nacimiento.» · `BIRTH_DATE_INVALID_FORMAT` «Formato de fecha inválido.» · `BIRTH_DATE_IN_THE_FUTURE` «Fecha de nacimiento inválida.» · `BIRTH_DATE_UNDERAGE` «Debes ser mayor de edad.» · `BIRTH_DATE_OUT_OF_RANGE` «Verifica tu fecha de nacimiento.» |
 | `email` | Sí | recorte + NFC + minúsculas | vacío · más de 254 · formato | `EMAIL_REQUIRED` «Ingresa tu correo electrónico.» · `EMAIL_TOO_LONG` «El correo no puede superar los 254 caracteres.» · `EMAIL_INVALID_FORMAT` «Ingresa un correo electrónico válido.» · duplicado: `EMAIL_ALREADY_REGISTERED` 409 «Ese correo ya tiene una cuenta.» |
 | `password` | Sí | ninguna (no se recorta; NFC solo para contar) | vacía (incluye solo espacios) · menos de 12 · más de 64 · común | `PASSWORD_REQUIRED` «Ingresa tu contraseña.» · `PASSWORD_TOO_SHORT` «La contraseña debe tener al menos 12 caracteres.» · `PASSWORD_TOO_LONG` «La contraseña no puede superar los 64 caracteres.» · `PASSWORD_TOO_COMMON` «Esta contraseña es demasiado común, elige otra.» |
-| `pronoun` | Sí | ninguna | ausente/`null` · fuera de la lista | `PRONOUN_REQUIRED` «Selecciona una opción.» · `PRONOUN_INVALID_VALUE` (texto: pregunta 10) |
+| `pronoun` | Sí | ninguna | ausente, `null`, vacío o solo espacios · fuera de la lista | `PRONOUN_REQUIRED` «Selecciona una opción.» · `PRONOUN_INVALID_VALUE` (texto: pregunta 10) |
 | `phoneNumber` | No | recorte | vacío = sin celular · formato | `PHONE_NUMBER_INVALID_FORMAT` «Revisa el número, no coincide con el formato del país elegido.» |
 | `estado`, `plan` y cualquier otro | — | — | se ignoran (RT-01-CA06) | — |
 
@@ -164,7 +164,7 @@ de código y con una variante multibyte (121 `ñ`; 12 emojis son 12 caracteres; 
 
 Respuesta 201 (sin cambios): `{id, firebaseUid, status:"PENDING_VERIFICATION", plan:"FREE"}`; nunca el correo ni la contraseña.
 
-Ejemplo de error de validación (formato final, 1B en adelante):
+Ejemplo de error de validación (formato final, 1B en adelante). El miembro `requestId` está desde el PR 1A (pregunta 4, PD-08).
 
 ```json
 {
@@ -210,8 +210,10 @@ lugar de la causa nueva «implausible»).
 | `EMAIL_NOT_VERIFIED` | 403 | `EmailNotVerifiedException` (activación; código reservado por el contrato) | 1A |
 | `INTERNAL_ERROR` | 500 | cualquier otro fallo | 1A |
 
-En 1A, los códigos se agregan **sin cambiar ningún texto** de los vigentes; los textos del catálogo se aplican en el bloque 6 una vez respondida la pregunta 2.
+En 1A, los códigos se agregan **sin cambiar ningún texto** de los vigentes, con una sola excepción: el `detail` del 500, cuyo texto literal fija el RT-05-CA01 (REQ-RV-04). Los textos del catálogo se aplican en el bloque 6 una vez respondida la pregunta 2.
 Las tres correcciones con texto literal en el backlog (formato de fecha, contraseña común y pronombre) usan su texto desde 1B.
+
+Los códigos `IDENTITY_REQUIRED`, `ACCOUNT_NOT_FOUND` y `EMAIL_NOT_VERIFIED` **no los emite el registro**: los emite la activación (`POST /api/v1/users/me/verification`). Están en esta tabla porque el PR 1A asigna código a toda respuesta de error del servicio; sus cambios de comportamiento son de CM-179.
 
 ## 7. Datos
 
@@ -237,13 +239,13 @@ Las tres correcciones con texto literal en el backlog (formato de fecha, contras
 | Texto (n−1, n, n+1; puntos de código; tildes, ñ, ü, emoji; combinantes; espacios; control; `<script>`) | Sí | Límites de la sección 5; REQ-RV-31 |
 | Números | Solo `birthDate`/`pronoun` enviados como número | REQ-RV-12 y REQ-RV-65 |
 | Fechas (31/02, bisiesto, hoy, mañana, borde de mes y año, UTC, reloj fijo) | Sí | REQ-RV-10; pruebas de edad con `Clock` fijo (bloque 6): cumple 18 hoy/mañana, cumple 111 hoy/mañana, nacido el 29/02 en año no bisiesto, 31/12 y 01/01 |
-| Enumerados (válido, desconocido, minúsculas, vacío) | `pronoun` | `HE`, `SHE`, `THEY`, `OTRO`, `he`, `""`, `null`, `1` |
+| Enumerados (válido, desconocido, minúsculas, vacío) | `pronoun` | `HE`, `SHE`, `THEY`, `OTRO`, `he`, `""` (obligatorio), `"   "` (obligatorio), `null`, `1`, `true` |
 | Duplicados (mayúscula, tilde, espacios; concurrente) | Correo | CA-1.1.42, REQ-RV-25; concurrencia: CM-251 |
 | Estado, propiedad, colecciones, paginación | No | Registro público sin identidad ni colecciones |
 | Concurrencia (doble envío) | No en esta tarea | CM-251 (registro repetido) |
 | Falla parcial | Sí | Ya cubierto por `RegisterUserServiceTest` (compensación); una validación que falla nunca llega a Firebase (`verify(directorio, never())`) |
 | Dependencias (Firebase lento o caído) | No cambia | Fuera de alcance; 500 genérico probado |
-| Carga (cuerpo grande, campos extra, JSON mal formado, tipo de contenido erróneo) | Sí | Campos extra ignorados; JSON mal formado y `text/plain` → REQ-RV-30 y 415 existente; cuerpo grande: **hoy no hay límite** (`max-http-form-post-size` solo aplica a formularios): se mide en el bloque 6 y se decide con la pregunta 14 |
+| Carga (cuerpo grande, campos extra, JSON mal formado, tipo de contenido erróneo) | Sí | Campos extra ignorados; JSON mal formado y `text/plain` → REQ-RV-30 y 415 existente; cuerpo grande: **hoy no hay límite** (`max-http-form-post-size` solo aplica a formularios): se corrige en una tarea aparte que se pide a Vela (pregunta 14) |
 
 ## 10. Reutilización
 
@@ -280,13 +282,13 @@ Cobertura: ≥ 90 % de líneas y ramas de lo nuevo o modificado, medida con JaCo
 
 | # | Decisión | Porqué | Alternativas descartadas | Decisión humana |
 |---|---|---|---|---|
-| D1 | `birthDate` llega como **texto** y se valida con una restricción propia de formato estricto `dd/MM/uuuu`; el controlador lo convierte con `toCommand()` | La receta del análisis (`@JsonFormat` con `lenient=FALSE` sobre `LocalDate`) rechaza bien las fechas imposibles pero **trata la cadena vacía y los espacios como error de formato** (probado: `""` y `"   "` lanzan «not allowed because 'strict' mode», la misma excepción que un número). Eso impediría responder «vacía» (CA-1.1.11) distinto de «formato» (CA-1.1.8) sin leer el texto de la excepción de Jackson, que cambia entre versiones. Con texto, todo el borde pasa por Bean Validation: un elemento por campo, junto con los demás errores del borde, y el contrato JSON no cambia | Receta del análisis con distinción por mensaje (frágil); registrar un deserializador propio (más código y estado global); analizar la fecha dentro del dominio (el formato es sintaxis y llegaría después del resto de errores del borde) | PENDIENTE (Paula), pregunta 5 |
-| D2 | `code` desde `ErrorCode` en `domain.exception`; el manejador asigna el `code` de cada restricción del borde con una tabla `campo + restricción` | Un solo lugar; una prueba falla si una restricción nueva no tiene código (REQ-RV-06) | Texto del código dentro del `message` de cada anotación (acopla mensaje y código); enumerado con el texto incluido (cambia los textos antes de la pregunta 2) | PENDIENTE (Paula) |
-| D3 | Validación en dos fases: el borde devuelve todos sus errores a la vez; las reglas del dominio (edad, contraseña común, duplicado) se aplican después, de una en una | Es el diseño vigente y el más simple; el frontend ya valida todo antes de enviar. Agregarlo todo exigiría un validador que ejecute el dominio sin crear la cuenta | Agregar los errores de dominio a la lista (más código y el servicio dejaría de lanzar al primer fallo) | PENDIENTE (Paula), pregunta 7 |
-| D4 | El cuerpo ilegible sigue en **422** | Es el contrato publicado que consume Frontend (jerarquía: contrato publicado primero); el estándar sugiere 400 | Cambiar a 400: rompe lo publicado sin pedirlo ningún CA | PENDIENTE (Paula), pregunta 6 |
-| D5 | El pronombre obligatorio vive en la API; la columna sigue admitiendo `NULL` | La anonimización vacía el dato; el CA lo pide a nivel de API | `NOT NULL` en la base: rompe la anonimización | PENDIENTE (Paula) |
-| D7 | El recorte y la normalización NFC viven en el objeto de valor `SingleLineText` del dominio; el DTO los aplica en su constructor compacto (antes de la validación) y la restricción `@CodePointSize` cuenta puntos de código | Una sola definición de «espacio» y de «carácter» para el borde y el dominio; `@NotBlank` ve el texto ya recortado (así un NBSP solo cuenta como vacío); `@Size` cuenta unidades UTF-16 y no sirve para el límite en puntos de código | Normalizar solo en el controlador (la validación vería el texto sin recortar); una clase de utilidades estáticas (prohibida por el estándar); copiar la lógica en cada validador | PENDIENTE (Paula), pregunta 13 |
-| D6 | Bloque 1 en dos PR (1A formato de error, 1B correcciones) | Un solo PR superaría 900 líneas y mezclaría un refactor transversal con tres correcciones de comportamiento | Un PR único | PENDIENTE (Paula) |
+| D1 | `birthDate` llega como **texto** y se valida con una restricción propia de formato estricto `dd/MM/uuuu`; el controlador lo convierte con `toCommand()` | La receta del análisis (`@JsonFormat` con `lenient=FALSE` sobre `LocalDate`) rechaza bien las fechas imposibles pero **trata la cadena vacía y los espacios como error de formato** (probado: `""` y `"   "` lanzan «not allowed because 'strict' mode», la misma excepción que un número). Eso impediría responder «vacía» (CA-1.1.11) distinto de «formato» (CA-1.1.8) sin leer el texto de la excepción de Jackson, que cambia entre versiones. Con texto, todo el borde pasa por Bean Validation: un elemento por campo, junto con los demás errores del borde, y el contrato JSON no cambia | Receta del análisis con distinción por mensaje (frágil); registrar un deserializador propio (más código y estado global); analizar la fecha dentro del dominio (el formato es sintaxis y llegaría después del resto de errores del borde) | Aprobada por Paula (6-oct-2026), pregunta 5 |
+| D2 | `code` desde `ErrorCode` en `domain.exception`; el manejador asigna el `code` de cada restricción del borde con una tabla `campo + restricción` | Un solo lugar; una prueba falla si una restricción nueva no tiene código (REQ-RV-06) | Texto del código dentro del `message` de cada anotación (acopla mensaje y código); enumerado con el texto incluido (cambia los textos antes de la pregunta 2) | Aprobada por Paula (6-oct-2026), con la spec |
+| D3 | Validación en dos fases: el borde devuelve todos sus errores a la vez; las reglas del dominio (edad, contraseña común, duplicado) se aplican después, de una en una | Es el diseño vigente y el más simple; el frontend ya valida todo antes de enviar. Agregarlo todo exigiría un validador que ejecute el dominio sin crear la cuenta | Agregar los errores de dominio a la lista (más código y el servicio dejaría de lanzar al primer fallo) | Aprobada por Paula (6-oct-2026), pregunta 7 |
+| D4 | El cuerpo ilegible sigue en **422** | Es el contrato publicado que consume Frontend (jerarquía: contrato publicado primero); el estándar sugiere 400 | Cambiar a 400: rompe lo publicado sin pedirlo ningún CA | Aprobada por Paula (6-oct-2026), pregunta 6 |
+| D5 | El pronombre obligatorio vive en la API; la columna sigue admitiendo `NULL` | La anonimización vacía el dato; el CA lo pide a nivel de API | `NOT NULL` en la base: rompe la anonimización | Aprobada por Paula (6-oct-2026), con la spec |
+| D7 | El recorte y la normalización NFC viven en el objeto de valor `SingleLineText` del dominio; el DTO los aplica en su constructor compacto (antes de la validación) y la restricción `@CodePointSize` cuenta puntos de código | Una sola definición de «espacio» y de «carácter» para el borde y el dominio; `@NotBlank` ve el texto ya recortado (así un NBSP solo cuenta como vacío); `@Size` cuenta unidades UTF-16 y no sirve para el límite en puntos de código | Normalizar solo en el controlador (la validación vería el texto sin recortar); una clase de utilidades estáticas (prohibida por el estándar); copiar la lógica en cada validador | Aprobada por Paula (6-oct-2026), pregunta 13 |
+| D6 | Bloque 1 en dos PR (1A formato de error, 1B correcciones) | Un solo PR superaría 900 líneas y mezclaría un refactor transversal con tres correcciones de comportamiento | Un PR único | Aprobada por Paula (6-oct-2026), con la spec |
 
 ## 14. Verificaciones previas de Backend
 
@@ -295,38 +297,36 @@ Cobertura: ≥ 90 % de líneas y ramas de lo nuevo o modificado, medida con JaCo
 - **V-05 (celular igual en cliente y servidor).** Comparar el resultado de `libphonenumber` Java con `libphonenumber-js` sobre los valores de los CA (`+573000000000`, `+34612345678`, `12345`) en el bloque 5; si difieren, se informa a Frontend.
 - **V-06.** Confirmar que la propiedad de Jackson que rechaza números como enumerado existe con su nombre en la versión del proyecto (bloque 6).
 
-## 15. Preguntas abiertas (cada una nombra a quién y qué bloquea)
+## 15. Preguntas
 
-**Ronda 1**
+### Respondidas (Paula, 6 de octubre de 2026)
 
-| # | Pregunta | A quién | Recomendación | Bloquea |
-|---|---|---|---|---|
-| 1 | ¿Las correcciones de HU-1.1 viven en CM-36? Jira no tiene una tarea «Ajustes v4 – Backend» de Cuentas para HU-1.1 (como sí tienen HU-2.2 y HU-2.4) | **PENDIENTE de Vela** | Sí, en CM-36 | Dónde se registra y cierra el trabajo; nada de código |
-| 2 | ¿El servidor devuelve los textos del catálogo de CA para todos los campos (sección 5)? Hoy difieren (p. ej. «Los nombres son obligatorios» frente a «Ingresa tu nombre.») | **PENDIENTE de Vela** | Sí: RT-01 pide «las mismas reglas» en cliente y servidor y dice que el mensaje literal está en el CA | Solo el bloque 6; 1A no cambia textos |
-| 3 | Fuente y licencia de las 3000 contraseñas de 12 o más caracteres (V-03), formato de entrega para `cameia-web` (archivo versionado en el repo de Cuentas) y qué se hace si la fuente no alcanza las 3000 | **PENDIENTE de Paula con Frontend** | Elegir una lista pública de contraseñas filtrada a 12 o más caracteres cuya licencia permita redistribuirla; si hay menos de 3000, completar con una segunda fuente y registrar ambas. No se elige hoy: se verifica la licencia al empezar el bloque 4 | Bloque 4 |
-| 4 | PD-08 de CM-283: ¿el cuerpo de error lleva `requestId` desde esta tarea? | **PENDIENTE de Paula** | Sí: se toma del encabezado `X-Request-Id` o se genera, sin filtro ni `MDC` (eso lo hace P2-05); costo ≈ 40 líneas | Solo la tarjeta T-1A.5 |
-| 5 | D1: ¿se aprueba el texto como tipo de `birthDate` (con restricción propia) en lugar de la receta `@JsonFormat` del análisis? | **PENDIENTE de Paula** | Sí, por la prueba que muestra el defecto de la receta con cadena vacía | Tarjetas del bloque 1B |
-| 6 | D4: ¿el cuerpo ilegible sigue en 422 (contrato publicado) o pasa a 400 (estándar)? | **PENDIENTE de Paula** | Seguir en 422 y documentarlo en el ADR del `code` | Bloque 6 |
+| # | Pregunta | Respuesta | Efecto |
+|---|---|---|---|
+| 3 | Fuente de la lista de 3000 contraseñas | SecLists (licencia MIT), lista de un millón filtrada a 12 o más caracteres, las 3000 más frecuentes. Al empezar el bloque 4 se verifican la licencia y el conteo; si no alcanza, se detiene y se avisa | Desbloquea el bloque 4. Frontend recibe el mismo archivo |
+| 4 | PD-08: ¿`requestId` desde esta tarea? | Sí, desde el PR 1A, sin filtro ni `MDC` | REQ-RV-03 y T-1A.5 |
+| 5 | D1: ¿`birthDate` como texto con restricción propia? | Sí | Bloque 1B |
+| 6 | D4: ¿cuerpo ilegible en 422 o 400? | Sigue en 422; la diferencia con el estándar se documenta en el ADR del `code` | REQ-RV-30 |
+| 7 | D3: ¿edad, contraseña común y duplicado de uno en uno? | Sí | REQ-RV-64 |
+| 11 | ¿Dependencia `libphonenumber` (Java)? | Aprobada; la versión, la última estable verificada en Maven Central el día del bloque | Bloque 5 |
+| 13 | ¿Qué es un «espacio» al recortar? | El conjunto de `trim` de JavaScript (opción a) | REQ-RV-20 |
+| 14 | Cuerpo sin límite de tamaño (OWASP API4) | Tarea aparte, que se pide a Vela: filtro de Cuentas de 16 KB para este endpoint y tope en el Gateway o Cloud Run (DevOps) | Fuera de CM-36 |
+| 15 | `"pronoun":""` contradecía REQ-RV-15 (obligatorio) y REQ-RV-61 (valor inválido) | Vacío y solo espacios son `PRONOUN_REQUIRED`, como en los demás campos | REQ-RV-15 y REQ-RV-61 |
+| 16 | ¿Bloques 2 y 3 en un solo PR? | Sí (≈ 650 líneas, mismos archivos) | Plan, sección 7 |
+| 17 | ¿CM-251 y CM-179 esperan a 1A–3 o solo a 1A? | Solo a 1A | Plan, sección 7 |
 
-**Ronda 2**
-
-| # | Pregunta | A quién | Recomendación | Bloquea |
-|---|---|---|---|---|
-| 7 | D3: ¿se acepta que edad y contraseña común se devuelvan una por vez (no junto con los errores del borde)? | **PENDIENTE de Paula** | Sí en el Sprint 2 | Alcance de REQ-RV-64 |
-| 8 | Nombre y apellido: ¿se permiten letras de otros alfabetos (`\p{L}`: «李», «Ñandú», «Åsa») y espacios dobles internos («María  José»)? El CA dice «letras (con tildes, ñ y ü)» | **PENDIENTE de Vela** | Permitir todo `\p{L}` y los espacios internos tal como se escribieron (sin colapsar) | Bloque 3 |
-| 9 | Celular: ¿se aceptan todos los tipos que `libphonenumber` da por válidos (móvil, fijo, gratuito, VoIP) o solo móvil y fijo? El CA dice «móviles y fijos» | **PENDIENTE de Vela** | Igual que el cliente (`isValid` de `libphonenumber-js`), para que cliente y servidor coincidan (V-05) | Bloque 5 |
-| 10 | Texto de `PRONOUN_INVALID_VALUE` (el CA no lo define: solo cubre «sin elegir») | **PENDIENTE de Vela** | «Selecciona una opción.» | Bloque 6 |
-| 11 | Dependencia nueva `libphonenumber` (Java) en `pom.xml`: ¿se aprueba? Su versión se fija en la tarjeta con la última estable verificada en Maven Central | **PENDIENTE de Paula** | Sí (la exige el CA y es la misma librería del cliente) | Bloque 5 |
-| 12 | Acción para DevOps vía Vela: confirmar en staging `SELECT DISTINCT pronombres FROM microcuentas.cuenta` antes de desplegar la migración V3 | **PENDIENTE de Vela / Juan Diego Gomez** | Pedirlo en el documento a DevOps ya existente | Despliegue de 1B (no el código) |
-
-**Ronda 3 (de 6 en 6: 13 y 14 forman la última)**
+### Abiertas (otras personas)
 
 | # | Pregunta | A quién | Recomendación | Bloquea |
 |---|---|---|---|---|
-| 13 | ¿Qué es un «espacio» al recortar? Opciones: (a) el conjunto de `trim` de JavaScript (el del cliente), (b) solo `String.strip()` de Java, que deja pasar el NBSP | **PENDIENTE de Paula** | (a): cliente y servidor recortan igual (misma intención de V-05) | Bloque 2 |
-| 14 | El cuerpo de `POST /api/v1/users` no tiene límite de tamaño (el servidor lo lee completo; OWASP API4). ¿Se propone una tarea aparte con un límite (p. ej. 16 KB) en un filtro de Cuentas, o se pide a DevOps un tope en el Gateway o en Cloud Run? | **PENDIENTE de Paula** (y Vela si hay tarea) | Tarea aparte con un filtro de Cuentas de 16 KB para este endpoint, más el tope del Gateway | Nada de CM-36; es un defecto de seguridad que se reporta |
+| 1 | ¿Las correcciones de HU-1.1 viven en CM-36? Jira no tiene una tarea «Ajustes v4 – Backend» de Cuentas para HU-1.1 | **PENDIENTE de Vela** | Sí, en CM-36 | Dónde se registra y cierra el trabajo; nada de código |
+| 2 | ¿El servidor devuelve los textos del catálogo de los CA en todos los campos (sección 5)? | **PENDIENTE de Vela** | Sí: RT-01 pide las mismas reglas en cliente y servidor | Bloque 6 (T-6.3) |
+| 8 | Nombre y apellido: ¿letras de otros alfabetos (`\p{L}`: «李», «Åsa») y espacios dobles internos («María  José»)? El CA dice «letras (con tildes, ñ y ü)» | **PENDIENTE de Vela** | Permitir todo `\p{L}` y los espacios internos sin colapsar | La parte de `PersonName` del PR 2+3 |
+| 9 | Celular: ¿todos los tipos que `libphonenumber` da por válidos o solo móvil y fijo? | **PENDIENTE de Vela** | Igual que el cliente (`isValid`) | Bloque 5 |
+| 10 | Texto de `PRONOUN_INVALID_VALUE` (el CA no lo define) | **PENDIENTE de Vela** | «Selecciona una opción.» | Bloque 6 (T-6.2) |
+| 12 | Confirmar en staging `SELECT DISTINCT pronombres FROM microcuentas.cuenta` antes de desplegar la migración V3 | **PENDIENTE de Juan Diego Gomez**, vía Vela | Pedirlo en el documento a DevOps | Despliegue de 1B (no el código) |
 
-Además: la fecha de fin del Sprint 2 (Jira 12-oct, backlog 23-oct) y la estimación (la HU dice 5 h y 5 puntos; las seis piezas suman unas 22 h con pruebas y documentación) se llevan a Vela en el documento a Product Owner, sin pregunta nueva aquí.
+Además, en el documento a Product Owner: la fecha de fin del Sprint 2 (Jira 12-oct, backlog 23-oct) y la estimación (la HU dice 5 h; las piezas suman ≈ 25 h, sección 17).
 
 ## 16. Fuera de alcance
 

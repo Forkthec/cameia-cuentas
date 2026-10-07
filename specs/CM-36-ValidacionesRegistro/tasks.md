@@ -151,7 +151,7 @@ agregan aquí antes de ejecutar cada bloque. Se marca `[x]` solo con la salida r
 - **`AccountActivationControllerTest`:** línea 62 (403) → `$.code` = `EMAIL_NOT_VERIFIED`; línea 73 (404) → `$.code` = `ACCOUNT_NOT_FOUND`.
 - **Verificación:** `./mvnw.cmd -B -Dtest='BusinessExceptionHandlerTest,UserRegistrationControllerTest,AccountActivationControllerTest,ErrorCodeTest' test` en verde.
 
-## [ ] T-1A.5 · `requestId` en el cuerpo y en el encabezado — ≤ 30 min, ≈ 70 líneas — **BLOQUEADA por PD-08 (pregunta 4)**
+## [ ] T-1A.5 · `requestId` en el cuerpo y en el encabezado — ≤ 30 min, ≈ 70 líneas
 
 Solo si Paula responde «sí, desde esta tarea». Si responde «no», se omite y el `requestId` lo agrega la pieza P2-05 de CM-283.
 
@@ -194,7 +194,7 @@ Solo si Paula responde «sí, desde esta tarea». Si responde «no», se omite y
 
 # PR 1B — fecha estricta, contraseña común, pronombre obligatorio
 
-## [ ] T-1B.1 · Restricción de formato de fecha — ≤ 30 min, ≈ 120 líneas — **BLOQUEADA por la pregunta 5 (D1)**
+## [ ] T-1B.1 · Restricción de formato de fecha — ≤ 30 min, ≈ 120 líneas
 
 - **Cubre:** REQ-RV-10, 11. **Crear:** `presentation/dto/BirthDateFormat.java`, `presentation/dto/BirthDateFormatValidator.java`, `src/test/.../presentation/dto/BirthDateFormatValidatorTest.java`.
 - **Código de referencia:**
@@ -242,7 +242,7 @@ Solo si Paula responde «sí, desde esta tarea». Si responde «no», se omite y
 - **Trampa conocida:** con `yyyy` y resolución estricta se rechazan todas las fechas válidas; debe ser `uuuu` (verificado con la versión del proyecto el 6-oct). Si alguna fecha de la lista «válidas» se rechaza, **detenerse**.
 - **Verificación:** `./mvnw.cmd -q -B -Dtest=BirthDateFormatValidatorTest test` en verde.
 
-## [ ] T-1B.2 · Contrato: `birthDate` texto, `pronoun` obligatorio, `toCommand()` — ≤ 30 min, ≈ 110 líneas — **BLOQUEADA por la pregunta 5 (D1)**
+## [ ] T-1B.2 · Contrato: `birthDate` texto, `pronoun` obligatorio, `toCommand()` — ≤ 30 min, ≈ 110 líneas
 
 - **Cubre:** REQ-RV-10 a 12, 15. **Modificar:** `presentation/dto/RegisterUserRequest.java`, `presentation/controller/UserRegistrationController.java`, `presentation/advice/BusinessExceptionHandler.java` (tabla), `domain/exception/ErrorCode.java` (dos códigos), `domain/model/Pronoun.java` (Javadoc).
 - **`ErrorCode`:** agregar `BIRTH_DATE_INVALID_FORMAT` y `PRONOUN_REQUIRED` (con su Javadoc).
@@ -279,9 +279,10 @@ Solo si Paula responde «sí, desde esta tarea». Si responde «no», se omite y
   Quitar los imports `JsonFormat` y los que queden sin uso. **Reescribir el Javadoc** del registro: `birthDate` «texto con formato `dd/MM/yyyy`, por ejemplo `12/04/1995`»; `pronoun` «obligatorio: `HE`, `SHE` o `THEY`»; quitar «opcional»; la nota sobre la contraseña sin límite en el borde se mantiene (su límite vive en `PasswordPolicy`).
 - **Controlador:** `servicio.register(request.toCommand())` en lugar de armar el comando campo por campo; quitar imports sin uso.
 - **`Pronoun`:** el Javadoc deja de decir «El dato es opcional»: «El registro lo exige; la cuenta guarda `null` solo después de la anonimización».
+- **`"pronoun":""` y `"pronoun":"   "` → `PRONOUN_REQUIRED`** (pregunta 15 de la spec). **Trampa:** por defecto Jackson no convierte una cadena vacía en un enumerado: falla al leer el cuerpo y saldría como cuerpo ilegible. Configurar la coerción **solo para enumerados** (`coercionConfigFor(LogicalType.Enum)`: cadena vacía → `null`, y aceptar la cadena en blanco como vacía) en la configuración de Jackson existente; así `@NotNull` lo reporta como obligatorio. Antes de escribirla, comprobar con una prueba que esa API existe con ese nombre en la versión de Jackson del proyecto (como V-06); si no existe o se comporta distinto, detenerse y avisar. Pruebas en T-1B.3: `""` y `"   "` → 422 `pronoun`/`PRONOUN_REQUIRED`; `"OTRO"` sigue fallando (no se convierte en `null`).
 - **Verificación:** `./mvnw.cmd -B -Dtest='BusinessExceptionHandlerTest,BirthDateFormatValidatorTest' test` en verde (la prueba de la tabla ahora exige las tres claves nuevas). El resto de pruebas del controlador se ajusta en T-1B.3.
 
-## [ ] T-1B.3 · Pruebas del contrato del registro — ≤ 30 min, ≈ 170 líneas — **BLOQUEADA por la pregunta 5 (D1)**
+## [ ] T-1B.3 · Pruebas del contrato del registro — ≤ 30 min, ≈ 170 líneas
 
 - **Cubre:** REQ-RV-10 a 12, 15, 16. **Modificar:** `UserRegistrationControllerTest`. Ayuda nueva: `private String cuerpoConFecha(String fecha)` = `cuerpoValido().replace("12/04/1995", fecha)`.
 - **Pruebas nuevas** (cada una verifica además `verify(servicio, never()).register(any(RegisterUserCommand.class))`):
@@ -354,7 +355,7 @@ Solo si Paula responde «sí, desde esta tarea». Si responde «no», se omite y
 # PR 2 — recorte, NFC y un mensaje por campo
 
 Se ejecuta **después de fusionar 1A y 1B**; revalidar las rutas y líneas contra `origin/develop` ese día. Rama: `CM-36-recorte-nfc-registro` desde `develop`. Mensaje de commit: `CM-36 | fix(cuentas): <resultado> [IA-ASISTIDO]`. Aplican las reglas del inicio de este archivo.
-**Todas las tarjetas del PR 2 están BLOQUEADAS por la pregunta 13 de la spec** hasta que Paula confirme qué es un «espacio»; la recomendación (a) es la que se escribe aquí.
+**Pregunta 13 respondida (Paula, 6-oct-2026): «espacio» es el conjunto de `trim` de JavaScript (opción a), que es lo que se escribe aquí.** Este bloque y el 3 van en el mismo PR.
 
 ## [ ] T-2.1 · Objeto de valor `SingleLineText` — ≤ 30 min, ≈ 140 líneas
 
@@ -608,7 +609,7 @@ Se ejecuta después de fusionar el PR 2. Rama `CM-36-nombre-solo-letras` desde `
 
 # PR 4 — lista de 3000 contraseñas comunes
 
-Rama `CM-36-contrasenas-comunes` desde `develop`. **Las tarjetas T-4.1 y T-4.2 (código) no dependen de la fuente; T-4.3 (datos) está BLOQUEADA por V-03 / pregunta 3 de la spec.** Los datos van en un commit aparte.
+Rama `CM-36-contrasenas-comunes` desde `develop`. **Fuente decidida (pregunta 3): SecLists, filtrada.** Los datos van en un commit aparte.
 
 ## [ ] T-4.1 · La política recibe la lista por constructor — ≤ 30 min, ≈ 90 líneas
 
@@ -652,7 +653,7 @@ Rama `CM-36-contrasenas-comunes` desde `develop`. **Las tarjetas T-4.1 y T-4.2 (
 - **Trampa:** hasta que exista el recurso real (T-4.3), el contexto de Spring no arranca (`FileNotFoundException`): las pruebas con contexto (`CuentaSchemaMigrationTest`, E2E) **fallarán hasta T-4.3**; por eso T-4.2 y T-4.3 van en el mismo PR y se ejecutan juntas en CI. Para trabajar antes de tener los datos, usar temporalmente `src/main/resources/security/common-passwords.txt` con 3000 entradas generadas (`pass` + número rellenado a 12 caracteres) **sin comprometerlas** (`git update-index --assume-unchanged` o dejarlas fuera del commit).
 - **Verificación:** `./mvnw.cmd -q -B -Dtest=CommonPasswordsLoaderTest test` en verde.
 
-## [ ] T-4.3 · Datos: la lista de 3000 — ≤ 30 min de trabajo + revisión de licencia — **BLOQUEADA por V-03 / pregunta 3 de la spec**
+## [ ] T-4.3 · Datos: la lista de 3000 — ≤ 30 min de trabajo + revisión de licencia — fuente: SecLists filtrada a 12 o más caracteres (pregunta 3); al empezar se verifican la licencia MIT y que haya 3000 entradas, y si no, se detiene
 
 - **Cubre:** REQ-RV-40, 42; CA-1.1.27. **Crear:** `src/main/resources/security/common-passwords.txt` y `src/main/resources/security/common-passwords.README.md`; **Crear (prueba):** `src/test/.../infrastructure/config/CommonPasswordsFileTest.java`.
 - **Procedimiento (en una carpeta temporal vacía, fuera del repositorio; la fuente es un archivo no confiable: se lee, nunca se ejecuta):** (1) descargar la fuente elegida y registrar URL, fecha y licencia; (2) filtrar las entradas de 12 o más puntos de código, pasar a minúsculas, recortar, quitar repetidas y conservar el orden de popularidad de la fuente; (3) tomar las primeras 3000; si hay menos, completar con la segunda fuente y registrarla; (4) comprobar que están `123456789012`, `password1234` y `qwertyuiop123` (si falta alguna, **detenerse y reportar**); (5) escribir el archivo con saltos de línea `\n`, UTF-8 sin BOM. El `README` registra: fuente(s), URL, licencia, fecha, el comando exacto con que se generó y la frase «La lista se entrega a `cameia-web` de la forma decidida en la pregunta 9».
@@ -668,7 +669,7 @@ Rama `CM-36-contrasenas-comunes` desde `develop`. **Las tarjetas T-4.1 y T-4.2 (
 
 # PR 5 — celular con `libphonenumber`
 
-Rama `CM-36-celular-libphonenumber` desde `develop`. **BLOQUEADO por las preguntas 11 y 9 de la spec.**
+Rama `CM-36-celular-libphonenumber` desde `develop`. **Dependencia aprobada (pregunta 11). La pregunta 9 (tipos de número, Vela) sigue abierta: sin respuesta, el bloque no empieza y se avisa a Paula.**
 
 ## [ ] T-5.1 · Dependencia — ≤ 15 min, ≈ 8 líneas
 
@@ -729,13 +730,13 @@ Rama `CM-36-etiquetas-textos-registro` desde `develop`, al final. Estado base: d
 - **Pruebas:** `ana`, `ana@correo`, `ana@@correo.co`, `ana@correo..co`, `ana @correo.co` → `InvalidEmailException` con `EMAIL_INVALID_FORMAT`; 255 puntos de código → `EMAIL_TOO_LONG`; válidos `ana@correo.co`, `ana.perez+cameia@correo.com`, `ANA@Correo.CO` (queda `ana@correo.co`); controlador: servicio simulado que lanza la excepción → 422, `field` = `email`. Ajustar las pruebas existentes de `ValueObjectsTest` que esperaban `IllegalArgumentException` por formato.
 - **Verificación:** `./mvnw.cmd -B -Dtest='ValueObjectsTest,UserRegistrationControllerTest' test` en verde.
 
-## [ ] T-6.2 · Cuerpo ilegible, pronombre inválido y fin del manejador genérico — ≤ 30 min, ≈ 110 líneas — **BLOQUEADA por las preguntas 6 y 10 de la spec**
+## [ ] T-6.2 · Cuerpo ilegible, pronombre inválido y fin del manejador genérico — ≤ 30 min, ≈ 110 líneas — **BLOQUEADA por la pregunta 10 de la spec (Vela); la 6 ya está respondida: 422**
 
 - **Cubre:** REQ-RV-30, 61, 65. **Modificar:** `presentation/advice/BusinessExceptionHandler.java`, `domain/exception/ErrorCode.java` (`PRONOUN_INVALID_VALUE`), `src/main/resources/application.properties`, `BusinessExceptionHandlerTest`, `UserRegistrationControllerTest`.
 - **`cuerpoIlegible`:** si `error.getCause()` es `tools.jackson.databind.exc.MismatchedInputException` y el último elemento de `getPath()` tiene `getPropertyName()` igual a `"pronoun"` → 422, `VALIDATION_FAILED`, un elemento `campo("pronoun", PRONOUN_INVALID_VALUE, <texto de la pregunta 10 de la spec>)`; en cualquier otro caso → 422, `REQUEST_BODY_INVALID_FORMAT`, `detail` «Revisa el formato de los datos enviados.» (sin la mención a la fecha). El `logger.warn` sigue registrando solo el nombre de la clase de la excepción. (Si la pregunta 6 de la spec resulta en 400, el estado cambia solo en la rama «cualquier otro caso».)
 - **Eliminar** el método `valorInvalido(IllegalArgumentException)` y su `import`; una `IllegalArgumentException` pasa a `falloInterno` (500 `INTERNAL_ERROR`). Verificar con `git grep -n "IllegalArgumentException" src/main` que no quedó una ruta alcanzable por la API (las de `RawPassword`, `BirthDate`, `SingleLineText`, `PersonName` y `PhoneNumber` son defensivas).
 - **Propiedad de Jackson (V-06):** agregar a `application.properties` `spring.jackson.deserialization.fail-on-numbers-for-enums=true`. **Verificar primero** que Spring Boot 4.1.1 con Jackson 3 reconoce ese nombre (arrancar la prueba de la tarjeta y comprobar que `"pronoun":1` ya no se acepta). Si la propiedad no existe o no surte efecto, **detenerse y reportar**: la alternativa es un deserializador de enumerados estricto (decisión de Paula).
-- **Pruebas:** `"pronoun":"OTRO"`, `"he"`, `""`, `1`, `true` → 422, `field` = `pronoun`, `code` = `PRONOUN_INVALID_VALUE`; JSON mal formado (`{"firstName":`), `birthDate` como `[]` y como `{}` → 422 `REQUEST_BODY_INVALID_FORMAT` y `detail` sin la palabra «fecha»; un `IllegalArgumentException("secreto de librería")` lanzado por un controlador de prueba → 500, `INTERNAL_ERROR`, sin el texto.
+- **Pruebas:** `"pronoun":"OTRO"`, `"he"`, `1`, `true` → 422, `field` = `pronoun`, `code` = `PRONOUN_INVALID_VALUE`; `"pronoun":""` y `"   "` → 422 `PRONOUN_REQUIRED` (pregunta 15); JSON mal formado (`{"firstName":`), `birthDate` como `[]` y como `{}` → 422 `REQUEST_BODY_INVALID_FORMAT` y `detail` sin la palabra «fecha»; un `IllegalArgumentException("secreto de librería")` lanzado por un controlador de prueba → 500, `INTERNAL_ERROR`, sin el texto.
 - **Verificación:** `./mvnw.cmd -B -Dtest='BusinessExceptionHandlerTest,UserRegistrationControllerTest' test` en verde.
 
 ## [ ] T-6.3 · Textos del catálogo — ≤ 30 min, ≈ 90 líneas — **BLOQUEADA por la pregunta 2 de la spec**
@@ -771,7 +772,7 @@ Rama `CM-36-etiquetas-textos-registro` desde `develop`, al final. Estado base: d
 ## [ ] T-6.5 · Casos que cumplen sin prueba (1.1.41, 1.1.42, 1.1.29, cumpleaños) — ≤ 30 min, ≈ 90 líneas
 
 - **Cubre:** CA-1.1.29, 1.1.41, 1.1.42. **Modificar:** `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest`.
-- **Pruebas:** (1) CA-1.1.41: contraseña `mi clave larga 🙂` (16 puntos de código) → 201 y el comando lleva exactamente ese texto; en el E2E, el registro se completa y la credencial se crea con esa contraseña (el doble de Firebase la recibe sin recortar). (2) CA-1.1.42: `  Ana@Correo.CO ` → 201 con `ana@correo.co` y un segundo registro con `ana@correo.co` → 409 `EMAIL_ALREADY_REGISTERED`. (3) CA-1.1.29: sin celular → 201 y `telefono` `NULL`. (4) Cuerpo con `estado`:`ACTIVE` y `plan`:`PREMIUM` extra → 201, la cuenta queda `PENDING_VERIFICATION` y `FREE` (RT-01-CA06). (5) Un campo desconocido cualquiera se ignora.
+- **Pruebas:** (1) CA-1.1.41: contraseña `mi clave larga 🙂` (16 puntos de código) → 201 y el comando lleva exactamente ese texto; en el E2E, el registro se completa y la credencial se crea con esa contraseña (el doble de Firebase la recibe sin recortar). (2) CA-1.1.42: `  Ana@Correo.CO ` → 201 con `ana@correo.co` y un segundo registro con `ana@correo.co` → 200 con el mismo `id` y `firebaseUid` (la cuenta sigue pendiente: CA-1.1.30, que CM-251 ya dejó en `develop` antes de este bloque) y una sola credencial en el doble de Firebase. Si al empezar el bloque CM-251 no está fusionada, se detiene y se avisa: no se escribe la prueba contra el 409. (3) CA-1.1.29: sin celular → 201 y `telefono` `NULL`. (4) Cuerpo con `estado`:`ACTIVE` y `plan`:`PREMIUM` extra → 201, la cuenta queda `PENDING_VERIFICATION` y `FREE` (RT-01-CA06). (5) Un campo desconocido cualquiera se ignora.
 - **Verificación:** con Docker, `./mvnw.cmd -B -Dtest='UserRegistrationControllerTest,AccountRegistrationEndToEndTest' test` en verde.
 
 ## [ ] T-6.6 · Verificaciones V-01 y tamaño del cuerpo — ≤ 30 min, sin cambios de producción
