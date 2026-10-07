@@ -169,7 +169,7 @@ Base: `develop` con el bloque 2 fusionado. Rama `CM-179-modo-tarea-purga`. ≈ 3
 
 ### 10.4 Hallazgo de seguridad
 
-`FirebaseConfiguration` detecta un despliegue con `K_SERVICE`, que Cloud Run define en los **servicios**; en un **Job** la variable es `CLOUD_RUN_JOB`. En el Job, la protección contra el emulador de Firebase depende solo del perfil `prod`. **Pregunta P-JOB-1 (Paula):** ¿se agrega `CLOUD_RUN_JOB` a la detección en este bloque (≈ 10 líneas y una prueba)? Recomendación: sí. **BLOQUEADA por P-JOB-1** solo la tarjeta T-4.3.
+`FirebaseConfiguration` detecta un despliegue con `K_SERVICE`, que Cloud Run define en los **servicios**; en un **Job** la variable es `CLOUD_RUN_JOB`. En el Job, la protección contra el emulador de Firebase depende solo del perfil `prod`. **Pregunta P-JOB-1 (Paula):** ¿se agrega `CLOUD_RUN_JOB` a la detección en este bloque (≈ 10 líneas y una prueba)? Recomendación: sí. **Respondida (Paula, 6-oct-2026): sí**, en la tarjeta T-4.3.
 
 ### 10.5 Matriz de pruebas
 

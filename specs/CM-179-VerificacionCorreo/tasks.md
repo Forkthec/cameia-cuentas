@@ -389,7 +389,7 @@ Rama `CM-179-modo-tarea-purga` desde `develop` **con el bloque 2 fusionado**.
 - **Trampa:** no llamar a `CuentasApplication.main` en las pruebas (ejecutaría `System.exit`).
 - **Verificación:** con Docker, `./mvnw.cmd -B -Dtest='PurgeJobProfileTest,CuentasApplicationTests' test`.
 
-## [ ] T-4.3 · Guarda del emulador en el Job — ≤ 20 min, ≈ 30 líneas — **BLOQUEADA por P-JOB-1**
+## [ ] T-4.3 · Guarda del emulador en el Job — ≤ 20 min, ≈ 30 líneas — P-JOB-1 respondida (Paula, 6-oct): sí
 
 - **Modificar:** `infrastructure/config/FirebaseConfiguration.java` (constante y método que detecta el despliegue, líneas ~63 y ~155-160): considerar desplegado si existe `K_SERVICE` **o** `CLOUD_RUN_JOB`, o si está activo `prod`. Actualizar el Javadoc y el mensaje de error («… despliegue (K_SERVICE o CLOUD_RUN_JOB definida o perfil 'prod') …»).
 - **Prueba (`FirebaseConfigurationTest`, copiando la de `K_SERVICE`):** con `FIREBASE_AUTH_EMULATOR_HOST=localhost:9099` y `CLOUD_RUN_JOB=cuentas-purga`, el arranque falla con ese mensaje.

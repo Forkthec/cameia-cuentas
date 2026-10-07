@@ -200,8 +200,8 @@ Plantilla del correo y DNS (CM-255) · pantallas y llamadas de `cameia-web` · e
 | 11 | D7: ¿cuatro PR (1, 2, 3, 4)? | **Respondida (Paula, 6-oct): sí, la recomendación** | Sí | Orden de entrega |
 | 12 | Orden: el bloque 3 (Gateway) depende de CM-260 (charset); ¿se hace CM-260 antes? | **Respondida (Paula, 6-oct): sí, la recomendación** | Sí, CM-260 primero (≈ 1 h) | Bloque 3 |
 | 13 | ¿Los bloques 1 y 2 de Cuentas se ejecutan después de los PR de CM-36 y CM-251, que tocan el mismo manejador de errores? | **Respondida (Paula, 6-oct): sí, la recomendación** | Solo el PR 1A de CM-36 antes (no CM-251) | Orden del bloque 1 |
-| 14 | P-JOB-1: en un Cloud Run Job no existe `K_SERVICE` (existe `CLOUD_RUN_JOB`) y la guarda del emulador de Firebase solo protege por el perfil `prod`. ¿Se agrega `CLOUD_RUN_JOB` a la detección en el bloque 4? | **PENDIENTE de Paula** | Sí (≈ 10 líneas y una prueba) | Tarjeta T-4.3 |
-| 15 | Nivel del log de una cuenta que la purga no pudo procesar: `WARN` sin traza, con el `firebaseUid` y solo el nombre de la clase de la excepción (el mensaje de Firebase puede traer datos personales). El resumen va en `INFO` y el aviso de fallidas en `WARN` | **PENDIENTE de Paula** | Aceptar: la cuenta se reintenta sola al día siguiente; `ERROR` alertaría por algo que se recupera solo | T-2.5 (una línea) |
+| 14 | P-JOB-1: en un Cloud Run Job no existe `K_SERVICE` (existe `CLOUD_RUN_JOB`) y la guarda del emulador de Firebase solo protege por el perfil `prod`. ¿Se agrega `CLOUD_RUN_JOB` a la detección en el bloque 4? | **Respondida (Paula, 6-oct-2026): sÃ­, en el bloque 4** | Sí (≈ 10 líneas y una prueba) | Tarjeta T-4.3 |
+| 15 | Nivel del log de una cuenta que la purga no pudo procesar: `WARN` sin traza, con el `firebaseUid` y solo el nombre de la clase de la excepción (el mensaje de Firebase puede traer datos personales). El resumen va en `INFO` y el aviso de fallidas en `WARN` | **Respondida (Paula, 6-oct-2026): WARN sin traza, como se propone** | Aceptar: la cuenta se reintenta sola al día siguiente; `ERROR` alertaría por algo que se recupera solo | T-2.5 (una línea) |
 
 ## 15. Estimación
 
