@@ -13,8 +13,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.ServletRequestBindingException;
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import tech.cameia.cuentas.domain.exception.AccountNotFoundException;
 import tech.cameia.cuentas.domain.exception.BusinessException;
@@ -242,6 +246,48 @@ class BusinessExceptionHandler {
         String detalle = origen.startsWith(PAQUETE_DOMINIO) ? error.getMessage() : "Revisa los datos enviados.";
         return rechazo(HttpStatus.UNPROCESSABLE_ENTITY, TITULO_VALIDACION, detalle,
                 ErrorCode.REQUEST_INVALID_VALUE, "origen=" + origen);
+    }
+
+    /**
+     * Ruta que no existe.
+     *
+     * @param error excepción de Spring cuando ningún controlador ni recurso atiende la ruta
+     * @return {@code 404 Not Found} con el código {@code ROUTE_NOT_FOUND}
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    ProblemDetail rutaInexistente(NoResourceFoundException error) {
+        return rechazo(HttpStatus.NOT_FOUND, "Ruta no encontrada", "No existe la ruta solicitada.",
+                ErrorCode.ROUTE_NOT_FOUND, "metodo=" + error.getHttpMethod());
+    }
+
+    /**
+     * Método HTTP que la ruta no admite.
+     *
+     * <p>El encabezado {@code Allow} con los métodos admitidos se agrega a la respuesta, como
+     * pide HTTP para un 405.</p>
+     *
+     * @param error excepción con los métodos que sí admite la ruta
+     * @return {@code 405 Method Not Allowed} con el código {@code METHOD_NOT_ALLOWED}
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    ResponseEntity<ProblemDetail> metodoNoPermitido(HttpRequestMethodNotSupportedException error) {
+        ProblemDetail problema = rechazo(HttpStatus.METHOD_NOT_ALLOWED, "Método no permitido",
+                "Método no permitido.", ErrorCode.METHOD_NOT_ALLOWED, "metodo=" + error.getMethod());
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).headers(error.getHeaders()).body(problema);
+    }
+
+    /**
+     * Tipo de contenido que la ruta no admite.
+     *
+     * @param error excepción con el tipo recibido y los admitidos
+     * @return {@code 415 Unsupported Media Type} con el código {@code MEDIA_TYPE_NOT_ALLOWED}
+     */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    ResponseEntity<ProblemDetail> tipoDeContenidoNoAdmitido(HttpMediaTypeNotSupportedException error) {
+        ProblemDetail problema = rechazo(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Tipo de contenido no admitido",
+                "Tipo de contenido no admitido.", ErrorCode.MEDIA_TYPE_NOT_ALLOWED, "");
+        // Accept con los tipos admitidos, como sugiere HTTP para un 415.
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).headers(error.getHeaders()).body(problema);
     }
 
     /**
