@@ -818,14 +818,18 @@ Rama `CM-36-celular-libphonenumber` desde `develop`. **Dependencia aprobada (pre
 
 Rama `CM-36-etiquetas-textos-registro` desde `develop`, al final. Estado base: después de los PR 1A a 5.
 
-## [ ] T-6.1 · `EmailAddress` con excepción tipada — ≤ 30 min, ≈ 80 líneas
+## [x] T-6.1 · `EmailAddress` con excepción tipada — ≤ 30 min, ≈ 80 líneas
+
+- **Resultado (7-oct):** hecha. Además de la tarjeta, el correo rechaza los caracteres invisibles (separadores, de control y de formato). Pruebas en `ValueObjectsTest` (14 formas inválidas, 4 válidas, límite 254/255), `BusinessExceptionHandlerTest`, `UserRegistrationControllerTest` y `AccountRegistrationEndToEndTest`.
 
 - **Cubre:** REQ-RV-60; CA-1.1.20. **Crear:** `domain/exception/InvalidEmailException.java` (con `getField()` = `email`; constructor `(ErrorCode code, String mensaje)`). **Modificar:** `domain/exception/ErrorCode.java` (`EMAIL_INVALID_FORMAT`), `domain/model/EmailAddress.java`, `presentation/advice/BusinessExceptionHandler.java`, `ValueObjectsTest`.
 - **Cambio:** en `EmailAddress`, el formato inválido lanza `new InvalidEmailException(ErrorCode.EMAIL_INVALID_FORMAT, "Ingresa un correo electrónico válido.")` y el exceso de longitud `new InvalidEmailException(ErrorCode.EMAIL_TOO_LONG, "El correo no puede superar los 254 caracteres.")`; vacío o nulo sigue siendo `IllegalArgumentException` defensiva (el borde responde antes). El manejador: 422, `VALIDATION_FAILED`, un elemento con el campo, el código y el mensaje de la excepción.
 - **Pruebas:** `ana`, `ana@correo`, `ana@@correo.co`, `ana@correo..co`, `ana @correo.co` → `InvalidEmailException` con `EMAIL_INVALID_FORMAT`; 255 puntos de código → `EMAIL_TOO_LONG`; válidos `ana@correo.co`, `ana.perez+cameia@correo.com`, `ANA@Correo.CO` (queda `ana@correo.co`); controlador: servicio simulado que lanza la excepción → 422, `field` = `email`. Ajustar las pruebas existentes de `ValueObjectsTest` que esperaban `IllegalArgumentException` por formato.
 - **Verificación:** `./mvnw.cmd -B -Dtest='ValueObjectsTest,UserRegistrationControllerTest' test` en verde.
 
-## [ ] T-6.2 · Cuerpo ilegible, pronombre inválido y fin del manejador genérico — ≤ 30 min, ≈ 110 líneas
+## [x] T-6.2 · Cuerpo ilegible, pronombre inválido y fin del manejador genérico — ≤ 30 min, ≈ 110 líneas
+
+- **Resultado (7-oct):** hecha. V-06: en Jackson 3 no se usa la propiedad de `application.properties` de la tarjeta; la regla va en `JacksonConfiguration` con `EnumFeature.FAIL_ON_NUMBERS_FOR_ENUMS`, y `"pronoun":1`, `0`, `-1` y `1.5` ya responden `PRONOUN_INVALID_VALUE` (prueba del controlador con el mismo `JsonMapper` y prueba de punta a punta con la aplicación real). Corrección sobre la tarjeta: la ruta del campo se lee solo de `MismatchedInputException`; un JSON mal formado dentro del pronombre (`{"pronoun": SHE}`) trae la misma ruta y debe seguir siendo `REQUEST_BODY_INVALID_FORMAT`.
 
 - **Cubre:** REQ-RV-30, 61, 65. **Modificar:** `presentation/advice/BusinessExceptionHandler.java`, `domain/exception/ErrorCode.java` (`PRONOUN_INVALID_VALUE`), `src/main/resources/application.properties`, `BusinessExceptionHandlerTest`, `UserRegistrationControllerTest`.
 - **`cuerpoIlegible`:** si `error.getCause()` es `tools.jackson.databind.exc.MismatchedInputException` y el último elemento de `getPath()` tiene `getPropertyName()` igual a `"pronoun"` → 422, `VALIDATION_FAILED`, un elemento `campo("pronoun", PRONOUN_INVALID_VALUE, <texto de la pregunta 10 de la spec>)`; en cualquier otro caso → 422, `REQUEST_BODY_INVALID_FORMAT`, `detail` «Revisa el formato de los datos enviados.» (sin la mención a la fecha). El `logger.warn` sigue registrando solo el nombre de la clase de la excepción. (Si la pregunta 6 de la spec resulta en 400, el estado cambia solo en la rama «cualquier otro caso».)
@@ -834,7 +838,9 @@ Rama `CM-36-etiquetas-textos-registro` desde `develop`, al final. Estado base: d
 - **Pruebas:** `"pronoun":"OTRO"`, `"he"`, `1`, `true` → 422, `field` = `pronoun`, `code` = `PRONOUN_INVALID_VALUE`; `"pronoun":""` y `"   "` → 422 `PRONOUN_REQUIRED` (pregunta 15); JSON mal formado (`{"firstName":`), `birthDate` como `[]` y como `{}` → 422 `REQUEST_BODY_INVALID_FORMAT` y `detail` sin la palabra «fecha»; un `IllegalArgumentException("secreto de librería")` lanzado por un controlador de prueba → 500, `INTERNAL_ERROR`, sin el texto.
 - **Verificación:** `./mvnw.cmd -B -Dtest='BusinessExceptionHandlerTest,UserRegistrationControllerTest' test` en verde.
 
-## [ ] T-6.3 · Textos del catálogo — ≤ 30 min, ≈ 90 líneas
+## [x] T-6.3 · Textos del catálogo — ≤ 30 min, ≈ 90 líneas
+
+- **Resultado (7-oct):** hecha, con `docs/errores.md` al día. Textos de la columna «Antes» que siguen en `cameia-web` (solo lectura, se avisa a Frontend): `src/mocks/handlers/auth.handlers.ts` líneas 82 y 163.
 
 - **Cubre:** REQ-RV-62, 63; CA-1.1.2, 1.1.3, 1.1.6, 1.1.7, 1.1.9 a 1.1.13, 1.1.17, 1.1.19, 1.1.23, 1.1.26. **Modificar:** `RegisterUserRequest.java`, `PasswordPolicy.java`, `AgePolicy.java`, `EmailAlreadyRegisteredException.java` y las pruebas que comparan texto.
 - **Tabla antes → después (solo cambia el texto; códigos y estados no):**
@@ -858,19 +864,25 @@ Rama `CM-36-etiquetas-textos-registro` desde `develop`, al final. Estado base: d
 - **Pruebas:** actualizar cada expectativa de texto de `UserRegistrationControllerTest`, `PasswordPolicyTest`, `AgePolicyTest`, `AccountRegistrationEndToEndTest`; agregar una prueba por texto de la tabla en el controlador (una por campo). **Detenerse** si una prueba de Frontend o un documento del repo citan un texto de la columna «Antes» y reportarlo.
 - **Verificación:** `./mvnw.cmd -B test` en verde.
 
-## [ ] T-6.4 · Pruebas de edad con reloj fijo — ≤ 30 min, ≈ 90 líneas
+## [x] T-6.4 · Pruebas de edad con reloj fijo — ≤ 30 min, ≈ 90 líneas
+
+- **Resultado (7-oct):** hecha: 12 filas en `AgePolicyTest.cadaLimiteDeEdadSeEvaluaConElDiaExacto` y la prueba de la hora de Colombia.
 
 - **Cubre:** CA-1.1.3 a 1.1.7. **Modificar:** `domain/policy/AgePolicyTest.java` (reloj `Clock.fixed(... UTC)` como en la línea 32).
 - **Casos** (hoy = 2026-10-06 UTC; cada uno con su `Reason` o aceptación): nacido 2008-10-06 (cumple 18 hoy) → acepta; 2008-10-07 (mañana) → `UNDERAGE`; 1915-10-07 (cumple 111 mañana) → acepta; 1915-10-06 (111 hoy) → `IMPLAUSIBLE` (código `BIRTH_DATE_OUT_OF_RANGE`); 2026-10-07 → `IN_THE_FUTURE`; 2026-10-06 → `UNDERAGE`; nacido el 2000-02-29 con hoy 2018-02-28 → `UNDERAGE` y con hoy 2018-03-01 → acepta (cumple el 1 de marzo en año no bisiesto); nacido el 2000-12-31 con hoy 2018-12-31 → acepta y con hoy 2018-12-30 → `UNDERAGE`; nacido el 2000-01-01 con hoy 2017-12-31 → `UNDERAGE` y con hoy 2018-01-01 → acepta; entre las 19:00 y las 24:00 de Colombia (`Instant.parse("2026-10-07T01:30:00Z")`) la fecha es 2026-10-07 (prueba existente `laEdadSeCalculaEnUtc…`, mantenerla). Una fila `@ParameterizedTest @CsvSource` para los pares de fecha de nacimiento y reloj.
 - **Verificación:** `./mvnw.cmd -q -B -Dtest=AgePolicyTest test` en verde.
 
-## [ ] T-6.5 · Casos que cumplen sin prueba (1.1.41, 1.1.42, 1.1.29, cumpleaños) — ≤ 30 min, ≈ 90 líneas
+## [x] T-6.5 · Casos que cumplen sin prueba (1.1.41, 1.1.42, 1.1.29, cumpleaños) — ≤ 30 min, ≈ 90 líneas
+
+- **Resultado (7-oct):** hechas (1), (3), (4) y (5); el doble de Firebase ahora guarda la contraseña recibida para comprobar que llega sin recortar. **(2) no se escribió contra el 200:** CM-251 no está en `develop`. La prueba de bloque 2 (`unCorreoConEspaciosYMayusculasSeGuardaNormalizadoYBloqueaElSiguiente`) sigue esperando 409 y la tarea del registro repetido la cambia a 200 al fusionarse.
 
 - **Cubre:** CA-1.1.29, 1.1.41, 1.1.42. **Modificar:** `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest`.
 - **Pruebas:** (1) CA-1.1.41: contraseña `mi clave larga 🙂` (16 puntos de código) → 201 y el comando lleva exactamente ese texto; en el E2E, el registro se completa y la credencial se crea con esa contraseña (el doble de Firebase la recibe sin recortar). (2) CA-1.1.42: `  Ana@Correo.CO ` → 201 con `ana@correo.co` y un segundo registro con `ana@correo.co` → 200 con el mismo `id` y `firebaseUid` (la cuenta sigue pendiente: CA-1.1.30, que CM-251 ya dejó en `develop` antes de este bloque) y una sola credencial en el doble de Firebase. Si al empezar el bloque CM-251 no está fusionada, se detiene y se avisa: no se escribe la prueba contra el 409. (3) CA-1.1.29: sin celular → 201 y `telefono` `NULL`. (4) Cuerpo con `estado`:`ACTIVE` y `plan`:`PREMIUM` extra → 201, la cuenta queda `PENDING_VERIFICATION` y `FREE` (RT-01-CA06). (5) Un campo desconocido cualquiera se ignora.
 - **Verificación:** con Docker, `./mvnw.cmd -B -Dtest='UserRegistrationControllerTest,AccountRegistrationEndToEndTest' test` en verde.
 
-## [ ] T-6.6 · Verificaciones V-01 y tamaño del cuerpo — ≤ 30 min, sin cambios de producción
+## [x] T-6.6 · Verificaciones V-01 y tamaño del cuerpo — ≤ 30 min, sin cambios de producción
+
+- **Resultado (7-oct), con la aplicación empaquetada y el emulador:** correo de 254 puntos de código (parte local de 64, etiquetas de 63, 63, 58 y 2) → 201; de 255 → 422 `EMAIL_TOO_LONG`; parte local de 65 con 254 en total → 201 (el servicio y el emulador la aceptan aunque RFC 5321 limita la parte local a 64; falta confirmarlo con Firebase real en staging: si lo rechaza, hoy respondería 500). Cuerpo de 2 MB → 422 `FIRST_NAME_TOO_LONG` en 0,06 s; de 20 MB → 422 en 0,38 s y la memoria del proceso pasó de 308 a 459 MB con esa sola petición. Alimenta la pregunta 14 (límite del cuerpo, tarea aparte).
 
 - **V-01:** con el emulador de Firebase Auth (ver `CLAUDE.md` y la spec de arranque con el emulador), registrar un correo de exactamente 254 puntos de código con parte local de 64 (`"a".repeat(64) + "@" + dominio de 189 caracteres en etiquetas de hasta 63`) y anotar la respuesta. Si Firebase lo rechaza, **no recortar ni cambiar el límite**: informar a Vela (el CA-1.1.21 usa el máximo que Firebase acepte).
 - **Tamaño del cuerpo:** enviar a `POST /api/v1/users` un JSON de 2 MB y otro de 20 MB con `firstName` enorme y anotar estado, tiempo y memoria. No se corrige aquí: el resultado alimenta la pregunta 14 de la spec.
