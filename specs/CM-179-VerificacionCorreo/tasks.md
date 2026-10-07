@@ -6,6 +6,7 @@ Estado: sin ejecutar; spec y plan pendientes de aprobación de Paula. Este archi
 
 - Ruta base del código: `src/main/java/tech/cameia/cuentas/`; pruebas: `src/test/java/tech/cameia/cuentas/`. Identificadores en inglés; Javadoc, comentarios, mensajes y logs en español; **sin** `CM-NNN` ni rutas a otros archivos en comentarios; sin abreviaturas; en una clase existente se mantiene su estilo (nombres de pruebas en español camelCase).
 - Prohibido: agregar dependencias, tocar migraciones, registrar contraseñas, correos o tokens, cambiar un texto que la tarjeta no nombre, refactorizar fuera de la tarjeta.
+- Todo código de error nuevo, o cuyo estado o texto cambia, se agrega o actualiza en `docs/errores.md` en el mismo PR, con las columnas `Código | HTTP | Endpoints | Campo | Mensaje | Origen | Prueba` (una fila por código; «Endpoints» lista cada método y ruta que lo emite). Si `docs/errores.md` aún no existe en `develop`, el PR lo dice y la pieza B de CM-283 lo recoge (su verificación V-12 compara el catálogo con el código).
 - Comandos: `./mvnw.cmd -q -B -Dtest=<Clase> test`; `./mvnw.cmd -B test`; `./mvnw.cmd -B clean verify` al cerrar. Las pruebas con Testcontainers se omiten sin Docker: decirlo.
 - **Detenerse y reportar** si: la tarjeta contradice el código real (CM-36 y CM-251 cambiaron el manejador y el servicio de registro), falta un dato, una prueba existente se rompe sin causa clara, o hace falta algo no listado.
 - Definición de terminado: pruebas nuevas en verde, suite completa en verde, `LayeredArchitectureTest` en verde, diff dentro de lo estimado.
