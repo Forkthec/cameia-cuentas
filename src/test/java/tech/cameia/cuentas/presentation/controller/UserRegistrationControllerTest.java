@@ -18,6 +18,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -233,15 +234,162 @@ class UserRegistrationControllerTest {
     }
 
     @Test
-    void unCampoQueIncumpleDosRestriccionesTieneUnSoloElemento() throws Exception {
-        // Una cadena vacía de más de 120 caracteres no existe; para que el mismo campo falle
-        // en dos restricciones a la vez se usan 121 espacios: incumple @NotBlank y @Size.
+    void cientoVeintiunEspaciosSonUnNombreVacioYNoUnoLargo() throws Exception {
+        // Los espacios se recortan antes de validar: el campo queda vacío y solo es obligatorio.
         String nombreLargoEnBlanco = cuerpoValido().replace("\"Ana\"", "\"" + " ".repeat(121) + "\"");
 
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(nombreLargoEnBlanco))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.errors.length()").value(1))
-                .andExpect(jsonPath("$.errors[0].field").value("firstName"));
+                .andExpect(jsonPath("$.errors[0].field").value("firstName"))
+                .andExpect(jsonPath("$.errors[0].code").value("FIRST_NAME_REQUIRED"));
+    }
+
+    @Test
+    void losTextosLleganRecortadosYEnNfcAlCasoDeUso() throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
+        String cuerpo = cuerpoValido()
+                .replace("\"Ana\"", "\"  Jose\u0301  \"")
+                .replace("\"Pérez\"", "\"\u00A0Gómez  Ruiz\u00A0\"")
+                .replace("\"ana@cameia.tech\"", "\"  Ana@Correo.CO \"");
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isCreated());
+
+        verify(servicio).register(comando.capture());
+        assertThat(comando.getValue().firstName()).isEqualTo("Jos\u00E9");
+        assertThat(comando.getValue().lastName()).isEqualTo("Gómez Ruiz");
+        // El correo se pasa a minúsculas en el dominio, no en el contrato.
+        assertThat(comando.getValue().email()).isEqualTo("Ana@Correo.CO");
+    }
+
+    @ParameterizedTest(name = "[{index}] {0} = vacío")
+    @MethodSource("textosSoloConEspacios")
+    void unTextoQueSoloTieneEspaciosEsObligatorio(String campo, String codigo, String valorJson) throws Exception {
+        String cuerpo = cuerpoConCampo(campo, valorJson);
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value(campo))
+                .andExpect(jsonPath("$.errors[0].code").value(codigo));
+
+        verify(servicio, never()).register(any(RegisterUserCommand.class));
+    }
+
+    static Stream<Arguments> textosSoloConEspacios() {
+        // El tabulador y el salto de línea van como escapes de JSON; el resto, como el carácter real.
+        String[] valores = {"\"\"", "\"   \"", "\"\\t\"", "\"\\n\"", "\"\u00A0\"", "\"\uFEFF\"", "null"};
+        Stream.Builder<Arguments> casos = Stream.builder();
+        for (String valor : valores) {
+            casos.add(Arguments.of("firstName", "FIRST_NAME_REQUIRED", valor));
+            casos.add(Arguments.of("lastName", "LAST_NAME_REQUIRED", valor));
+            casos.add(Arguments.of("email", "EMAIL_REQUIRED", valor));
+        }
+        return casos.build();
+    }
+
+    @ParameterizedTest(name = "[{index}] {0} con {1} caracteres -> {2}")
+    @MethodSource("limitesDeNombreYApellido")
+    void elNombreYElApellidoAdmitenExactamente120CaracteresYRechazan121(String campo, int cantidad, int estado,
+            String texto) throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON)
+                        .content(cuerpoConCampo(campo, "\"" + texto + "\"")))
+                .andExpect(status().is(estado));
+    }
+
+    static Stream<Arguments> limitesDeNombreYApellido() {
+        Stream.Builder<Arguments> casos = Stream.builder();
+        for (String campo : new String[] {"firstName", "lastName"}) {
+            casos.add(Arguments.of(campo, 119, 201, "ñ".repeat(119)));
+            casos.add(Arguments.of(campo, 120, 201, "ñ".repeat(120)));
+            casos.add(Arguments.of(campo, 121, 422, "ñ".repeat(121)));
+            casos.add(Arguments.of(campo, 120, 201, "a".repeat(119) + "e\u0301"));
+            casos.add(Arguments.of(campo, 120, 201, "\uD835\uDC9C".repeat(120)));
+            casos.add(Arguments.of(campo, 121, 422, "\uD835\uDC9C".repeat(121)));
+        }
+        return casos.build();
+    }
+
+    @Test
+    void unNombreDe121CaracteresTieneSuCodigoYSuMensaje() throws Exception {
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON)
+                        .content(cuerpoConCampo("lastName", "\"" + "ñ".repeat(121) + "\"")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errors[0].field").value("lastName"))
+                .andExpect(jsonPath("$.errors[0].code").value("LAST_NAME_TOO_LONG"));
+    }
+
+    @ParameterizedTest(name = "[{index}] correo de {0} caracteres -> {1}")
+    @CsvSource({"253, 201", "254, 201", "255, 422"})
+    void elCorreoAdmiteExactamente254PuntosDeCodigo(int cantidad, int estado) throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        String correo = "a".repeat(cantidad - 6) + "@b.com";
+
+        var resultado = mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON)
+                        .content(cuerpoConCampo("email", "\"" + correo + "\"")))
+                .andExpect(status().is(estado));
+        if (estado == 422) {
+            resultado.andExpect(jsonPath("$.errors.length()").value(1))
+                    .andExpect(jsonPath("$.errors[0].field").value("email"))
+                    .andExpect(jsonPath("$.errors[0].code").value("EMAIL_TOO_LONG"))
+                    .andExpect(jsonPath("$.errors[0].message").value("El correo no puede superar los 254 caracteres."));
+        }
+    }
+
+    @Test
+    void laContraseniaNoSeRecortaNiSeNormalizaAlLlegarAlCasoDeUso() throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON)
+                        .content(cuerpoConCampo("password", "\"  frase secreta larga e\u0301  \"")))
+                .andExpect(status().isCreated());
+
+        verify(servicio).register(comando.capture());
+        assertThat(comando.getValue().password()).isEqualTo("  frase secreta larga e\u0301  ");
+    }
+
+    @Test
+    void unaContraseniaDeDoceEspaciosEsObligatoria() throws Exception {
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON)
+                        .content(cuerpoConCampo("password", "\"" + " ".repeat(12) + "\"")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errors[0].field").value("password"))
+                .andExpect(jsonPath("$.errors[0].code").value("PASSWORD_REQUIRED"));
+    }
+
+    @Test
+    void variosCamposQueIncumplenReglasDevuelvenUnSoloMensajePorCampo() throws Exception {
+        String cuerpo = cuerpoValido()
+                .replace("\"Ana\"", "\"   \"")
+                .replace("\"Pérez\"", "\"" + "a".repeat(121) + "\"")
+                .replace("\"ana@cameia.tech\"", "\"   \"");
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errors.length()").value(3))
+                .andExpect(jsonPath("$.errors[?(@.field=='firstName')].code")
+                        .value(org.hamcrest.Matchers.contains("FIRST_NAME_REQUIRED")))
+                .andExpect(jsonPath("$.errors[?(@.field=='lastName')].code")
+                        .value(org.hamcrest.Matchers.contains("LAST_NAME_TOO_LONG")))
+                .andExpect(jsonPath("$.errors[?(@.field=='email')].code")
+                        .value(org.hamcrest.Matchers.contains("EMAIL_REQUIRED")));
+    }
+
+    @Test
+    void unCorreoLargoSinArrobaSoloReportaLaLongitud() throws Exception {
+        // El formato lo decide el dominio después; el borde responde primero por la longitud.
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON)
+                        .content(cuerpoConCampo("email", "\"" + "a".repeat(255) + "\"")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].code").value("EMAIL_TOO_LONG"));
+
+        verify(servicio, never()).register(any(RegisterUserCommand.class));
     }
 
     @Test
@@ -403,6 +551,17 @@ class UserRegistrationControllerTest {
         return Account.rebuild(UUID.randomUUID(), "uid-firebase", "Ana", "Pérez",
                 new BirthDate(LocalDate.of(1995, 4, 12)), null, null,
                 tech.cameia.cuentas.domain.model.AccountStatus.PENDING_VERIFICATION);
+    }
+
+    /**
+     * Cuerpo válido con un campo de texto reemplazado.
+     *
+     * @param campo nombre del campo del contrato
+     * @param valorJson valor tal como va en el JSON, con sus comillas o {@code null}
+     */
+    private String cuerpoConCampo(String campo, String valorJson) {
+        return cuerpoValido().replaceFirst("\"" + campo + "\":\"[^\"]*\"",
+                java.util.regex.Matcher.quoteReplacement("\"" + campo + "\":" + valorJson));
     }
 
     private String cuerpoConFecha(String fecha) {

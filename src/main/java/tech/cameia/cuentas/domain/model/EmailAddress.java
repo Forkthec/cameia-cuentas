@@ -6,8 +6,9 @@ import java.util.regex.Pattern;
 /**
  * Correo electrónico con el que se crea la credencial en Firebase Auth.
  *
- * <p>El valor se normaliza a minúsculas y sin espacios alrededor, para que la unicidad
- * que impone Firebase no dependa de cómo lo escribió la persona.</p>
+ * <p>El valor se guarda sin espacios en los extremos (los mismos que recorta el cliente), en
+ * forma Unicode NFC y en minúsculas, para que la unicidad que impone Firebase no dependa de
+ * cómo lo escribió la persona. El límite es de 254 puntos de código.</p>
  *
  * <p>La validación comprueba la forma, no la existencia del buzón: eso lo resuelve el
  * correo de verificación. Se prefiere una regla simple y permisiva a una compleja, porque
@@ -32,11 +33,14 @@ public record EmailAddress(String value) {
      *                                  o no tiene forma de correo
      */
     public EmailAddress {
-        if (value == null || value.isBlank()) {
+        SingleLineText recortado = value == null ? null : new SingleLineText(value);
+        if (recortado == null || recortado.isEmpty()) {
             throw new IllegalArgumentException("El correo electrónico es obligatorio");
         }
-        value = value.trim().toLowerCase(Locale.ROOT);
-        if (value.length() > MAX_LENGTH) {
+        // Se vuelve a normalizar tras pasar a minúsculas: algunas mayúsculas (como «İ») cambian
+        // de forma al convertirlas y dejan de estar en NFC.
+        value = SingleLineText.normalize(recortado.value().toLowerCase(Locale.ROOT));
+        if (value.codePointCount(0, value.length()) > MAX_LENGTH) {
             throw new IllegalArgumentException("El correo electrónico es demasiado largo");
         }
         if (!FORMAT.matcher(value).matches()) {

@@ -104,12 +104,13 @@ class BusinessExceptionHandler {
      */
     static final Map<String, ErrorCode> FIELD_ERROR_CODES = Map.ofEntries(
             Map.entry("firstName.NotBlank", ErrorCode.FIRST_NAME_REQUIRED),
-            Map.entry("firstName.Size", ErrorCode.FIRST_NAME_TOO_LONG),
+            Map.entry("firstName.CodePointSize", ErrorCode.FIRST_NAME_TOO_LONG),
             Map.entry("lastName.NotBlank", ErrorCode.LAST_NAME_REQUIRED),
-            Map.entry("lastName.Size", ErrorCode.LAST_NAME_TOO_LONG),
+            Map.entry("lastName.CodePointSize", ErrorCode.LAST_NAME_TOO_LONG),
             Map.entry("birthDate.NotBlank", ErrorCode.BIRTH_DATE_REQUIRED),
             Map.entry("birthDate.BirthDateFormat", ErrorCode.BIRTH_DATE_INVALID_FORMAT),
             Map.entry("email.NotBlank", ErrorCode.EMAIL_REQUIRED),
+            Map.entry("email.CodePointSize", ErrorCode.EMAIL_TOO_LONG),
             Map.entry("password.NotBlank", ErrorCode.PASSWORD_REQUIRED),
             Map.entry("pronoun.NotNull", ErrorCode.PRONOUN_REQUIRED));
 

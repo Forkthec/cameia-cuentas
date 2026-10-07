@@ -1,5 +1,6 @@
 package tech.cameia.cuentas.domain.policy;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -115,6 +116,32 @@ class PasswordPolicyTest {
                 .hasMessageNotContaining(comun.trim())
                 .extracting(excepcion -> ((WeakPasswordException) excepcion).getErrorCode())
                 .isEqualTo(ErrorCode.PASSWORD_TOO_COMMON);
+    }
+
+    @Test
+    void unaLetraConAcentoCombinanteCuentaComoUnCaracter() {
+        // "e" + acento combinante doce veces: 24 puntos de código escritos, 12 en NFC.
+        assertThatCode(() -> policy.verify(new RawPassword("é".repeat(12)))).doesNotThrowAnyException();
+        assertThatCode(() -> policy.verify(new RawPassword("é".repeat(64)))).doesNotThrowAnyException();
+    }
+
+    @Test
+    void elLimiteEnNfcRechazaOnceYSesentaYCincoLetrasConAcentoCombinante() {
+        assertThatThrownBy(() -> policy.verify(new RawPassword("é".repeat(11))))
+                .extracting(excepcion -> ((WeakPasswordException) excepcion).getErrorCode())
+                .isEqualTo(ErrorCode.PASSWORD_TOO_SHORT);
+        assertThatThrownBy(() -> policy.verify(new RawPassword("é".repeat(65))))
+                .extracting(excepcion -> ((WeakPasswordException) excepcion).getErrorCode())
+                .isEqualTo(ErrorCode.PASSWORD_TOO_LONG);
+    }
+
+    @Test
+    void laContraseniaNoSeModificaAlMedirla() {
+        RawPassword original = new RawPassword("é".repeat(12));
+
+        policy.verify(original);
+
+        assertThat(original.value()).isEqualTo("é".repeat(12));
     }
 
     @Test

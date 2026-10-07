@@ -159,6 +159,40 @@ class AccountRegistrationEndToEndTest {
     }
 
     @Test
+    void unCorreoConEspaciosYMayusculasSeGuardaNormalizadoYBloqueaElSiguiente() {
+        ResponseEntity<String> primero = registrar(cuerpoValido().replace("ana@cameia.tech", "  Ana@Correo.CO "));
+        ResponseEntity<String> segundo = registrar(cuerpoValido().replace("ana@cameia.tech", "ana@correo.co"));
+
+        assertThat(primero.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(segundo.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(segundo.getBody()).contains("\"code\":\"EMAIL_ALREADY_REGISTERED\"");
+        assertThat(directorio.cantidadDeUsuarios()).isEqualTo(1);
+        assertThat(cuentasGuardadas()).isEqualTo(1);
+    }
+
+    @Test
+    void unNombreDe120CaracteresSeGuardaCompleto() {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("\"Ana\"", "\"" + "ñ".repeat(120) + "\""));
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(jdbcTemplate.queryForObject("SELECT char_length(nombre) FROM microcuentas.cuenta", Integer.class))
+                .isEqualTo(120);
+    }
+
+    @Test
+    void unNombreEnNfdSeGuardaEnNfcYSinEspaciosSobrantes() {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido()
+                .replace("\"Ana\"", "\"  José  Luis \"")
+                .replace("\"Pérez\"", "\" Pérez \""));
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(jdbcTemplate.queryForObject("SELECT nombre FROM microcuentas.cuenta", String.class))
+                .isEqualTo("José Luis");
+        assertThat(jdbcTemplate.queryForObject("SELECT apellido FROM microcuentas.cuenta", String.class))
+                .isEqualTo("Pérez");
+    }
+
+    @Test
     void sinVerificarElCorreoLaActivacionSeRechazaYLaCuentaSigueIgual() {
         registrar(cuerpoValido());
         String uid = uidGuardado();

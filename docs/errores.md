@@ -21,16 +21,17 @@ servicio. Las pruebas citadas están en `src/test/java/tech/cameia/cuentas/`.
 | Código | HTTP | Endpoints | Campo | Mensaje | Origen | Prueba |
 |---|---|---|---|---|---|---|
 | `VALIDATION_FAILED` | 422 | registro | — (lista `errors`) | Revisa los campos marcados. | Lista `errors` no vacía | `UserRegistrationControllerTest` |
-| `FIRST_NAME_REQUIRED` | 422 | registro | `firstName` | Los nombres son obligatorios | `@NotBlank` | `UserRegistrationControllerTest` |
-| `FIRST_NAME_TOO_LONG` | 422 | registro | `firstName` | Los nombres no pueden superar los 120 caracteres | `@Size(max = 120)` | `UserRegistrationControllerTest` |
-| `LAST_NAME_REQUIRED` | 422 | registro | `lastName` | Los apellidos son obligatorios | `@NotBlank` | `UserRegistrationControllerTest` |
-| `LAST_NAME_TOO_LONG` | 422 | registro | `lastName` | Los apellidos no pueden superar los 120 caracteres | `@Size(max = 120)` | `UserRegistrationControllerTest` |
+| `FIRST_NAME_REQUIRED` | 422 | registro | `firstName` | Los nombres son obligatorios | `@NotBlank`, tras recortar los espacios que recorta el cliente | `UserRegistrationControllerTest` |
+| `FIRST_NAME_TOO_LONG` | 422 | registro | `firstName` | Los nombres no pueden superar los 120 caracteres | `@CodePointSize(max = 120)`, en puntos de código tras recortar y normalizar a NFC | `UserRegistrationControllerTest` |
+| `LAST_NAME_REQUIRED` | 422 | registro | `lastName` | Los apellidos son obligatorios | `@NotBlank`, tras recortar los espacios que recorta el cliente | `UserRegistrationControllerTest` |
+| `LAST_NAME_TOO_LONG` | 422 | registro | `lastName` | Los apellidos no pueden superar los 120 caracteres | `@CodePointSize(max = 120)`, en puntos de código tras recortar y normalizar a NFC | `UserRegistrationControllerTest` |
 | `BIRTH_DATE_REQUIRED` | 422 | registro | `birthDate` | La fecha de nacimiento es obligatoria | `@NotBlank` (ausente, `null`, vacía o en blanco) | `UserRegistrationControllerTest` |
 | `BIRTH_DATE_INVALID_FORMAT` | 422 | registro | `birthDate` | Formato de fecha inválido. | `@BirthDateFormat`: no es una fecha real con el formato `dd/MM/aaaa` (incluye `31/02/2000`, espacios, otro formato, número o booleano) | `BirthDateFormatValidatorTest`, `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest` |
 | `BIRTH_DATE_IN_THE_FUTURE` | 422 | registro | `birthDate` | Fecha de nacimiento inválida | `AgePolicy` (`InvalidBirthDateException`) | `AgePolicyTest` |
 | `BIRTH_DATE_UNDERAGE` | 422 | registro | `birthDate` | Debes ser mayor de edad | `AgePolicy` (`InvalidBirthDateException`) | `AgePolicyTest`, `UserRegistrationControllerTest` |
 | `BIRTH_DATE_OUT_OF_RANGE` | 422 | registro | `birthDate` | La fecha de nacimiento no es plausible, por favor verifícala | `AgePolicy` (`InvalidBirthDateException`) | `AgePolicyTest` |
-| `EMAIL_REQUIRED` | 422 | registro | `email` | El correo electrónico es obligatorio | `@NotBlank` | `UserRegistrationControllerTest` |
+| `EMAIL_REQUIRED` | 422 | registro | `email` | El correo electrónico es obligatorio | `@NotBlank`, tras recortar los espacios que recorta el cliente | `UserRegistrationControllerTest` |
+| `EMAIL_TOO_LONG` | 422 | registro | `email` | El correo no puede superar los 254 caracteres. | `@CodePointSize(max = 254)`, en puntos de código tras recortar y normalizar a NFC | `UserRegistrationControllerTest` |
 | `EMAIL_ALREADY_REGISTERED` | 409 | registro | — | Este correo ya se encuentra registrado | `EmailAlreadyRegisteredException` | `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest` |
 | `PASSWORD_REQUIRED` | 422 | registro | `password` | La contraseña es obligatoria | `@NotBlank` | `UserRegistrationControllerTest` |
 | `PASSWORD_TOO_SHORT` | 422 | registro | `password` | La contraseña debe tener al menos 12 caracteres | `PasswordPolicy` (`WeakPasswordException`) | `PasswordPolicyTest`, `UserRegistrationControllerTest` |
