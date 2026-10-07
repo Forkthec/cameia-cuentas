@@ -61,7 +61,7 @@ Spec, sección 11 (D1 a D7). El plan agrega: el conflicto de versión solo puede
 
 ## 7. Orden y dependencias
 
-T-1.1 → T-1.2 → T-1.3 → T-1.4 → T-1.5 → T-1.6 → T-1.7. **BLOQUEADAS:** el texto de `EmailNotVerifiedException` por la pregunta 3; los textos y estados de `DISABLED` y `ANONYMIZED` por la 2; T-1.2 y T-1.3 ya no están bloqueadas (pregunta 5 respondida: sí). Depende de que el PR 1A de CM-36 esté fusionado (pregunta 13 respondida).
+T-1.1 → T-1.2 → T-1.3 → T-1.4 → T-1.5 → T-1.6 → T-1.7. Sin bloqueos: los textos y estados (preguntas 1 a 3) se cerraron sin consulta y la pregunta 5 está respondida. Depende de que el PR 1A de CM-36 esté fusionado (pregunta 13 respondida).
 
 ## 8. Estimación
 

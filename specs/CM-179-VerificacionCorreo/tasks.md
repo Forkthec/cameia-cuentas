@@ -12,7 +12,7 @@ Estado: sin ejecutar; spec y plan pendientes de aprobación de Paula. Este archi
 - Definición de terminado: pruebas nuevas en verde, suite completa en verde, `LayeredArchitectureTest` en verde, diff dentro de lo estimado.
 - Rama `CM-179-verificacion-correo-cuentas` desde `develop`. Commit: `CM-179 | <tipo>(cuentas): <resultado> [IA-ASISTIDO]`.
 
-## [ ] T-1.1 · Excepciones y códigos — ≤ 30 min, ≈ 110 líneas — **texto de `EMAIL_NOT_VERIFIED` por la pregunta 3; textos de `DISABLED` por la pregunta 2**
+## [ ] T-1.1 · Excepciones y códigos — ≤ 30 min, ≈ 110 líneas
 
 - **Cubre:** REQ-VC-05, 06, 07, 08. **Crear:** `domain/exception/AccountDisabledException.java`, `AccountConflictException.java`, `InvalidIdentityException.java`. **Modificar:** `domain/exception/ErrorCode.java` (agregar `ACCOUNT_DISABLED`, `ACCOUNT_CONFLICT` e `IDENTITY_INVALID_VALUE`, cada una con su Javadoc), `domain/exception/EmailNotVerifiedException.java`, `domain/model/Account.java` (método `activate`, líneas 100-105), `AccountTest`.
 - **Excepciones** (molde de `AccountNotFoundException`: constructor sin parámetros, constante `MENSAJE`, Javadoc):
@@ -125,7 +125,7 @@ Estado: sin ejecutar; spec y plan pendientes de aprobación de Paula. Este archi
 - **Trampa:** sin `@Transactional`, `Account` leída y guardada ya no comparten sesión: el adaptador vuelve a leer antes de guardar (código actual), no cambiar eso.
 - **Verificación:** `./mvnw.cmd -B -Dtest=ActivateAccountServiceTest test` en verde.
 
-## [ ] T-1.4 · Controlador y manejador — ≤ 30 min, ≈ 90 líneas — **textos por las preguntas 2 y 3**
+## [ ] T-1.4 · Controlador y manejador — ≤ 30 min, ≈ 90 líneas
 
 - **Cubre:** REQ-VC-01, 05 a 08, 11. **Modificar:** `presentation/controller/AccountActivationController.java`, `presentation/advice/BusinessExceptionHandler.java`, `domain/exception/ErrorCode.java` si falta algo, `AccountActivationControllerTest`, `BusinessExceptionHandlerTest`.
 - **Controlador** (antes → después):
