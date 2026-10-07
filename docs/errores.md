@@ -55,8 +55,10 @@ servicio. Las pruebas citadas están en `src/test/java/tech/cameia/cuentas/`.
 | `MEDIA_TYPE_NOT_ACCEPTABLE` | 406 | cualquiera | — | Tipo de respuesta no admitido. | `HttpMediaTypeNotAcceptableException` (el `Accept` no admite ningún tipo que el servicio produzca) | `FrameworkErrorsTest` |
 | `INTERNAL_ERROR` | 500 | cualquiera | — | Ocurrió un error. Inténtalo de nuevo. | Cualquier fallo imprevisto, incluida la violación de una restricción de la base | `BusinessExceptionHandlerTest` |
 
-Un rechazo de Firebase por un dato que pasó la validación propia (por ejemplo, un correo que Firebase considera inválido) no es
-indisponibilidad: responde `INTERNAL_ERROR` y queda en el log como defecto de validación.
+Un rechazo de Firebase no es indisponibilidad. Si Identity Toolkit responde `INVALID_EMAIL`, la persona recibe 422
+`EMAIL_INVALID_FORMAT` en `email`. Cualquier otro rechazo (`WEAK_PASSWORD`, `PASSWORD_DOES_NOT_MEET_REQUIREMENTS`,
+`OPERATION_NOT_ALLOWED`: una política o un proveedor configurados en Firebase) es un defecto de configuración que la persona no puede
+corregir: responde `INTERNAL_ERROR` y el log lleva el código del servicio, nunca el correo.
 
 **Restricciones de la tabla `cuenta`.** Ninguna se viola por una entrada de la persona, porque la validación del contrato y del dominio
 actúa antes; todas están clasificadas como invariantes internas (`cuenta_pkey`, `uq_cuenta_firebase_uid`, `ck_cuenta_nombre`,
@@ -78,6 +80,7 @@ Se conservan porque Frontend ya las consume o porque su corrección es de otra t
 | 500 `INTERNAL_ERROR` en la activación cuando Firebase no responde al consultar si el correo está verificado (cuando `X-User-Email-Verified` no es `true`) | La indisponibilidad de Firebase es 503 `DEPENDENCY_UNAVAILABLE`, como en el registro | La tarea de verificación de correo. CA-1.2.6 toma la verificación solo del token, así que al alinear la activación con ese criterio la consulta a Firebase desaparece, y con ella este caso |
 | 500 `INTERNAL_ERROR` en la activación cuando el usuario no existe en Firebase | Un caso previsible tiene su excepción de negocio, su código y su estado | La tarea de verificación de correo, por la misma razón que la fila anterior |
 | 409 `EMAIL_ALREADY_REGISTERED` al reintentar un registro cuya credencial quedó en Firebase sin cuenta local (Firebase venció el tiempo después de crearla, o la compensación no pudo borrarla) | — (el comportamiento es el aceptado) | El backlog v4 (P-02 A) acepta el 409 para la credencial sin fila y pide registrar el identificador para conciliarla a mano. Ese registro lo agrega la tarea del registro repetido (CA-1.1.30); la compensación fallida ya se registra en `ERROR` con el `firebaseUid` |
+| Sin límite de tamaño del cuerpo: un registro de 50 KB responde 201 | OWASP API4: un tope de tamaño para la petición | La tarea pedida a Vela (pregunta 14 de la spec de CM-36): filtro de 16 KB en Cuentas para este endpoint y tope en el Gateway o en Cloud Run |
 | 500 `INTERNAL_ERROR` ante una violación de restricción de la base | El estándar pide traducirla a su código específico | Se conserva por decisión de la spec de validaciones del registro: ninguna restricción es alcanzable por una entrada, y una tabla de traducción sería código sin camino que la active |
 
 ## Cómo se agrega un código

@@ -2,8 +2,11 @@ package tech.cameia.cuentas.infrastructure.client;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.google.firebase.ErrorCode;
+import com.google.firebase.IncomingHttpResponse;
 import com.google.firebase.auth.AuthErrorCode;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
@@ -11,6 +14,8 @@ import com.google.firebase.auth.UserRecord;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.InvalidEmailException;
@@ -42,6 +47,17 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
     /** Valor del plan gratuito. */
     private static final String FREE_PLAN = "FREE";
 
+    /** Código de Identity Toolkit para un correo que no considera válido. */
+    private static final String CORREO_INVALIDO = "INVALID_EMAIL";
+
+    /** Valor cuando la respuesta de Firebase no trae un código legible. */
+    private static final String DESCONOCIDO = "desconocido";
+
+    /** El código es el comienzo del mensaje: mayúsculas y guiones bajos. */
+    private static final Pattern CODIGO_DEL_SERVICIO = Pattern.compile("^[A-Z][A-Z_]*");
+
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+
     private final FirebaseAuth firebaseAuth;
 
     /**
@@ -63,7 +79,7 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
      * @param password contraseña ya validada por la política del dominio
      * @return identificador del usuario creado
      * @throws EmailAlreadyRegisteredException si ese correo ya tiene credencial
-     * @throws InvalidEmailException si Firebase rechaza el correo como dato inválido
+     * @throws InvalidEmailException si Firebase rechaza el correo ({@code INVALID_EMAIL})
      * @throws DependencyUnavailableException si Firebase no respondió o falló de su lado
      * @throws IllegalStateException si Firebase rechaza la creación por cualquier otro motivo
      */
@@ -80,29 +96,47 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
             if (AuthErrorCode.EMAIL_ALREADY_EXISTS.equals(error.getAuthErrorCode())) {
                 throw new EmailAlreadyRegisteredException();
             }
-            if (esDatoInvalido(error)) {
+            String codigoDelServicio = codigoDelServicio(error);
+            if (CORREO_INVALIDO.equals(codigoDelServicio)) {
                 // EmailAddress es permisiva a propósito y Firebase podría ser más estricta. No se
                 // conoce un correo que pase la regla propia y Firebase rechace (el emulador los
-                // acepta todos), así que es una defensa. Para la persona sería un correo inválido
+                // acepta todos), así que es una defensa. Para la persona es un correo inválido
                 // (CA-1.1.20); el aviso deja ver en el log que las dos reglas difieren.
-                logger.warn("Firebase rechazó como inválido un correo que pasó la validación propia [codigo={}]",
-                        error.getErrorCode());
+                logger.warn("Firebase rechazó como inválido un correo que pasó la validación propia");
                 throw InvalidEmailException.invalidFormat();
             }
-            throw indisponibleOEnRechazo(error, "Firebase rechazó la creación del usuario");
+            // Cualquier otro rechazo (una política de contraseñas o un proveedor deshabilitado en
+            // Firebase) es un defecto de configuración que la persona no puede corregir: el código
+            // del servicio va al log para diagnosticarlo.
+            throw indisponibleOEnRechazo(error,
+                    "Firebase rechazó la creación del usuario [codigoDelServicio=" + codigoDelServicio + "]");
         }
     }
 
     /**
-     * Indica si Firebase rechazó un dato de la solicitud de creación.
+     * Código de error que devolvió Identity Toolkit, leído del cuerpo de la respuesta.
      *
-     * <p>El SDK no tiene un código propio para el correo inválido: el {@code INVALID_EMAIL} del
-     * servidor llega como {@code INVALID_ARGUMENT} sin código de autenticación. El único dato
-     * libre de la solicitud que Firebase puede rechazar es el correo: la contraseña llega ya
-     * validada con un mínimo de 12 caracteres, por encima de los 6 que exige Firebase.</p>
+     * <p>El SDK no tiene código propio para varios rechazos: {@code INVALID_EMAIL},
+     * {@code WEAK_PASSWORD}, {@code PASSWORD_DOES_NOT_MEET_REQUIREMENTS} u
+     * {@code OPERATION_NOT_ALLOWED} llegan todos como {@code INVALID_ARGUMENT} sin código de
+     * autenticación. El servicio los distingue en {@code error.message}, que empieza por el código
+     * documentado y puede seguir con un detalle ({@code WEAK_PASSWORD : …}). Solo se devuelve el
+     * código, nunca el detalle.</p>
+     *
+     * @return el código, o {@code desconocido} si la respuesta no lo trae
      */
-    private static boolean esDatoInvalido(FirebaseAuthException error) {
-        return error.getErrorCode() == ErrorCode.INVALID_ARGUMENT && error.getAuthErrorCode() == null;
+    static String codigoDelServicio(FirebaseAuthException error) {
+        IncomingHttpResponse respuesta = error.getHttpResponse();
+        if (respuesta == null || respuesta.getContent() == null) {
+            return DESCONOCIDO;
+        }
+        try {
+            String mensaje = JSON.readTree(respuesta.getContent()).path("error").path("message").asString("");
+            Matcher codigo = CODIGO_DEL_SERVICIO.matcher(mensaje);
+            return codigo.find() ? codigo.group() : DESCONOCIDO;
+        } catch (JacksonException ilegible) {
+            return DESCONOCIDO;
+        }
     }
 
     /**
@@ -152,6 +186,11 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
      * Cualquier otro error es un rechazo de un dato que pasó la validación propia: un
      * defecto, no algo pasajero.</p>
      *
+     * <p>La causa de E/S solo cuenta si no hubo respuesta: ante un rechazo HTTP (un 400 o un 404)
+     * el SDK también adjunta una {@code HttpResponseException}, que es de E/S, y confundirla con
+     * una conexión fallida respondía 503 «inténtalo de nuevo» a un rechazo que no se resuelve
+     * reintentando.</p>
+     *
      * @param error excepción del SDK
      * @param rechazo texto técnico para el log si no es indisponibilidad
      * @return la excepción que se debe lanzar
@@ -161,7 +200,7 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
         boolean indisponible = codigo == ErrorCode.UNAVAILABLE
                 || codigo == ErrorCode.DEADLINE_EXCEEDED
                 || codigo == ErrorCode.INTERNAL
-                || error.getCause() instanceof IOException;
+                || (error.getHttpResponse() == null && error.getCause() instanceof IOException);
         return indisponible ? new DependencyUnavailableException(error) : new IllegalStateException(rechazo, error);
     }
 
