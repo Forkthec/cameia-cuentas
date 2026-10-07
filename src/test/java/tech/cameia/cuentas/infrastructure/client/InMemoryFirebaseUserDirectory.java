@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.RawPassword;
@@ -29,6 +30,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     private final Set<String> correosVerificados = new HashSet<>();
 
     private boolean fallarAlEscribirElPlan;
+    private boolean indisponibleAlEscribirElPlan;
     private boolean fallarAlBorrar;
 
     @Override
@@ -45,6 +47,9 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     public void assignFreePlanClaim(String firebaseUid) {
         if (fallarAlEscribirElPlan) {
             throw new IllegalStateException("Firebase rechazó la escritura del plan del usuario");
+        }
+        if (indisponibleAlEscribirElPlan) {
+            throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
         }
         planesPorUid.put(firebaseUid, "FREE");
     }
@@ -98,6 +103,11 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         this.fallarAlEscribirElPlan = true;
     }
 
+    /** Hace que la escritura del plan falle como si Firebase no estuviera disponible. */
+    public void quedarIndisponibleAlEscribirElPlan() {
+        this.indisponibleAlEscribirElPlan = true;
+    }
+
     /** Hace que el borrado de credenciales falle, para probar la compensación fallida. */
     public void fallarAlBorrar() {
         this.fallarAlBorrar = true;
@@ -106,6 +116,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     /** Desactiva los fallos provocados, conservando lo que haya en el directorio. */
     public void dejarDeFallar() {
         this.fallarAlEscribirElPlan = false;
+        this.indisponibleAlEscribirElPlan = false;
         this.fallarAlBorrar = false;
     }
 
@@ -115,6 +126,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         planesPorUid.clear();
         correosVerificados.clear();
         fallarAlEscribirElPlan = false;
+        indisponibleAlEscribirElPlan = false;
         fallarAlBorrar = false;
     }
 }

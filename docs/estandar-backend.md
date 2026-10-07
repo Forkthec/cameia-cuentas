@@ -133,7 +133,7 @@ Toda respuesta de error de un microservicio Spring usa `application/problem+json
   "type": "about:blank",
   "title": "Datos no válidos",
   "status": 422,
-  "detail": "La contraseña es demasiado común.",
+  "detail": "Revisa los campos marcados.",
   "instance": "/api/v1/users",
   "code": "VALIDATION_FAILED",
   "requestId": "3c14c237-9fb8-4c25-86c6-cd81501d44f2",
@@ -146,10 +146,11 @@ Toda respuesta de error de un microservicio Spring usa `application/problem+json
 - `code`: la causa de la operación. `VALIDATION_FAILED` cuando hay `errors`; en los demás casos, el código específico (`EMAIL_ALREADY_REGISTERED` con 409).
 - `requestId`: el `X-Request-Id` que pone el Gateway; si falta, el servicio genera uno y lo devuelve en el encabezado. Es el hilo para depurar entre el Gateway, el servicio y el log.
 - `errors[]`: un elemento por campo rechazado, con `field` (nombre del contrato JSON), `code` y `message`.
+- `detail` de un 422 con `errors` es fijo; el mensaje de cada campo va en `errors[].message`. Un error de dominio de un solo campo (por ejemplo, la edad o la contraseña común) usa la misma forma, con `errors` de un elemento.
 - Un fallo técnico responde 500 con `INTERNAL_ERROR` y un mensaje genérico, sin detalle técnico, que cada servicio fija en su `docs/errores.md`; la causa y la traza van solo al log. Ninguna respuesta lleva traza, SQL, nombre de clase ni el mensaje de una excepción de librería.
 - `code`, `requestId` y `errors[].code` son miembros de extensión que la norma admite; se agregan sin reemplazar nada de lo publicado y se avisan a Frontend. La decisión está en el [ADR 0001](adr/0001-codigo-de-error-y-request-id.md).
 
-**Nombre de los códigos.** `UPPER_SNAKE_CASE` en inglés con la forma `<SUJETO>_<CAUSA>`. El sujeto es el campo o el recurso (`EMAIL`, `PASSWORD`, `BIRTH_DATE`, `PROFILE`, `SKILL`, `ACCOUNT`). La causa sale de un vocabulario cerrado: `REQUIRED`, `TOO_SHORT`, `TOO_LONG`, `INVALID_FORMAT`, `INVALID_CHARACTERS`, `INVALID_VALUE`, `OUT_OF_RANGE`, `IN_THE_FUTURE`, `UNDERAGE`, `NOT_FOUND`, `ALREADY_EXISTS` (o `ALREADY_REGISTERED`), `LIMIT_REACHED`, `NOT_ALLOWED`, `NOT_VERIFIED`, `DISABLED`, `CONFLICT`, `UNAVAILABLE` y `TIMEOUT`. Una causa nueva se agrega con su spec.
+**Nombre de los códigos.** `UPPER_SNAKE_CASE` en inglés con la forma `<SUJETO>_<CAUSA>`. El sujeto es el campo o el recurso (`EMAIL`, `PASSWORD`, `BIRTH_DATE`, `PROFILE`, `SKILL`, `ACCOUNT`). La causa sale de un vocabulario cerrado: `REQUIRED`, `TOO_SHORT`, `TOO_LONG`, `TOO_COMMON`, `INVALID_FORMAT`, `INVALID_CHARACTERS`, `INVALID_VALUE`, `OUT_OF_RANGE`, `IN_THE_FUTURE`, `UNDERAGE`, `NOT_FOUND`, `ALREADY_EXISTS` (o `ALREADY_REGISTERED`), `LIMIT_REACHED`, `NOT_ALLOWED`, `NOT_VERIFIED`, `DISABLED`, `CONFLICT`, `UNAVAILABLE` y `TIMEOUT`. Una causa nueva se agrega con su spec.
 
 **Reglas del catálogo**
 

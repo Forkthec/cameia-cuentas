@@ -150,6 +150,26 @@ class FirebaseConfigurationTest {
         assertThat(FirebaseApp.getApps()).hasSize(1);
     }
 
+    /** Toda llamada a Firebase tiene tiempo de espera: 5 s para conectar y 10 s para cada respuesta. */
+    @Test
+    void firebaseCallsHaveConnectAndReadTimeouts() {
+        FirebaseApp app = configurationWith("", new MockEnvironment()).firebaseApp();
+
+        assertThat(app.getOptions().getConnectTimeout()).isEqualTo(5_000);
+        assertThat(app.getOptions().getReadTimeout()).isEqualTo(10_000);
+    }
+
+    /** Con el emulador rigen los mismos tiempos de espera: así se prueba en local lo que corre desplegado. */
+    @Test
+    void emulatorHost_keepsTheSameTimeouts() {
+        FirebaseApp app = configurationWith("",
+                new MockEnvironment().withProperty(FirebaseConfiguration.EMULATOR_HOST_VARIABLE, "localhost:9099"))
+                .firebaseApp();
+
+        assertThat(app.getOptions().getConnectTimeout()).isEqualTo(FirebaseConfiguration.CONNECT_TIMEOUT_MS);
+        assertThat(app.getOptions().getReadTimeout()).isEqualTo(FirebaseConfiguration.READ_TIMEOUT_MS);
+    }
+
     private static RecordingFirebaseConfiguration configurationWith(String keyPath, Environment environment) {
         return new RecordingFirebaseConfiguration(keyPath, environment);
     }

@@ -9,12 +9,17 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.hibernate.exception.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.ServletRequestBindingException;
@@ -23,9 +28,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import tech.cameia.cuentas.domain.exception.AccountNotFoundException;
 import tech.cameia.cuentas.domain.exception.BusinessException;
+import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.EmailNotVerifiedException;
 import tech.cameia.cuentas.domain.exception.ErrorCode;
@@ -79,6 +86,12 @@ class BusinessExceptionHandler {
 
     /** {@code detail} de todo fallo que la persona no puede corregir. */
     private static final String DETALLE_INTERNO = "Ocurrió un error. Inténtalo de nuevo.";
+
+    /**
+     * Máximo de causas que se recorren: una cadena con un ciclo (A causada por B y B por A) no
+     * debe dejar el hilo en un bucle.
+     */
+    private static final int MAX_CAUSAS = 32;
 
     /** Paquete del dominio: sus excepciones traen textos escritos para la persona. */
     private static final String PAQUETE_DOMINIO = "tech.cameia.cuentas.domain";
@@ -245,6 +258,88 @@ class BusinessExceptionHandler {
     }
 
     /**
+     * Dependencia externa (Firebase) que no respondió o falló de su lado.
+     *
+     * <p>Es un fallo del servicio y no de la persona, así que se registra en {@code ERROR}
+     * con la causa técnica; la respuesta solo dice que puede reintentar.</p>
+     *
+     * @param error excepción con la causa técnica
+     * @return {@code 503 Service Unavailable} con el código {@code DEPENDENCY_UNAVAILABLE}
+     */
+    @ExceptionHandler(DependencyUnavailableException.class)
+    ProblemDetail dependenciaNoDisponible(DependencyUnavailableException error) {
+        ProblemDetail problema = problema(HttpStatus.SERVICE_UNAVAILABLE, "Servicio no disponible", DETALLE_INTERNO,
+                error.getErrorCode());
+        logger.error("Dependencia no disponible [code={}, requestId={}]", error.getErrorCode(),
+                problema.getProperties().get("requestId"), error);
+        return problema;
+    }
+
+    /**
+     * Violación de una restricción de la base de datos.
+     *
+     * <p>Ninguna restricción de la tabla de cuentas es alcanzable por una entrada de la
+     * persona, porque la validación del contrato y del dominio actúa antes: una violación es
+     * un defecto y responde como cualquier fallo imprevisto. El mensaje de la base incluye el
+     * valor de la columna (un dato personal), así que ni se devuelve ni se registra: el log
+     * lleva solo el nombre de la restricción.</p>
+     *
+     * @param error excepción traducida por Spring
+     * @return {@code 500 Internal Server Error} con un mensaje genérico
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ProblemDetail integridadDeDatos(DataIntegrityViolationException error) {
+        ProblemDetail problema = problema(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno", DETALLE_INTERNO,
+                ErrorCode.INTERNAL_ERROR);
+        logger.error("Violación de restricción de la base [constraint={}, code={}, requestId={}, causa={}]",
+                restriccionDe(error), ErrorCode.INTERNAL_ERROR, problema.getProperties().get("requestId"),
+                claseMasEspecifica(error));
+        return problema;
+    }
+
+    /**
+     * Ruta que no existe.
+     *
+     * @param error excepción de Spring cuando ningún controlador ni recurso atiende la ruta
+     * @return {@code 404 Not Found} con el código {@code ROUTE_NOT_FOUND}
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    ProblemDetail rutaInexistente(NoResourceFoundException error) {
+        return rechazo(HttpStatus.NOT_FOUND, "Ruta no encontrada", "No existe la ruta solicitada.",
+                ErrorCode.ROUTE_NOT_FOUND, "metodo=" + error.getHttpMethod());
+    }
+
+    /**
+     * Método HTTP que la ruta no admite.
+     *
+     * <p>El encabezado {@code Allow} con los métodos admitidos se agrega a la respuesta, como
+     * pide HTTP para un 405.</p>
+     *
+     * @param error excepción con los métodos que sí admite la ruta
+     * @return {@code 405 Method Not Allowed} con el código {@code METHOD_NOT_ALLOWED}
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    ResponseEntity<ProblemDetail> metodoNoPermitido(HttpRequestMethodNotSupportedException error) {
+        ProblemDetail problema = rechazo(HttpStatus.METHOD_NOT_ALLOWED, "Método no permitido",
+                "Método no permitido.", ErrorCode.METHOD_NOT_ALLOWED, "metodo=" + error.getMethod());
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).headers(error.getHeaders()).body(problema);
+    }
+
+    /**
+     * Tipo de contenido que la ruta no admite.
+     *
+     * @param error excepción con el tipo recibido y los admitidos
+     * @return {@code 415 Unsupported Media Type} con el código {@code MEDIA_TYPE_NOT_ALLOWED}
+     */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    ResponseEntity<ProblemDetail> tipoDeContenidoNoAdmitido(HttpMediaTypeNotSupportedException error) {
+        ProblemDetail problema = rechazo(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Tipo de contenido no admitido",
+                "Tipo de contenido no admitido.", ErrorCode.MEDIA_TYPE_NOT_ALLOWED, "");
+        // Accept con los tipos admitidos, como sugiere HTTP para un 415.
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).headers(error.getHeaders()).body(problema);
+    }
+
+    /**
      * Cualquier otro fallo.
      *
      * @param error excepción no prevista
@@ -358,10 +453,21 @@ class BusinessExceptionHandler {
         return traza[0].getClassName() + "." + traza[0].getMethodName();
     }
 
+    /** Nombre de la restricción violada, buscado en la cadena de causas; nunca el mensaje. */
+    private static String restriccionDe(Throwable error) {
+        Throwable actual = error;
+        for (int nivel = 0; actual != null && nivel < MAX_CAUSAS; nivel++, actual = actual.getCause()) {
+            if (actual instanceof ConstraintViolationException hibernate && hibernate.getConstraintName() != null) {
+                return hibernate.getConstraintName();
+            }
+        }
+        return "desconocida";
+    }
+
     /** Nombre simple de la causa más profunda: dice qué falló sin citar el valor recibido. */
     private static String claseMasEspecifica(Throwable error) {
         Throwable actual = error;
-        while (actual.getCause() != null && actual.getCause() != actual) {
+        for (int nivel = 0; actual.getCause() != null && nivel < MAX_CAUSAS; nivel++) {
             actual = actual.getCause();
         }
         return actual.getClass().getSimpleName();
