@@ -27,10 +27,10 @@ Respuestas publicadas que difieren del [estándar](estandar-backend.md#6-errores
 
 | Respuesta actual | Qué pide el estándar | Destino |
 |---|---|---|
-| 422 cuando el cuerpo no se puede interpretar | 400 para un cuerpo ilegible | Se conserva; pasarlo a 400 es una decisión de contrato con Frontend, con su propia spec |
-| 422 con el mensaje de cualquier `IllegalArgumentException` | Ninguna respuesta lleva el mensaje de una excepción de librería | Primera tarea de código que modifique el manejador: cada caso de negocio pasa a su excepción y su código |
-| 500 al activar una cuenta bloqueada o anonimizada | Un caso previsible tiene su excepción de negocio, su código y su estado | Primera tarea de código que modifique el manejador o la activación |
-| `Content-Type: application/problem+json`, sin `charset` | `application/problem+json; charset=UTF-8` | Primera tarea de código del servicio |
+| 422 cuando el cuerpo no se puede interpretar | 400 para un cuerpo ilegible | Se conserva (decisión de contrato); la tarea de validaciones del registro le agrega el código `REQUEST_BODY_INVALID_FORMAT`. Pasarlo a 400 sería un cambio de contrato con Frontend, con su propia spec |
+| 422 con el mensaje de cualquier `IllegalArgumentException` | Ninguna respuesta lleva el mensaje de una excepción de librería | La tarea de validaciones del registro le asigna el código de respaldo `REQUEST_INVALID_VALUE` y, al terminar, cada objeto de valor lanza su excepción de negocio con su código |
+| 500 al activar una cuenta bloqueada o anonimizada | Un caso previsible tiene su excepción de negocio, su código y su estado | La tarea de verificación de correo: 403 `ACCOUNT_DISABLED` para la cuenta bloqueada y 404 `ACCOUNT_NOT_FOUND` para la anonimizada |
+| `Content-Type: application/problem+json`, sin `charset` | `application/problem+json; charset=UTF-8` | La tarea de validaciones del registro, en su primer PR |
 
 ## Cómo se agrega un código
 
