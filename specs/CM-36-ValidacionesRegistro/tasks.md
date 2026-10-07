@@ -734,7 +734,7 @@ Rama `CM-36-etiquetas-textos-registro` desde `develop`, al final. Estado base: d
 - **Pruebas:** `ana`, `ana@correo`, `ana@@correo.co`, `ana@correo..co`, `ana @correo.co` → `InvalidEmailException` con `EMAIL_INVALID_FORMAT`; 255 puntos de código → `EMAIL_TOO_LONG`; válidos `ana@correo.co`, `ana.perez+cameia@correo.com`, `ANA@Correo.CO` (queda `ana@correo.co`); controlador: servicio simulado que lanza la excepción → 422, `field` = `email`. Ajustar las pruebas existentes de `ValueObjectsTest` que esperaban `IllegalArgumentException` por formato.
 - **Verificación:** `./mvnw.cmd -B -Dtest='ValueObjectsTest,UserRegistrationControllerTest' test` en verde.
 
-## [ ] T-6.2 · Cuerpo ilegible, pronombre inválido y fin del manejador genérico — ≤ 30 min, ≈ 110 líneas — **BLOQUEADA por la pregunta 10 de la spec (Vela); la 6 ya está respondida: 422**
+## [ ] T-6.2 · Cuerpo ilegible, pronombre inválido y fin del manejador genérico — ≤ 30 min, ≈ 110 líneas
 
 - **Cubre:** REQ-RV-30, 61, 65. **Modificar:** `presentation/advice/BusinessExceptionHandler.java`, `domain/exception/ErrorCode.java` (`PRONOUN_INVALID_VALUE`), `src/main/resources/application.properties`, `BusinessExceptionHandlerTest`, `UserRegistrationControllerTest`.
 - **`cuerpoIlegible`:** si `error.getCause()` es `tools.jackson.databind.exc.MismatchedInputException` y el último elemento de `getPath()` tiene `getPropertyName()` igual a `"pronoun"` → 422, `VALIDATION_FAILED`, un elemento `campo("pronoun", PRONOUN_INVALID_VALUE, <texto de la pregunta 10 de la spec>)`; en cualquier otro caso → 422, `REQUEST_BODY_INVALID_FORMAT`, `detail` «Revisa el formato de los datos enviados.» (sin la mención a la fecha). El `logger.warn` sigue registrando solo el nombre de la clase de la excepción. (Si la pregunta 6 de la spec resulta en 400, el estado cambia solo en la rama «cualquier otro caso».)
@@ -743,7 +743,7 @@ Rama `CM-36-etiquetas-textos-registro` desde `develop`, al final. Estado base: d
 - **Pruebas:** `"pronoun":"OTRO"`, `"he"`, `1`, `true` → 422, `field` = `pronoun`, `code` = `PRONOUN_INVALID_VALUE`; `"pronoun":""` y `"   "` → 422 `PRONOUN_REQUIRED` (pregunta 15); JSON mal formado (`{"firstName":`), `birthDate` como `[]` y como `{}` → 422 `REQUEST_BODY_INVALID_FORMAT` y `detail` sin la palabra «fecha»; un `IllegalArgumentException("secreto de librería")` lanzado por un controlador de prueba → 500, `INTERNAL_ERROR`, sin el texto.
 - **Verificación:** `./mvnw.cmd -B -Dtest='BusinessExceptionHandlerTest,UserRegistrationControllerTest' test` en verde.
 
-## [ ] T-6.3 · Textos del catálogo — ≤ 30 min, ≈ 90 líneas — **BLOQUEADA por la pregunta 2 de la spec**
+## [ ] T-6.3 · Textos del catálogo — ≤ 30 min, ≈ 90 líneas
 
 - **Cubre:** REQ-RV-62, 63; CA-1.1.2, 1.1.3, 1.1.6, 1.1.7, 1.1.9 a 1.1.13, 1.1.17, 1.1.19, 1.1.23, 1.1.26. **Modificar:** `RegisterUserRequest.java`, `PasswordPolicy.java`, `AgePolicy.java`, `EmailAlreadyRegisteredException.java` y las pruebas que comparan texto.
 - **Tabla antes → después (solo cambia el texto; códigos y estados no):**

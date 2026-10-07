@@ -141,7 +141,7 @@ nombre del contrato JSON. Los mensajes van entre comillas y con su punto final, 
 
 - **REQ-RV-30.** Cuando el cuerpo no se pueda leer (JSON mal formado, un arreglo u objeto donde va un texto, `Content-Type` ilegible), el servicio debe responder 422 con `code` `REQUEST_BODY_INVALID_FORMAT` y el `detail` «Revisa el formato de los datos enviados.», sin el texto de la excepción de Jackson y sin la afirmación fija sobre el formato de la fecha que hoy incluye. (Pregunta 6: el estándar dice 400; el contrato publicado dice 422.)
 - **REQ-RV-60.** Cuando `email` no tenga formato válido, el servicio debe responder 422 con `field:"email"`, `code` `EMAIL_INVALID_FORMAT` y el texto «Ingresa un correo electrónico válido.» (la longitud la resuelve el bloque 2).
-- **REQ-RV-61.** Cuando `pronoun` sea un valor fuera de la lista (`OTRO`, `he`, `1`, `true`; la cadena vacía es REQ-RV-15), el servicio debe responder 422 con `field:"pronoun"` y `code` `PRONOUN_INVALID_VALUE`. Texto: pregunta 10.
+- **REQ-RV-61.** Cuando `pronoun` sea un valor fuera de la lista (`OTRO`, `he`, `1`, `true`; la cadena vacía es REQ-RV-15), el servicio debe responder 422 con `field:"pronoun"` y `code` `PRONOUN_INVALID_VALUE`. Texto: «Selecciona una opción.» (RT-01).
 - **REQ-RV-62.** Cuando el correo ya tenga credencial y la cuenta esté activa, bloqueada o anonimizada, el servicio debe responder 409 con `code` `EMAIL_ALREADY_REGISTERED` y el mensaje «Ese correo ya tiene una cuenta.», sin revelar el estado de la cuenta. La cuenta **pendiente de verificación no** responde 409: responde 200 con la cuenta existente (CA-1.1.30, tarea CM-251).
 - **REQ-RV-63.** Los mensajes de los demás campos deben ser los del catálogo de la sección 6 (pregunta 2).
 - **REQ-RV-64.** Cuando se envíen varios campos inválidos a la vez, el servicio debe responder un elemento por campo para los campos que fallan en la validación del borde (sintaxis, longitud, formato, caracteres); las reglas del dominio (edad, contraseña común, correo duplicado) se aplican después y de una en una (decisión D3, pregunta 7).
@@ -156,7 +156,7 @@ nombre del contrato JSON. Los mensajes van entre comillas y con su punto final, 
 | `birthDate` | Sí | ninguna (texto exacto `dd/MM/uuuu`) | vacía · formato · futura · menor de 18 · más de 110 | `BIRTH_DATE_REQUIRED` «Ingresa tu fecha de nacimiento.» · `BIRTH_DATE_INVALID_FORMAT` «Formato de fecha inválido.» · `BIRTH_DATE_IN_THE_FUTURE` «Fecha de nacimiento inválida.» · `BIRTH_DATE_UNDERAGE` «Debes ser mayor de edad.» · `BIRTH_DATE_OUT_OF_RANGE` «Verifica tu fecha de nacimiento.» |
 | `email` | Sí | recorte + NFC + minúsculas | vacío · más de 254 · formato | `EMAIL_REQUIRED` «Ingresa tu correo electrónico.» · `EMAIL_TOO_LONG` «El correo no puede superar los 254 caracteres.» · `EMAIL_INVALID_FORMAT` «Ingresa un correo electrónico válido.» · duplicado: `EMAIL_ALREADY_REGISTERED` 409 «Ese correo ya tiene una cuenta.» |
 | `password` | Sí | ninguna (no se recorta; NFC solo para contar) | vacía (incluye solo espacios) · menos de 12 · más de 64 · común | `PASSWORD_REQUIRED` «Ingresa tu contraseña.» · `PASSWORD_TOO_SHORT` «La contraseña debe tener al menos 12 caracteres.» · `PASSWORD_TOO_LONG` «La contraseña no puede superar los 64 caracteres.» · `PASSWORD_TOO_COMMON` «Esta contraseña es demasiado común, elige otra.» |
-| `pronoun` | Sí | ninguna | ausente, `null`, vacío o solo espacios · fuera de la lista | `PRONOUN_REQUIRED` «Selecciona una opción.» · `PRONOUN_INVALID_VALUE` (texto: pregunta 10) |
+| `pronoun` | Sí | ninguna | ausente, `null`, vacío o solo espacios · fuera de la lista | `PRONOUN_REQUIRED` «Selecciona una opción.» · `PRONOUN_INVALID_VALUE` «Selecciona una opción.» |
 | `phoneNumber` | No | recorte | vacío = sin celular · formato | `PHONE_NUMBER_INVALID_FORMAT` «Revisa el número, no coincide con el formato del país elegido.» |
 | `estado`, `plan` y cualquier otro | — | — | se ignoran (RT-01-CA06) | — |
 
@@ -322,10 +322,10 @@ Cobertura: ≥ 90 % de líneas y ramas de lo nuevo o modificado, medida con JaCo
 | # | Pregunta | A quién | Recomendación | Bloquea |
 |---|---|---|---|---|
 | 1 | ¿Las correcciones de HU-1.1 viven en CM-36? Jira no tiene una tarea «Ajustes v4 – Backend» de Cuentas para HU-1.1 | **PENDIENTE de Vela** | Sí, en CM-36 | Dónde se registra y cierra el trabajo; nada de código |
-| 2 | ¿El servidor devuelve los textos del catálogo de los CA en todos los campos (sección 5)? | **PENDIENTE de Vela** | Sí: RT-01 pide las mismas reglas en cliente y servidor | Bloque 6 (T-6.3) |
+| 2 | ¿El servidor devuelve los textos del catálogo de los CA en todos los campos (sección 5)? | **Cerrada sin consulta (cambio sin alternativa):** RT-01 ya lo dice: las mismas reglas en la interfaz y en el backend y «el mensaje literal de cada campo está en su CA» | Sí: RT-01 pide las mismas reglas en cliente y servidor | Bloque 6 (T-6.3) |
 | 8 | Nombre y apellido: ¿letras de otros alfabetos (`\p{L}`: «李», «Åsa») y espacios dobles internos («María  José»)? El CA dice «letras (con tildes, ñ y ü)» | **PENDIENTE de Vela** | Permitir todo `\p{L}` y los espacios internos sin colapsar | La parte de `PersonName` del PR 2+3 |
 | 9 | Celular: ¿todos los tipos que `libphonenumber` da por válidos o solo móvil y fijo? | **PENDIENTE de Vela** | Igual que el cliente (`isValid`) | Bloque 5 |
-| 10 | Texto de `PRONOUN_INVALID_VALUE` (el CA no lo define) | **PENDIENTE de Vela** | «Selecciona una opción.» | Bloque 6 (T-6.2) |
+| 10 | Texto de `PRONOUN_INVALID_VALUE` (el CA no lo define) | **Cerrada sin consulta (cambio sin alternativa):** RT-01 fija el texto para listas: «Selecciona una opción.» | «Selecciona una opción.» | Bloque 6 (T-6.2) |
 | 12 | Confirmar en staging `SELECT DISTINCT pronombres FROM microcuentas.cuenta` antes de desplegar la migración V3 | **PENDIENTE de Juan Diego Gomez**, vía Vela | Pedirlo en el documento a DevOps | Despliegue de 1B (no el código) |
 
 Además, en el documento a Product Owner: la fecha de fin del Sprint 2 (Jira 12-oct, backlog 23-oct) y la estimación (la HU dice 5 h; las piezas suman ≈ 25 h, sección 17).
