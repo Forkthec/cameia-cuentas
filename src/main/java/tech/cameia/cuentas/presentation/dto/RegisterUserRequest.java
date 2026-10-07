@@ -2,6 +2,9 @@ package tech.cameia.cuentas.presentation.dto;
 
 import java.time.LocalDate;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -38,26 +41,42 @@ import tech.cameia.cuentas.domain.model.Pronoun;
  */
 public record RegisterUserRequest(
 
+        @Schema(description = "Nombres de la persona: letras, espacios, apóstrofo y guion", example = "María José",
+                minLength = 1, maxLength = 120, requiredMode = RequiredMode.REQUIRED)
         @NotBlank(message = "Los nombres son obligatorios")
         @Size(max = 120, message = "Los nombres no pueden superar los 120 caracteres")
         String firstName,
 
+        @Schema(description = "Apellidos de la persona: letras, espacios, apóstrofo y guion", example = "Gómez-Ruiz",
+                minLength = 1, maxLength = 120, requiredMode = RequiredMode.REQUIRED)
         @NotBlank(message = "Los apellidos son obligatorios")
         @Size(max = 120, message = "Los apellidos no pueden superar los 120 caracteres")
         String lastName,
 
+        @Schema(description = "Fecha de nacimiento con formato dd/MM/yyyy; debe ser una fecha real y la persona debe "
+                + "tener entre 18 y 110 años cumplidos en UTC", example = "12/04/1995",
+                pattern = "^\\d{2}/\\d{2}/\\d{4}$", requiredMode = RequiredMode.REQUIRED)
         @NotBlank(message = "La fecha de nacimiento es obligatoria")
         @BirthDateFormat
         String birthDate,
 
+        @Schema(description = "Correo con el que iniciará sesión; se guarda recortado y en minúsculas",
+                example = "ana@correo.co", maxLength = 254, format = "email", requiredMode = RequiredMode.REQUIRED)
         @NotBlank(message = "El correo electrónico es obligatorio")
         String email,
 
+        @Schema(description = "Contraseña de 12 a 64 caracteres, sin reglas de composición; no puede ser una "
+                + "contraseña común. No se recorta ni se devuelve nunca", minLength = 12, maxLength = 64,
+                format = "password", requiredMode = RequiredMode.REQUIRED)
         @NotBlank(message = "La contraseña es obligatoria")
         String password,
 
+        @Schema(description = "Opcional; formato internacional E.164 sin espacios", example = "+573000000000",
+                requiredMode = RequiredMode.NOT_REQUIRED)
         String phoneNumber,
 
+        @Schema(description = "Pronombres: Él (HE), Ella (SHE) o Elle (THEY)", allowableValues = {"HE", "SHE", "THEY"},
+                requiredMode = RequiredMode.REQUIRED)
         @NotNull(message = "Selecciona una opción.")
         Pronoun pronoun) {
 
