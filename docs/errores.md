@@ -14,6 +14,10 @@ Los errores de forma de cada campo salen todos a la vez, un elemento por campo: 
 longitud de la contraseña, opción del pronombre), que `@DomainRule` ejecuta en el borde tomando el código y el mensaje de la
 excepción del dominio. Las reglas de negocio (edad, contraseña común, correo repetido) se aplican después y de una en una.
 
+Excepción: un arreglo u objeto JSON donde va un texto responde `REQUEST_BODY_INVALID_FORMAT` sin campo y oculta los demás errores,
+porque Jackson corta la lectura del cuerpo entero. Solo lo envía un cliente que no es el formulario. El pronombre sí sale en su
+campo (`PRONOUN_INVALID_VALUE`), por ser una lista de opciones. Decisión D19 de la spec de CM-36.
+
 Todas las respuestas las produce `BusinessExceptionHandler`. Cada error se registra una sola vez: los 4xx en `WARN` sin traza, con
 `code`, `requestId` y, en validación, los nombres de campo y sus códigos; los 5xx en `ERROR` con traza. Nunca se registran el valor de
 un campo, el correo, la contraseña ni el mensaje de una excepción de deserialización o de base de datos.

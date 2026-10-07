@@ -35,7 +35,7 @@ public class DomainRuleValidator implements ConstraintValidator<DomainRule, Stri
      * @param value texto recibido
      * @param context contexto de Bean Validation
      * @return {@code true} si está ausente o en blanco (lo reporta otra restricción), si cumple
-     *         la regla o si el dominio lo rechaza por una causa que reporta otra restricción
+     *         la regla o si el dominio lo rechaza con un código que reporta otra restricción
      */
     @Override
     public boolean isValid(String value, ConstraintValidatorContext context) {
@@ -55,10 +55,9 @@ public class DomainRuleValidator implements ConstraintValidator<DomainRule, Stri
                     .buildConstraintViolationWithTemplate(literal(rechazo.getMessage()))
                     .addConstraintViolation();
             return false;
-        } catch (IllegalArgumentException invariante) {
-            // Vacío o demasiado largo para el objeto de valor: lo reporta @NotBlank o @CodePointSize.
-            return true;
         }
+        // Cualquier otra excepción del dominio no se atrapa: una invariante que la regla no prevé
+        // debe verse como un fallo, no desactivar la regla en silencio.
     }
 
     /** Escapa el texto para que la plantilla de mensajes no interprete llaves ni expresiones. */

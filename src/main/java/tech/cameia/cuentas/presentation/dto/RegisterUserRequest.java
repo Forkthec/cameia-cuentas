@@ -105,9 +105,11 @@ public record RegisterUserRequest(
      * <p>Usa el mismo formato con el que se validó la fecha, así que validar y convertir no
      * pueden separarse.</p>
      *
-     * @return el comando con la fecha ya interpretada
+     * @return el comando con la fecha y el pronombre ya interpretados
      * @throws java.util.NoSuchElementException si se llama sin haber validado el formato de
      *                                          la fecha
+     * @throws tech.cameia.cuentas.domain.exception.InvalidPronounException si se llama sin haber
+     *                                          validado el pronombre
      */
     public RegisterUserCommand toCommand() {
         LocalDate fecha = BirthDateFormatValidator.parse(birthDate).orElseThrow();

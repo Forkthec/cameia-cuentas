@@ -71,11 +71,11 @@ public @interface DomainRule {
     enum Rule {
 
         /** Nombre: solo letras, espacios, apóstrofo y guion. */
-        FIRST_NAME(texto -> new PersonName(texto, PersonName.Part.FIRST_NAME),
+        FIRST_NAME(texto -> comprobarNombre(texto, PersonName.Part.FIRST_NAME),
                 Set.of(ErrorCode.FIRST_NAME_INVALID_CHARACTERS)),
 
         /** Apellido: solo letras, espacios, apóstrofo y guion. */
-        LAST_NAME(texto -> new PersonName(texto, PersonName.Part.LAST_NAME),
+        LAST_NAME(texto -> comprobarNombre(texto, PersonName.Part.LAST_NAME),
                 Set.of(ErrorCode.LAST_NAME_INVALID_CHARACTERS)),
 
         /** Correo con forma de correo. */
@@ -102,6 +102,16 @@ public @interface DomainRule {
         private final Consumer<String> comprobacion;
         private final Set<ErrorCode> codigos;
 
+        /**
+         * Aplica la regla de caracteres a un nombre que cabe en el máximo. El que no cabe lo
+         * reporta {@code @CodePointSize}: el objeto de valor lo rechazaría como invariante.
+         */
+        private static void comprobarNombre(String texto, PersonName.Part parte) {
+            if (texto.codePointCount(0, texto.length()) <= PersonName.MAX_LENGTH) {
+                new PersonName(texto, parte);
+            }
+        }
+
         Rule(Consumer<String> comprobacion, Set<ErrorCode> codigos) {
             this.comprobacion = comprobacion;
             this.codigos = codigos;
@@ -111,6 +121,7 @@ public @interface DomainRule {
          * Aplica la regla del dominio.
          *
          * @param texto valor recibido, presente y no en blanco
+         * @throws tech.cameia.cuentas.domain.exception.InvalidFieldException si el dominio lo rechaza
          */
         void comprobar(String texto) {
             comprobacion.accept(texto);
