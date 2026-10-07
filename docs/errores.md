@@ -25,7 +25,8 @@ servicio. Las pruebas citadas están en `src/test/java/tech/cameia/cuentas/`.
 | `FIRST_NAME_TOO_LONG` | 422 | registro | `firstName` | Los nombres no pueden superar los 120 caracteres | `@Size(max = 120)` | `UserRegistrationControllerTest` |
 | `LAST_NAME_REQUIRED` | 422 | registro | `lastName` | Los apellidos son obligatorios | `@NotBlank` | `UserRegistrationControllerTest` |
 | `LAST_NAME_TOO_LONG` | 422 | registro | `lastName` | Los apellidos no pueden superar los 120 caracteres | `@Size(max = 120)` | `UserRegistrationControllerTest` |
-| `BIRTH_DATE_REQUIRED` | 422 | registro | `birthDate` | La fecha de nacimiento es obligatoria | `@NotNull` | `UserRegistrationControllerTest` |
+| `BIRTH_DATE_REQUIRED` | 422 | registro | `birthDate` | La fecha de nacimiento es obligatoria | `@NotBlank` (ausente, `null`, vacía o en blanco) | `UserRegistrationControllerTest` |
+| `BIRTH_DATE_INVALID_FORMAT` | 422 | registro | `birthDate` | Formato de fecha inválido. | `@BirthDateFormat`: no es una fecha real con el formato `dd/MM/aaaa` (incluye `31/02/2000`, espacios, otro formato, número o booleano) | `BirthDateFormatValidatorTest`, `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest` |
 | `BIRTH_DATE_IN_THE_FUTURE` | 422 | registro | `birthDate` | Fecha de nacimiento inválida | `AgePolicy` (`InvalidBirthDateException`) | `AgePolicyTest` |
 | `BIRTH_DATE_UNDERAGE` | 422 | registro | `birthDate` | Debes ser mayor de edad | `AgePolicy` (`InvalidBirthDateException`) | `AgePolicyTest`, `UserRegistrationControllerTest` |
 | `BIRTH_DATE_OUT_OF_RANGE` | 422 | registro | `birthDate` | La fecha de nacimiento no es plausible, por favor verifícala | `AgePolicy` (`InvalidBirthDateException`) | `AgePolicyTest` |
@@ -34,8 +35,9 @@ servicio. Las pruebas citadas están en `src/test/java/tech/cameia/cuentas/`.
 | `PASSWORD_REQUIRED` | 422 | registro | `password` | La contraseña es obligatoria | `@NotBlank` | `UserRegistrationControllerTest` |
 | `PASSWORD_TOO_SHORT` | 422 | registro | `password` | La contraseña debe tener al menos 12 caracteres | `PasswordPolicy` (`WeakPasswordException`) | `PasswordPolicyTest`, `UserRegistrationControllerTest` |
 | `PASSWORD_TOO_LONG` | 422 | registro | `password` | La contraseña no puede superar los 64 caracteres | `PasswordPolicy` (`WeakPasswordException`) | `PasswordPolicyTest` |
-| `PASSWORD_TOO_COMMON` | 422 | registro | `password` | La contraseña es demasiado común brother, cambiala si no quieres que te terminen robando la cuenta | `PasswordPolicy` (`WeakPasswordException`) | `PasswordPolicyTest` |
-| `REQUEST_BODY_INVALID_FORMAT` | 422 | registro | — | Revisa el formato de los datos enviados. La fecha de nacimiento usa el formato DD/MM/AAAA | Cuerpo ilegible (`HttpMessageNotReadableException`) | `UserRegistrationControllerTest` |
+| `PASSWORD_TOO_COMMON` | 422 | registro | `password` | Esta contraseña es demasiado común, elige otra. | `PasswordPolicy` (`WeakPasswordException`) | `PasswordPolicyTest`, `UserRegistrationControllerTest` |
+| `PRONOUN_REQUIRED` | 422 | registro | `pronoun` | Selecciona una opción. | `@NotNull` (ausente, `null`, vacío o en blanco) | `UserRegistrationControllerTest`, `AccountRegistrationEndToEndTest` |
+| `REQUEST_BODY_INVALID_FORMAT` | 422 | registro | — | Revisa el formato de los datos enviados. La fecha de nacimiento usa el formato DD/MM/AAAA | Cuerpo ilegible (`HttpMessageNotReadableException`): JSON mal formado, un arreglo u objeto donde va un texto, o un pronombre fuera de la lista | `UserRegistrationControllerTest` |
 | `REQUEST_INVALID_VALUE` | 422 | registro | — | El texto del objeto de valor que rechazó el dato, o «Revisa los datos enviados.» si la excepción no nació en el dominio | `IllegalArgumentException` (respaldo temporal) | `BusinessExceptionHandlerTest`, `UserRegistrationControllerTest` |
 | `IDENTITY_REQUIRED` | 400 | activación | — | La petición no incluye los datos que exige esta ruta | Falta `X-User-Id` (`ServletRequestBindingException`) | `AccountActivationControllerTest` |
 | `EMAIL_NOT_VERIFIED` | 403 | activación | — | Primero debes verificar tu correo con el enlace que te enviamos | `EmailNotVerifiedException` | `AccountActivationControllerTest` |
@@ -52,7 +54,7 @@ indisponibilidad: responde `INTERNAL_ERROR` y queda en el log como defecto de va
 **Restricciones de la tabla `cuenta`.** Ninguna se viola por una entrada de la persona, porque la validación del contrato y del dominio
 actúa antes; todas están clasificadas como invariantes internas (`cuenta_pkey`, `uq_cuenta_firebase_uid`, `ck_cuenta_nombre`,
 `ck_cuenta_apellido`, `ck_cuenta_estado`, `ck_cuenta_version`, `ck_cuenta_telefono_e164`, `ck_cuenta_pronombres_no_vacio`,
-`ck_cuenta_fecha_actualizacion`, `ck_cuenta_fecha_eliminacion` y `ck_cuenta_anonimizacion`). Una violación es un defecto: responde
+`ck_cuenta_fecha_actualizacion`, `ck_cuenta_fecha_eliminacion`, `ck_cuenta_anonimizacion` y `ck_cuenta_pronombres_valor`). Una violación es un defecto: responde
 `INTERNAL_ERROR` y el log lleva solo el nombre de la restricción, nunca la fila. `CuentaConstraintsClassificationTest` falla si
 aparece una restricción sin clasificar. `uq_cuenta_firebase_uid` solo se alcanza con dos registros simultáneos del mismo usuario; su
 código lo fija la tarea del registro repetido.

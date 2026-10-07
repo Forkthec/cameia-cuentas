@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import tech.cameia.cuentas.application.command.RegisterUserCommand;
 import tech.cameia.cuentas.application.service.RegisterUserService;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.presentation.dto.RegisterUserRequest;
@@ -44,14 +43,7 @@ class UserRegistrationController {
      */
     @PostMapping("/api/v1/users")
     ResponseEntity<RegisteredUserResponse> register(@Valid @RequestBody RegisterUserRequest request) {
-        Account cuenta = servicio.register(new RegisterUserCommand(
-                request.firstName(),
-                request.lastName(),
-                request.birthDate(),
-                request.email(),
-                request.password(),
-                request.phoneNumber(),
-                request.pronoun()));
+        Account cuenta = servicio.register(request.toCommand());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(RegisteredUserResponse.de(cuenta));
     }

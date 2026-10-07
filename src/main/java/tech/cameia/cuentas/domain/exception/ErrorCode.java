@@ -36,6 +36,9 @@ public enum ErrorCode {
     /** Falta la fecha de nacimiento. */
     BIRTH_DATE_REQUIRED,
 
+    /** La fecha de nacimiento no es una fecha real con el formato {@code dd/MM/aaaa}. */
+    BIRTH_DATE_INVALID_FORMAT,
+
     /** La fecha de nacimiento está en el futuro. */
     BIRTH_DATE_IN_THE_FUTURE,
 
@@ -62,6 +65,9 @@ public enum ErrorCode {
 
     /** La contraseña figura entre las más comunes. */
     PASSWORD_TOO_COMMON,
+
+    /** Falta elegir los pronombres. */
+    PRONOUN_REQUIRED,
 
     /** El cuerpo de la petición no se puede interpretar. */
     REQUEST_BODY_INVALID_FORMAT,

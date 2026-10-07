@@ -91,7 +91,7 @@ Una ruta nueva no se suma a esta lista sin una spec que lo justifique.
 
 ## 5. Datos
 
-Base PostgreSQL propia, esquema `microcuentas`, migraciones Flyway en `src/main/resources/db/migration` (`V1__esquema_inicial_cuenta.sql` y `V2__ajustar_version_inicial_cuenta.sql`).
+Base PostgreSQL propia, esquema `microcuentas`, migraciones Flyway en `src/main/resources/db/migration` (`V1__esquema_inicial_cuenta.sql`, `V2__ajustar_version_inicial_cuenta.sql` y `V3__restringir_pronombres.sql`).
 
 Tabla `microcuentas.cuenta`:
 
@@ -103,7 +103,7 @@ Tabla `microcuentas.cuenta`:
 | `apellido` | `varchar(120)` | No nulo y no vacío |
 | `fecha_nacimiento` | `date` | Opcional |
 | `telefono` | `varchar(16)` | Opcional; formato E.164 |
-| `pronombres` | `varchar(60)` | Opcional y no vacío si existe |
+| `pronombres` | `varchar(60)` | `HE`, `SHE` o `THEY` (`ck_cuenta_pronombres_valor`); nulo solo tras la anonimización |
 | `estado` | `varchar(24)` | `PENDING_VERIFICATION` (por defecto), `ACTIVE`, `DISABLED` o `ANONYMIZED` |
 | `version` | `bigint` | Control de concurrencia; ≥ 0 |
 | `fecha_creacion`, `fecha_actualizacion` | `timestamptz` | No nulas, en UTC |

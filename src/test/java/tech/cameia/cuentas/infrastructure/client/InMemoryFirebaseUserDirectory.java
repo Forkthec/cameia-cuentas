@@ -80,6 +80,15 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     }
 
     /**
+     * Indica cuántas credenciales conserva el directorio.
+     *
+     * @return número de usuarios creados y no borrados
+     */
+    public int cantidadDeUsuarios() {
+        return correosPorUid.size();
+    }
+
+    /**
      * Devuelve el plan escrito como custom claim.
      *
      * @param firebaseUid identificador del usuario
