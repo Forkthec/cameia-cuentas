@@ -7,6 +7,7 @@ import java.util.Set;
 import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
 import tech.cameia.cuentas.domain.model.RawPassword;
+import tech.cameia.cuentas.domain.model.SingleLineText;
 
 /**
  * Comprueba que una contraseña cumpla la política de seguridad del proyecto.
@@ -31,27 +32,27 @@ public class PasswordPolicy {
     private static final String COMMON_PASSWORD_MESSAGE = "Esta contraseña es demasiado común, elige otra.";
 
     /**
-     * Contraseñas rechazadas aunque cumplan la longitud exigida.
+     * Contraseñas rechazadas aunque cumplan la longitud exigida, en minúsculas.
      *
-     * <p>La longitud sola no basta: {@code 123456789012} tiene doce caracteres y aparece
-     * en las primeras posiciones de cualquier lista de filtraciones, así que un ataque de
+     * <p>La longitud sola no basta: {@code 123456789012} tiene doce caracteres y aparece en
+     * las primeras posiciones de cualquier lista de filtraciones, así que un ataque de
      * diccionario la prueba en los primeros intentos. ASVS pide justamente comprobar la
      * contraseña contra un conjunto de valores conocidos.</p>
-     *
-     * <p>Son solo las que superan el mínimo de doce caracteres: una más corta ya la
-     * rechaza la regla de longitud, así que incluirla aquí no aportaría nada. La
-     * comparación ignora mayúsculas y espacios alrededor, porque {@code Password1234} y
-     * {@code password1234 } son la misma contraseña para quien la adivina.</p>
      */
-    private static final Set<String> COMMON_PASSWORDS = Set.of(
-            "123456789012", "1234567890123", "12345678901234", "123456789012345",
-            "1234567890123456", "111111111111", "000000000000", "121212121212",
-            "123123123123", "abcdefghijkl", "abcd1234abcd", "qwertyuiop12",
-            "qwertyuiop123", "qwertyuiopasd", "asdfghjklzxc", "1qaz2wsx3edc",
-            "password1234", "password12345", "passwordpassword", "contrasena123",
-            "contrasena1234", "contrasenia123", "administrador", "administrator",
-            "iloveyou1234", "letmein12345", "welcome12345", "superman1234",
-            "futbol123456", "colombia1234", "bogota123456", "cameia123456");
+    private final Set<String> commonPasswords;
+
+    /**
+     * Crea la política con su lista de contraseñas comunes.
+     *
+     * <p>La comparación ignora mayúsculas y espacios alrededor, porque {@code Password1234} y
+     * {@code password1234 } son la misma contraseña para quien la adivina. La lista que usa la
+     * aplicación se carga de un recurso versionado; la ensambla la configuración.</p>
+     *
+     * @param commonPasswords contraseñas rechazadas aunque cumplan la longitud, ya en minúsculas
+     */
+    public PasswordPolicy(Set<String> commonPasswords) {
+        this.commonPasswords = Set.copyOf(commonPasswords);
+    }
 
     /**
      * Comprueba que la contraseña sea aceptable.
@@ -92,6 +93,8 @@ public class PasswordPolicy {
      *         espacios alrededor
      */
     private boolean esConocida(String value) {
-        return COMMON_PASSWORDS.contains(value.trim().toLowerCase(Locale.ROOT));
+        // Mismo recorte y misma forma Unicode que el resto del servicio: un espacio duro alrededor
+        // o un acento combinante no convierten una contraseña común en otra.
+        return commonPasswords.contains(SingleLineText.normalize(value).toLowerCase(Locale.ROOT));
     }
 }

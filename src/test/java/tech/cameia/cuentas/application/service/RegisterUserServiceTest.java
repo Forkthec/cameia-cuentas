@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,7 +47,8 @@ class RegisterUserServiceTest {
 
     @BeforeEach
     void prepararServicio() {
-        servicio = new RegisterUserService(directorio, repositorio, new AgePolicy(), new PasswordPolicy());
+        servicio = new RegisterUserService(directorio, repositorio, new AgePolicy(),
+                new PasswordPolicy(Set.of("123456789012", "password1234", "qwertyuiop123")));
     }
 
     @Test
