@@ -1,6 +1,6 @@
 # Plan — CM-251-RegistroRepetido
 
-Base: `develop` después de fusionar los PR 1A a 3 de CM-36 (se revalidan rutas y líneas al empezar; las que se citan son de `908112c`). Estado: pendiente de aprobación de Paula. Un solo PR (≈ 600 líneas con pruebas, ≈ 5 h).
+Base: `develop` después de fusionar el PR 1A de CM-36 (decidido por Paula el 6-oct-2026) (se revalidan rutas y líneas al empezar; las que se citan son de `908112c`). Estado: pendiente de aprobación de Paula. Un solo PR (≈ 600 líneas con pruebas, ≈ 5 h).
 
 ## 1. Cómo se aborda
 
@@ -64,7 +64,7 @@ Spec, sección 11 (D1 a D5). El plan agrega: el resultado es un `record` de `app
 
 ## 7. Orden y dependencias
 
-T-1 → T-2 → T-3 → T-4 y T-5 (independientes) → T-6 → T-7 → T-8 → T-9 (V-02 puede ir en paralelo con T-4 a T-7) → T-10. **BLOQUEADA por la pregunta 1** solo la forma del cuerpo del 200 (T-2/T-3: si Paula decide otra cosa, cambia `RegisteredUserResponse`). El nivel del registro de S4 (pregunta 2) cambia una línea. Depende de que los PR 1A a 3 de CM-36 estén fusionados (códigos de error y servicio actual).
+T-1 → T-2 → T-3 → T-4 y T-5 (independientes) → T-6 → T-7 → T-8 → T-9 (V-02 puede ir en paralelo con T-4 a T-7) → T-10. Preguntas 1 y 2 respondidas (6-oct-2026): cuerpo del 200 literal del CA; `ERROR` y `WARN` en la carrera. Depende de que el PR 1A de CM-36 esté fusionado (códigos de error y servicio actual).
 
 ## 8. Estimación
 

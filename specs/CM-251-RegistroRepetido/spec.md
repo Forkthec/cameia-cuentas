@@ -3,9 +3,9 @@
 - **Tarea:** CM-251 · Subtarea «CM-241 – Backend: corrección del defecto» · padre CM-241 (Error DF-001, «Registro muestra "No hay conexión" pero la cuenta sí se crea», HU-1.1, staging, 24-sep-2026) · hermana de Frontend CM-250 · Sprint 2 · responsable: Paula Andrea Muñoz Delgado
 - **Repositorio:** `cameia-cuentas`, rama `CM-251-registro-repetido-pendiente`, creada desde `origin/develop` (`908112c`)
 - **Backlog vigente:** `05102026_01_Backlog.xlsx`, hoja `HE-01`: CA-1.1.30 (principal), CA-1.2.12 (remite a CA-1.1.30), CA-1.1.2, CA-1.2.11 y las reglas transversales RT-05 y RT-06
-- **Estado:** spec, plan y tarjetas escritos; **pendiente de aprobación de Paula** (3 preguntas abiertas en la sección 12)
+- **Estado:** spec, plan y tarjetas escritos; **pendiente de aprobación de Paula**. Las preguntas 1 y 2 están respondidas (6-oct-2026); la 3 es de Vela y no afecta al código
 - **Atributos de calidad que toca:** fiabilidad (un reintento no deja datos a medias ni falla), seguridad (no revelar el estado de otras cuentas; exposición de identificadores), compatibilidad de contrato (el registro puede devolver 200 además de 201), observabilidad (rastro de credenciales sin cuenta).
-- **Orden:** el plan parte del estado de `develop` **después** de fusionar los PR 1A a 3 de CM-36 (formato de error con `code`, normalización de textos y validación de nombres), que tocan el mismo servicio y el mismo manejador; las rutas y líneas se revalidan al empezar.
+- **Orden:** el plan parte del estado de `develop` **después** de fusionar el PR 1A de CM-36 (formato de error con `code` y `ErrorCode`), que toca el mismo manejador (decidido por Paula el 6-oct-2026: no espera a 1B, 2 ni 3; si alguno se fusiona antes, se hace rebase); las rutas y líneas se revalidan al empezar.
 
 ## 1. Contexto y objetivo
 
@@ -26,7 +26,7 @@ Fuera: ver sección 13.
 | # | Situación al llegar un registro válido | Respuesta | Datos |
 |---|---|---|---|
 | S1 | No existe credencial para el correo | **201** con la cuenta nueva (CA-1.1.1, sin cambios) | Crea credencial, plan `FREE` y fila |
-| S2 | Existe la credencial y la fila `cuenta` de ese `firebase_uid` está `PENDING_VERIFICATION` (menos de 7 días, o 7 o más y aún sin purgar) | **200** con la cuenta existente (CA-1.1.30) | No escribe nada: ni credencial ni fila; `fecha_creacion` y `fecha_actualizacion` no cambian |
+| S2 | Existe la credencial y la fila `cuenta` de ese `firebase_uid` está `PENDING_VERIFICATION` (menos de 7 días, o 7 o más y aún sin purgar: la purga diaria de CM-179, bloque 2, borra las de más de 168 h, y desde entonces el correo es S1) | **200** con la cuenta existente (CA-1.1.30) | No escribe nada: ni credencial ni fila; `fecha_creacion` y `fecha_actualizacion` no cambian |
 | S3 | Existe la credencial y la fila está `ACTIVE`, `DISABLED` o `ANONYMIZED` | **409** `EMAIL_ALREADY_REGISTERED`; el mismo cuerpo para los tres estados | No escribe nada |
 | S4 | Existe la credencial y **no** hay fila | **409** `EMAIL_ALREADY_REGISTERED` y se registra el `firebase_uid` para conciliación manual (riesgo aceptado: CA-1.3.9 salió del MVP) | No escribe nada; no se completa la fila |
 | S5 | Firebase no responde al consultar o al crear | **500** `INTERNAL_ERROR`, «Ocurrió un error. Inténtalo de nuevo.» (RT-05) | Sin datos a medias: la consulta ocurre antes de crear nada; la compensación existente cubre el resto |
@@ -44,7 +44,7 @@ Fuera: ver sección 13.
 - **REQ-RR-07.** Mientras el servicio atienda un registro, debe aplicar todas las validaciones del cuerpo (formato, edad, contraseña, nombres) **antes** de consultar a Firebase.
 - **REQ-RR-08.** El servicio no debe comparar, enviar ni registrar la contraseña en la vía de un registro repetido (S2 a S4).
 - **REQ-RR-09.** Cuando atienda S2, el servicio debe registrar en nivel `INFO` «Registro repetido atendido con la cuenta pendiente del usuario {firebaseUid}» (solo el `firebase_uid`).
-- **REQ-RR-10.** Mientras no haya cambios entre dos registros repetidos, ambas respuestas deben ser idénticas (200 con el mismo cuerpo).
+- **REQ-RR-10.** Mientras no haya cambios entre dos registros repetidos, ambas respuestas deben ser 200 con el mismo cuerpo (`id`, `firebaseUid`, `status`, `plan`). El encabezado `X-Request-Id` y el miembro `requestId` (si existe) son propios de cada petición y no cuentan en la comparación.
 - **REQ-RR-11.** El contrato de `POST /api/v1/users` debe documentar en OpenAPI las respuestas 200, 201, 409, 422 y 500, aclarando que 200 y 201 son éxito y que el cuerpo es el mismo.
 - **REQ-RR-12.** Ninguna respuesta ni registro debe incluir el correo, la contraseña ni el estado de una cuenta ajena.
 
@@ -58,11 +58,11 @@ Fuera: ver sección 13.
 
 - Ruta y cuerpo sin cambios. La respuesta puede ser **200** o **201** con el mismo cuerpo `{id, firebaseUid, status, plan}`.
 - Consumidor: `cameia-web` (`register.api.ts` trata cualquier 2xx como éxito y el 409 como «Ese correo ya tiene una cuenta.» —`SPEC.md` de auth, línea 696—). No hay que cambiar nada en Frontend; sí avisar de que 200 también es éxito.
-- El mensaje del 409 pasa a «Ese correo ya tiene una cuenta.» en el PR 6 de CM-36; esta tarea no cambia textos.
+- El mensaje del 409 pasa a «Ese correo ya tiene una cuenta.» en el PR 6 de CM-36; esta tarea no cambia textos. Por eso las pruebas de esta tarea afirman el estado y el `code` (`EMAIL_ALREADY_REGISTERED`), **nunca el texto literal del 409**: así no dependen de si el PR 6 de CM-36 ya está fusionado.
 
 ## 7. Seguridad y calidad
 
-- **Exposición en S2.** Cualquiera que conozca un correo con cuenta pendiente y envíe un cuerpo válido recibe el `id` y el `firebaseUid` de esa cuenta (identificadores internos, no secretos; no permiten actuar sin credenciales). Es lo que pide el CA («responde con la cuenta existente») y `cameia-web` los guarda en su modelo. La alternativa (devolver solo `status` y `plan`) contradice el CA y rompe el tipo del frontend. **Decisión D2, PENDIENTE de Paula (pregunta 1).**
+- **Exposición en S2.** Cualquiera que conozca un correo con cuenta pendiente y envíe un cuerpo válido recibe el `id` y el `firebaseUid` de esa cuenta (identificadores internos, no secretos; no permiten actuar sin credenciales). Es lo que pide el CA («responde con la cuenta existente») y `cameia-web` los guarda en su modelo. La alternativa (devolver solo `status` y `plan`) contradice el CA y rompe el tipo del frontend. **Decisión D2: aceptada por Paula el 6-oct-2026 (pregunta 1)**; el riesgo se registra en la matriz de seguridad del PR.
 - **Enumeración de correos.** El 409 y el 200 revelan que un correo está registrado: aceptado por producto (CA-1.1.2); el control compensatorio es el límite de peticiones antes del Gateway. No se revela el estado (REQ-RR-03).
 - **Contraseña.** No se compara (decisión P-02 A): un tercero no obtiene nada que no tenga al enviar el correo; no se puede crear ni modificar nada por esta vía.
 - **ASVS 4.1.1/4.2.1 (sin cambios), API1 (autorización por objeto):** el registro es público y no expone datos más allá de lo anterior; **API6 (flujos sensibles):** sin cambios de estado en S2 a S4; **API4:** una consulta más a Firebase por registro, con el tiempo de espera del SDK.
@@ -106,8 +106,8 @@ Hipótesis: `httpClient.ts` de `cameia-web` aborta a los 10 s y muestra «No hay
 | # | Decisión | Porqué | Alternativas descartadas | Decisión humana |
 |---|---|---|---|---|
 | D1 | Consultar con `getUserByEmail` **antes** de crear, en vez de crear y capturar el conflicto | La consulta permite distinguir «no existe» de «existe» sin depender de un error y evita escribir en Firebase en un reintento. La captura del conflicto se conserva solo para la carrera (REQ-RR-06) | Solo capturar el conflicto de `createUser` (no distingue la carrera de un reintento y obliga a leer igual); verificar la contraseña con la API REST de Firebase (descartada por P-02 A) | Producto: P-02 A (5-oct-2026); técnica: PENDIENTE (Paula) |
-| D2 | El cuerpo del 200 es el de la cuenta existente, con `id` y `firebaseUid` | Lo exige el CA y lo guarda el frontend | Devolver solo `status` y `plan` (contradice el CA) | PENDIENTE (Paula), pregunta 1 |
-| D3 | Una credencial sin fila responde 409 y se registra en `ERROR`; no se completa la fila | Riesgo aceptado por el PO; completar la fila exigiría los datos del registro original y la contraseña no se verifica | Completar la fila con los datos del nuevo cuerpo (cualquiera podría crear la fila de una cuenta ajena) | Producto: P-02 A; nivel del registro: PENDIENTE (Paula), pregunta 2 |
+| D2 | El cuerpo del 200 es el de la cuenta existente, con `id` y `firebaseUid` | Lo exige el CA y lo guarda el frontend | Devolver solo `status` y `plan` (contradice el CA) | Aprobada por Paula (6-oct-2026), pregunta 1 |
+| D3 | Una credencial sin fila responde 409 y se registra en `ERROR`; no se completa la fila | Riesgo aceptado por el PO; completar la fila exigiría los datos del registro original y la contraseña no se verifica | Completar la fila con los datos del nuevo cuerpo (cualquiera podría crear la fila de una cuenta ajena) | Producto: P-02 A; nivel del registro: aprobado por Paula (6-oct-2026), pregunta 2 |
 | D4 | El servicio devuelve un resultado `{cuenta, creada}` y el controlador elige 201 o 200 | El estado HTTP es de presentación; el servicio no conoce HTTP | Lanzar una excepción para el 200 (flujo de control con excepciones); devolver siempre 201 (contradice el CA) | PENDIENTE (Paula) |
 | D5 | Sin captura de `DataIntegrityViolationException` | La vía nunca inserta para una credencial preexistente (sección 5) | Capturar y releer (código inalcanzable que no se podría probar sin forzarlo) | PENDIENTE (Paula) |
 
@@ -115,8 +115,8 @@ Hipótesis: `httpClient.ts` de `cameia-web` aborta a los 10 s y muestra «No hay
 
 | # | Pregunta | A quién | Recomendación | Bloquea |
 |---|---|---|---|---|
-| 1 | D2: ¿el 200 devuelve `id` y `firebaseUid` de la cuenta existente a quien conozca el correo (literal del CA)? | **PENDIENTE de Paula** (seguridad) | Sí, literal; el riesgo es bajo (identificadores no secretos, solo cuentas pendientes de menos de 8 días) y se registra en la matriz de seguridad del PR | La forma del cuerpo del 200 (tarjeta T-2) |
-| 2 | D3: ¿la credencial sin cuenta se registra en `ERROR` (alguien debe actuar) y la vía de carrera en `WARN`? | **PENDIENTE de Paula** | Sí | Solo el nivel del registro |
+| 1 | D2: ¿el 200 devuelve `id` y `firebaseUid` de la cuenta existente a quien conozca el correo (literal del CA)? | **Respondida (Paula, 6-oct): sí, literal del CA**; el riesgo se registra en la matriz de seguridad del PR | Sí, literal; el riesgo es bajo (identificadores no secretos, solo cuentas pendientes de menos de 8 días) y se registra en la matriz de seguridad del PR | La forma del cuerpo del 200 (tarjeta T-2) |
+| 2 | D3: ¿la credencial sin cuenta se registra en `ERROR` (alguien debe actuar) y la vía de carrera en `WARN`? | **Respondida (Paula, 6-oct): sí** | Sí | Solo el nivel del registro |
 | 3 | ¿CM-251 es el hogar del CA-1.1.30? (Jira no tiene una «Ajustes v4 – Backend» de Cuentas para HU-1.1) | **PENDIENTE de Vela** (es la pregunta 5 de ESTADO.md, ya hecha para CM-36) | Sí, CM-251 | Dónde se registra y cierra el trabajo; nada de código |
 
 ## 13. Fuera de alcance
