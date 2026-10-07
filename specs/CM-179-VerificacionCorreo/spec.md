@@ -203,6 +203,17 @@ Plantilla del correo y DNS (CM-255) · pantallas y llamadas de `cameia-web` · e
 | 14 | P-JOB-1: en un Cloud Run Job no existe `K_SERVICE` (existe `CLOUD_RUN_JOB`) y la guarda del emulador de Firebase solo protege por el perfil `prod`. ¿Se agrega `CLOUD_RUN_JOB` a la detección en el bloque 4? | **Respondida (Paula, 6-oct-2026): sí, en el bloque 4** | Sí (≈ 10 líneas y una prueba) | Tarjeta T-4.3 |
 | 15 | Nivel del log de una cuenta que la purga no pudo procesar: `WARN` sin traza, con el `firebaseUid` y solo el nombre de la clase de la excepción (el mensaje de Firebase puede traer datos personales). El resumen va en `INFO` y el aviso de fallidas en `WARN` | **Respondida (Paula, 6-oct-2026): WARN sin traza, como se propone** | Aceptar: la cuenta se reintenta sola al día siguiente; `ERROR` alertaría por algo que se recupera solo | T-2.5 (una línea) |
 
+### Pendientes que deja CM-36 (revisión final, 7-oct-2026)
+
+- **Textos de la activación con el estilo del catálogo** (tuteo y punto final, D2-01). Hoy, al terminar CM-36, siguen sin punto:
+  400 `IDENTITY_REQUIRED` «La petición no incluye los datos que exige esta ruta», 403 `EMAIL_NOT_VERIFIED` «Primero debes verificar tu
+  correo con el enlace que te enviamos» y 404 `ACCOUNT_NOT_FOUND` «No encontramos una cuenta para este usuario». Esta tarea los
+  define con sus CA; CM-36 no los tocó para no cambiarlos dos veces (decisión de Paula). Cambia textos: aviso a Frontend.
+- **Ningún error previsible en `INTERNAL_ERROR`** (regla de Paula para todo Backend). `docs/errores.md` de CM-36 deja con destino
+  esta tarea: activar una cuenta bloqueada o anonimizada, `X-User-Email-Verified` con un valor que no es `true` ni `false`, Firebase
+  caído al consultar el correo (debe ser 503 `DEPENDENCY_UNAVAILABLE`, como en el registro) y un `uid` inexistente en Firebase.
+  `UntypedExceptionClassificationTest` los tiene como «pendiente de CM-179»: al corregirlos, se quitan de su clasificación.
+
 ## 15. Estimación
 
 Bloque 1 ≈ 4 h (≈ 450 líneas) · bloque 2 ≈ 6 h (≈ 700) · bloque 3 ≈ 3 h (≈ 250) · bloque 4 ≈ 3 h (≈ 300). Total ≈ **16 h** frente a 9 h de la HU (pregunta 10).
