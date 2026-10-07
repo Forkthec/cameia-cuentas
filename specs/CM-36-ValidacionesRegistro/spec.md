@@ -3,7 +3,7 @@
 - **Tarea:** CM-36 · Subtarea · «HU-1.1 – Backend: estado inicial de la cuenta nueva» · padre CM-14 «HU-1.1 Registro de Nuevo Usuario» · Sprint 2 · responsable: Paula Andrea Muñoz Delgado
 - **Repositorio:** `cameia-cuentas`, rama `CM-36-validaciones-registro`, creada desde `origin/develop` (`908112c`)
 - **Backlog vigente:** `05102026_01_Backlog.xlsx`, hoja `HE-01`, HU-1.1 (44 criterios) y su apartado «Cambios v4» (5-oct-2026)
-- **Estado:** spec completa de la tarea, **aprobada por Paula el 6-oct-2026** junto con el plan del bloque 1 (1A y 1B). Las preguntas de Paula están respondidas (sección 15); quedan abiertas las de Vela y DevOps, que solo afectan a textos y nombres de los bloques 3, 5 y 6 y al despliegue de 1B.
+- **Estado:** spec completa de la tarea, **pendiente de aprobación expresa de Paula** (revisada con sus respuestas del 7-oct-2026). Las preguntas de Paula están respondidas (sección 15); quedan abiertas las de Vela y DevOps, que solo afectan a textos y nombres de los bloques 3, 5 y 6 y al despliegue de 1B.
 - **Atributos de calidad que toca:** seguridad (ASVS 6.2.4, 5.1, API3 y API6), compatibilidad de contrato (aditiva, con un cambio de textos), mantenibilidad y testabilidad (códigos de error y validación por capas), fiabilidad (sin 500 por entrada inválida).
 
 ## 1. Contexto y objetivo
@@ -31,11 +31,11 @@ Una sola spec; seis bloques, cada uno un PR hacia `develop` de menos de 1000 lí
 
 | Bloque | Qué entrega | Corrección (análisis) | CA que cierra |
 |---|---|---|---|
-| 1A | Formato de error con `code` en toda respuesta de error y en cada elemento de `errors[]` | H-14 de CM-283, estándar §3.6 | transversal (RT-01-CA05) |
+| 1A | Formato de error con `code` en toda respuesta de error y en cada elemento de `errors[]`, `requestId`, `detail` fijo, 503 si Firebase no está disponible, códigos de 404, 405 y 415, registro seguro de cada error y clasificación de las restricciones de la base | H-14 de CM-283, estándar §3.6 | transversal (RT-01-CA05) |
 | 1B | Fecha estricta · mensaje de contraseña común · pronombre obligatorio · restricción de la base para los pronombres · documentación OpenAPI del registro | 1, 2 (mensaje) y 3 | CA-1.1.8, 1.1.15, 1.1.27 (mensaje), 1.1.43 |
 | 2 (mismo PR que 3) | Recorte y NFC de nombre, apellido y correo; cuenta de caracteres por puntos de código (incluida la contraseña); `EMAIL_TOO_LONG` en el borde; un mensaje por campo en el orden fijado | 5 | CA-1.1.9 a 1.1.13 (espacios), 1.1.16 a 1.1.19, 1.1.22, 1.1.42 |
 | 3 (mismo PR que 2) | `PersonName` (solo letras) | 4 | CA-1.1.31, 1.1.39, 1.1.40 |
-| 4 | Lista de 3000 contraseñas comunes | 2 (lista) | CA-1.1.27 (lista) |
+| 4 (dos PR) | 4a: código que carga y valida la lista · 4b: solo el archivo de datos de 3000 entradas (excepción al tope de 1000 líneas pedida por Paula el 7-oct-2026, porque es un archivo mecánico) | 2 (lista) | CA-1.1.27 (lista) |
 | 5 | Celular con `libphonenumber` | 6 | CA-1.1.32, 1.1.37, 1.1.38, 1.1.29 |
 | 6 | Etiqueta de campo y `code` en los 422 que hoy no lo tienen; textos del catálogo; correo duplicado; pruebas de edad y de los casos 1.1.41 y 1.1.42 | 7, 8, 9 | CA-1.1.2, 1.1.3 a 1.1.7, 1.1.20 a 1.1.26, 1.1.41 |
 
@@ -86,12 +86,16 @@ nombre del contrato JSON. Los mensajes van entre comillas y con su punto final, 
 ### Bloque 1A — formato de error
 
 - **REQ-RV-01.** Cuando el servicio responda cualquier error (4xx o 5xx), el cuerpo debe incluir el miembro `code` de nivel superior con un valor del catálogo de la sección 6, sin reemplazar `type`, `title`, `status`, `detail` ni `instance`.
-- **REQ-RV-02.** Cuando el servicio responda 422 con una lista `errors`, cada elemento debe tener `field`, `code` y `message`, un elemento por campo (no dos para el mismo campo) y `code` de nivel superior `VALIDATION_FAILED`.
+- **REQ-RV-02.** Cuando el servicio responda 422 con una lista `errors`, cada elemento debe tener `field`, `code` y `message`, un elemento por campo (no dos para el mismo campo), `code` de nivel superior `VALIDATION_FAILED` y `detail` fijo «Revisa los campos marcados.». Esto incluye el error de dominio de un solo campo (edad, contraseña común): lleva `errors` de un elemento, nunca el código específico arriba y sin lista. El mensaje para la persona va en `errors[].message`; el `code` de cada elemento nunca es `VALIDATION_FAILED`.
 - **REQ-RV-03.** Cuando el servicio responda un error, debe incluir el miembro `requestId` con el `X-Request-Id` recibido o, si falta o no cumple `^[A-Za-z0-9._-]{1,64}$`, un UUID v4 generado, y devolver el mismo valor en el encabezado `X-Request-Id`. (PD-08 respondida por Paula el 6-oct-2026: desde el PR 1A.)
 - **REQ-RV-04.** Si un fallo no es de negocio, el servicio debe responder 500 con `code` `INTERNAL_ERROR` y el `detail` «Ocurrió un error. Inténtalo de nuevo.», sin traza, SQL, nombre de clase ni mensaje de excepción; el detalle va al log. (Texto del RT-05-CA01: hoy dice «No pudimos completar la operación. Inténtalo de nuevo en unos minutos».)
-- **REQ-RV-05.** Mientras el servicio emita un código, el catálogo no debe reutilizar ni renombrar un código publicado; todo valor de `ErrorCode` debe cumplir `^[A-Z]+(_[A-Z]+)+$` y terminar en una causa del vocabulario cerrado del estándar (§A).
-- **REQ-RV-07 (trazabilidad).** Ningún código debe significar dos cosas: `VALIDATION_FAILED` solo acompaña a una lista `errors` no vacía; un dato rechazado sin campo usa `REQUEST_INVALID_VALUE`. Cada error 4xx se registra en `WARN` con `code` y `requestId` (y el origen `clase.método` cuando es el respaldo), y cada 500 en `ERROR` con `requestId` y la traza, de modo que el `requestId` de la respuesta lleve a una sola entrada del log. Ninguna respuesta lleva el mensaje de una librería.
-- **REQ-RV-06.** Si una restricción de Bean Validation del contrato no tiene `code` asignado, una prueba debe fallar (ninguna restricción cae al código `VALIDATION_FAILED` por omisión).
+- **REQ-RV-05.** Mientras el servicio emita un código, el catálogo no debe reutilizar ni renombrar un código publicado; todo valor de `ErrorCode` debe cumplir `^[A-Z]+(_[A-Z]+)+$` y terminar en una causa del vocabulario cerrado del estándar (§A), con dos excepciones fijas y nombradas en la prueba: `VALIDATION_FAILED` e `INTERNAL_ERROR` (describen la operación entera, no una causa). La causa `TOO_COMMON` (contraseña común) se agrega al vocabulario con esta spec y al estándar de Cuentas.
+- **REQ-RV-07 (trazabilidad y ningún error conocido en un código genérico).** Ningún código debe significar dos cosas: `VALIDATION_FAILED` solo acompaña a una lista `errors` no vacía y `INTERNAL_ERROR` solo lo emite el manejador de respaldo ante un fallo imprevisto. Todo fallo previsible tiene su excepción, su código específico y su prueba; si un fallo conocido llegara a `INTERNAL_ERROR` o `VALIDATION_FAILED`, es un defecto. Los fallos conocidos que hoy terminan en 500 y pertenecen a otra tarea quedan listados con su destino en `docs/errores.md` (sección «Respuestas publicadas que difieren del estándar»); esta tarea no agrega ninguno. Un dato rechazado sin campo usa `REQUEST_INVALID_VALUE` (respaldo temporal que los bloques 3, 5 y 6 eliminan).
+- **REQ-RV-06.** Si una restricción de Bean Validation del contrato no tiene `code` asignado, una prueba debe fallar. Si por un descuido llegara una sin código a producción, el elemento lleva `REQUEST_INVALID_VALUE` y se registra un `ERROR` con la restricción: nunca cae a `VALIDATION_FAILED`.
+- **REQ-RV-08 (errores del propio framework).** Cuando la ruta no exista, el método HTTP no esté permitido o el tipo de contenido no sea compatible, el servicio debe responder con el formato de error del estándar y los códigos `ROUTE_NOT_FOUND` (404), `METHOD_NOT_ALLOWED` (405) y `MEDIA_TYPE_NOT_ALLOWED` (415), nunca 500 ni la página de error de Spring. Texto de `detail` de cada uno: «No existe la ruta solicitada.», «Método no permitido.» y «Tipo de contenido no admitido.».
+- **REQ-RV-09 (Firebase no disponible).** Cuando Firebase no responda o falle del lado del servidor al crear la credencial o escribir el claim del plan (error de transporte, `UNAVAILABLE`, `DEADLINE_EXCEEDED` o `INTERNAL` del SDK), el servicio debe compensar y responder 503 con `code` `DEPENDENCY_UNAVAILABLE` y el `detail` «Ocurrió un error. Inténtalo de nuevo.». Un rechazo de Firebase por un dato que pasó la validación propia (por ejemplo, un correo que Firebase considera inválido) no es indisponibilidad: sigue siendo un fallo imprevisto (`INTERNAL_ERROR`) y se registra como defecto de validación. No se distingue el tiempo agotado con 504 (el SDK no lo separa de forma fiable).
+- **REQ-RV-27 (registro de cada error).** Cada error se registra una sola vez, en el manejador, en español y sin datos personales: los 4xx de negocio en `WARN` sin traza con `code`, `requestId` y, en validación, la lista de nombres de campo (salen del contrato, nunca de lo que escribe quien llama); los 5xx y las compensaciones fallidas en `ERROR` con traza, `code` y `requestId`. `firebaseUid` se agrega solo cuando existe (en el registro anónimo que falla antes de crear la credencial no existe). Nunca se registran el correo, la contraseña, el valor de un campo ni el mensaje de una excepción de deserialización o de base de datos (puede citar el valor); de esas se registra la clase. El `requestId` solo entra al log después de cumplir la expresión de REQ-RV-03, para impedir inyección de líneas. Si la compensación falla (la base falló y Firebase no pudo borrar la credencial), se registra `ERROR` con `firebaseUid` y `requestId`, y hay una prueba.
+- **REQ-RV-19 (base de datos).** Una violación de restricción de la base nunca devuelve el mensaje de la base ni se registra con él (puede contener el valor de la columna). El manejador responde 500 `INTERNAL_ERROR` y registra solo el nombre de la restricción, el `requestId` y la clase de la excepción. Cada restricción de la tabla `cuenta` está clasificada por escrito en la sección 7 y una prueba falla si aparece una restricción sin clasificar.
 
 ### Bloque 1B — tres correcciones de validación
 
@@ -186,7 +190,7 @@ Ejemplo de error de validación (formato final, 1B en adelante). El miembro `req
 
 Se agrega `ErrorCode` junto a las excepciones (`domain.exception`). Un código ↔ un estado ↔ un mensaje ↔ una excepción o restricción ↔ una prueba.
 Los códigos nuevos son una **propuesta** que queda aprobada con esta spec; las causas usan el vocabulario cerrado del estándar (`OUT_OF_RANGE` en
-lugar de la causa nueva «implausible»).
+lugar de la causa nueva «implausible»), con una causa nueva aprobada por Paula el 7-oct-2026: `TOO_COMMON` (`PASSWORD_TOO_COMMON`).
 
 | Código | HTTP | Origen | Bloque que lo emite |
 |---|---|---|---|
@@ -210,9 +214,13 @@ lugar de la causa nueva «implausible»).
 | `ACCOUNT_NOT_FOUND` | 404 | `AccountNotFoundException` (activación) | 1A |
 | `EMAIL_NOT_VERIFIED` | 403 | `EmailNotVerifiedException` (activación; código reservado por el contrato) | 1A |
 | `REQUEST_INVALID_VALUE` | 422 | `IllegalArgumentException` de un objeto de valor sin campo (respaldo; deja de emitirse en el bloque 6) | 1A |
-| `INTERNAL_ERROR` | 500 | cualquier otro fallo | 1A |
+| `INTERNAL_ERROR` | 500 | cualquier otro fallo imprevisto (incluye la violación de una restricción de la base, REQ-RV-19) | 1A |
+| `DEPENDENCY_UNAVAILABLE` | 503 | `DependencyUnavailableException` (Firebase no disponible, REQ-RV-09) | 1A |
+| `ROUTE_NOT_FOUND` | 404 | ruta inexistente | 1A |
+| `METHOD_NOT_ALLOWED` | 405 | método HTTP no permitido | 1A |
+| `MEDIA_TYPE_NOT_ALLOWED` | 415 | tipo de contenido no admitido | 1A |
 
-En 1A, los códigos se agregan **sin cambiar ningún texto** de los vigentes, con una sola excepción: el `detail` del 500, cuyo texto literal fija el RT-05-CA01 (REQ-RV-04). Los textos del catálogo se aplican en el bloque 6 una vez respondida la pregunta 2.
+En 1A, los códigos se agregan **sin cambiar el mensaje de ningún campo** de los vigentes. Cambian solo tres `detail`: el del 500 (texto literal del RT-05-CA01, REQ-RV-04), el de los 422 con `errors` (fijo, REQ-RV-02) y el del nuevo 503 (REQ-RV-09). Los textos del catálogo se aplican en el bloque 6 (pregunta 2, ya cerrada).
 Las tres correcciones con texto literal en el backlog (formato de fecha, contraseña común y pronombre) usan su texto desde 1B.
 
 Los códigos `IDENTITY_REQUIRED`, `ACCOUNT_NOT_FOUND` y `EMAIL_NOT_VERIFIED` **no los emite el registro**: los emite la activación (`POST /api/v1/users/me/verification`). Están en esta tabla porque el PR 1A asigna código a toda respuesta de error del servicio; sus cambios de comportamiento son de CM-179.
@@ -223,6 +231,7 @@ Los códigos `IDENTITY_REQUIRED`, `ACCOUNT_NOT_FOUND` y `EMAIL_NOT_VERIFIED` **n
 - **Migración nueva V3** (bloque 1B): `ALTER TABLE microcuentas.cuenta ADD CONSTRAINT ck_cuenta_pronombres_valor CHECK (pronombres IS NULL OR pronombres IN ('HE','SHE','THEY'));`. Probada con `CuentaSchemaMigrationTest` (una fila con `OTRO` viola la restricción y la prueba comprueba el nombre de la restricción) y con el E2E. Riesgo: una fila existente con otro valor haría fallar el arranque; el código solo escribe el enumerado con `EnumType.STRING`, así que no debería existir. Acción para DevOps (vía Vela): confirmar `SELECT DISTINCT pronombres` en staging antes del despliegue.
 - Restricción de caracteres de nombre y apellido: no se replica en la base (el estándar §B.2 pide `CHECK` para enums y rangos; una clase `\p{L}` no se puede expresar de forma equivalente en las expresiones regulares POSIX de PostgreSQL, que dependen del idioma de la base). Se mantiene `ck_cuenta_nombre`/`ck_cuenta_apellido` (`btrim <> ''`). Justificado.
 - Índices y claves foráneas: sin cambios (la tabla no tiene FK a otro servicio; `uq_cuenta_firebase_uid` ya existe).
+- **Clasificación de las restricciones de `cuenta` (REQ-RV-19).** Ninguna se puede violar hoy por una entrada de la persona, porque la validación del borde y del dominio actúa antes de llegar a la base; una violación sería un defecto y responde 500 `INTERNAL_ERROR` con el nombre de la restricción en el log (el estándar §6.3 pide un código específico, y aquí queda justificado por escrito: no hay un camino alcanzable que lo produzca). Clasificadas como invariantes internas: `cuenta_pkey`, `uq_cuenta_firebase_uid`, `ck_cuenta_nombre`, `ck_cuenta_apellido`, `ck_cuenta_estado`, `ck_cuenta_version`, `ck_cuenta_telefono_e164`, `ck_cuenta_pronombres_no_vacio`, `ck_cuenta_fecha_actualizacion`, `ck_cuenta_fecha_eliminacion`, `ck_cuenta_anonimizacion` y, desde 1B, `ck_cuenta_pronombres_valor`. `uq_cuenta_firebase_uid` pasa a alcanzable cuando CM-251 haga idempotente el registro: esa tarea le asigna su código (`EMAIL_ALREADY_REGISTERED` o el 200 según el caso). Una prueba con la base real (Testcontainers) lista las restricciones de la tabla y falla si alguna no está en esta clasificación.
 
 ## 8. Seguridad y calidad
 
@@ -246,7 +255,7 @@ Los códigos `IDENTITY_REQUIRED`, `ACCOUNT_NOT_FOUND` y `EMAIL_NOT_VERIFIED` **n
 | Estado, propiedad, colecciones, paginación | No | Registro público sin identidad ni colecciones |
 | Concurrencia (doble envío) | No en esta tarea | CM-251 (registro repetido) |
 | Falla parcial | Sí | Ya cubierto por `RegisterUserServiceTest` (compensación); una validación que falla nunca llega a Firebase (`verify(directorio, never())`) |
-| Dependencias (Firebase lento o caído) | No cambia | Fuera de alcance; 500 genérico probado |
+| Dependencias (Firebase lento o caído) | Sí (REQ-RV-09) | 503 `DEPENDENCY_UNAVAILABLE` con compensación; un rechazo de Firebase por un dato propio sigue en `INTERNAL_ERROR`; V-07 comprueba qué lanza el SDK |
 | Carga (cuerpo grande, campos extra, JSON mal formado, tipo de contenido erróneo) | Sí | Campos extra ignorados; JSON mal formado y `text/plain` → REQ-RV-30 y 415 existente; cuerpo grande: **hoy no hay límite** (`max-http-form-post-size` solo aplica a formularios): se corrige en una tarea aparte que se pide a Vela (pregunta 14) |
 
 ## 10. Reutilización
@@ -279,6 +288,9 @@ Cobertura: ≥ 90 % de líneas y ramas de lo nuevo o modificado, medida con JaCo
 | 10 | `[]` se lee como fecha ausente con `LocalDate` (Jackson desempaqueta el arreglo vacío) | Prueba desechable, 6-oct | Deja de ocurrir con el DTO de texto (1B) |
 | 11 | Contraseña común: 32 entradas | `PasswordPolicy.java:41-49` | 4 |
 | 12 | Texto de `RegisterUserRequest` dice que el pronombre es opcional y que la contraseña no tiene límite en el borde | Javadoc del registro | 1B (se reescribe) |
+| 13 | Toda falla de Firebase en el registro (también la indisponibilidad) termina en `IllegalStateException` y por tanto en el 500 genérico | `FirebaseUserDirectoryAdapter.java:73-75, 94` | 1A (REQ-RV-09) |
+| 14 | Una violación de restricción de la base cae al manejador genérico, que registra la excepción completa: el mensaje de PostgreSQL incluye el valor de la columna (dato personal en el log) | `BusinessExceptionHandler` (`falloInterno`) | 1A (REQ-RV-19) |
+| 15 | Rutas inexistentes, método no permitido y tipo de contenido no admitido no pasan por el formato de error con `code` | por comprobar en 1A (T-1A.8) | 1A (REQ-RV-08) |
 
 ## 13. Decisiones
 
@@ -291,6 +303,12 @@ Cobertura: ≥ 90 % de líneas y ramas de lo nuevo o modificado, medida con JaCo
 | D5 | El pronombre obligatorio vive en la API; la columna sigue admitiendo `NULL` | La anonimización vacía el dato; el CA lo pide a nivel de API | `NOT NULL` en la base: rompe la anonimización | Aprobada por Paula (6-oct-2026), con la spec |
 | D7 | El recorte y la normalización NFC viven en el objeto de valor `SingleLineText` del dominio; el DTO los aplica en su constructor compacto (antes de la validación) y la restricción `@CodePointSize` cuenta puntos de código | Una sola definición de «espacio» y de «carácter» para el borde y el dominio; `@NotBlank` ve el texto ya recortado (así un NBSP solo cuenta como vacío); `@Size` cuenta unidades UTF-16 y no sirve para el límite en puntos de código | Normalizar solo en el controlador (la validación vería el texto sin recortar); una clase de utilidades estáticas (prohibida por el estándar); copiar la lógica en cada validador | Aprobada por Paula (6-oct-2026), pregunta 13 |
 | D6 | Bloque 1 en dos PR (1A formato de error, 1B correcciones) | Un solo PR superaría 900 líneas y mezclaría un refactor transversal con tres correcciones de comportamiento | Un PR único | Aprobada por Paula (6-oct-2026), con la spec |
+| D8 | `VALIDATION_FAILED` e `INTERNAL_ERROR` quedan como excepciones fijas de la forma `<SUJETO>_<CAUSA>`, y ningún error conocido puede terminar en ellos (REQ-RV-05 y 07) | Son genéricos por definición (una agrupa causas, la otra es una causa desconocida); el estándar y el ADR 0001 los nombran así | Agregar `FAILED` y `ERROR` al vocabulario cerrado (es lo mismo escrito distinto); renombrarlos (rompe el estándar y el Gateway) | Paula, 7-oct-2026: «ok, pero no quiero que errores conocidos se metan en estos errores» |
+| D9 | `detail` fijo en todo 422 con `errors`, también el de un solo campo; el error de dominio de un campo lleva `errors` de un elemento (REQ-RV-02). El ejemplo del estándar se corrige en el mismo PR 1A (copia de Cuentas y de la skill); Perfil, Gateway y Entrevista reciben el mismo archivo en el PR de cada uno | Un comportamiento único para Frontend; con varios errores no hay un mensaje único para `detail`. La copia del estándar debe ser idéntica en los cuatro repos: mientras los otros tres no la actualicen, Cuentas queda distinta y se declara en el PR | Mensaje del primer error en `detail` (dos comportamientos); código específico arriba y sin lista (Frontend leería dos formas); corregir el ejemplo en un PR aparte (descartado por Paula); no tocar el ejemplo hasta la verificación final del 23-oct | Paula, 7-oct-2026 (respuestas 1, 2 y 8: «estándar siempre», «texto fijo pero no un PR aparte», «A») |
+| D10 | Firebase no disponible responde 503 `DEPENDENCY_UNAVAILABLE` con el texto de RT-05, no 500; sin 504 | Es más específico y es el mapa de estados del estándar; cambia el criterio del backlog (P-02 dice 500), que se comunica a Vela y a Frontend | 500 `INTERNAL_ERROR` como dice el CA; 504 para el tiempo agotado (el SDK no lo distingue de forma fiable) | Paula, 7-oct-2026 («entre más específico mejor»; comunicar) |
+| D11 | Las restricciones de la tabla `cuenta` se clasifican por escrito como invariantes internas y no se traducen a códigos; el log lleva solo el nombre de la restricción; una prueba falla ante una restricción sin clasificar. `uq_cuenta_firebase_uid` recibe su código en CM-251, donde pasa a ser alcanzable | Ninguna es alcanzable por una entrada de la persona (la validación va antes); una tabla de traducción sería código muerto y el mensaje de la base contiene el valor de la columna | Tabla restricción → código en el manejador (el estándar dice que el manejador no inventa códigos); excepciones nuevas por restricción (≈ 40 líneas sin camino que las active) | Paula, 7-oct-2026 («lo mejor, más seguro y usable»); el criterio lo fijó Claude |
+| D12 | Registro de errores según REQ-RV-27: WARN sin valores, solo `code`, `requestId` y nombres de campo; el mensaje de Jackson y el de la base nunca se registran; `firebaseUid` solo cuando existe | Seguridad ante todo: el endpoint es público y los mensajes de las librerías citan los valores enviados | Registrar el mensaje de la excepción para depurar mejor (filtraría la contraseña o el correo al log) | Paula, 7-oct-2026 («lo más seguro») |
+| D13 | El bloque 4 va en dos PR: 4a el código y 4b solo el archivo de datos | El tope de 1000 líneas se aplica al código; el archivo de 3000 líneas es mecánico y se revisa como datos | Un solo PR de ≈ 3300 líneas; generar el archivo en el arranque desde una fuente externa (pierde la lista versionada que consume Frontend) | Paula, 7-oct-2026 («ok»). La excepción al tope de 1000 líneas del PR 4b es de Paula |
 
 ## 14. Verificaciones previas de Backend
 
@@ -298,6 +316,8 @@ Cobertura: ≥ 90 % de líneas y ramas de lo nuevo o modificado, medida con JaCo
 - **V-03 (lista de contraseñas).** Fuente y licencia de la lista de 3000 antes del bloque 4 (pregunta 3).
 - **V-05 (celular igual en cliente y servidor).** Comparar el resultado de `libphonenumber` Java con `libphonenumber-js` sobre los valores de los CA (`+573000000000`, `+34612345678`, `12345`) en el bloque 5; si difieren, se informa a Frontend.
 - **V-06.** Confirmar que la propiedad de Jackson que rechaza números como enumerado existe con su nombre en la versión del proyecto (bloque 6).
+- **V-07 (excepción del SDK de Firebase con el servicio caído).** Con el emulador detenido o con un host inalcanzable, comprobar qué `FirebaseAuthException` lanza `createUser` (su `getErrorCode()` de Firebase y su `getAuthErrorCode()`), para fijar qué excepciones cuentan como indisponibilidad (REQ-RV-09). Se hace en T-1A.9; si el resultado no coincide con el supuesto de la tarjeta, se detiene y se reporta.
+- **V-08 (comportamiento del framework).** Comprobar qué responde hoy Cuentas a una ruta inexistente, a `DELETE /api/v1/users` y a un `Content-Type: text/plain` en el registro, antes de escribir los manejadores de REQ-RV-08 (T-1A.8).
 
 ## 15. Preguntas
 
@@ -316,6 +336,17 @@ Cobertura: ≥ 90 % de líneas y ramas de lo nuevo o modificado, medida con JaCo
 | 15 | `"pronoun":""` contradecía REQ-RV-15 (obligatorio) y REQ-RV-61 (valor inválido) | Vacío y solo espacios son `PRONOUN_REQUIRED`, como en los demás campos | REQ-RV-15 y REQ-RV-61 |
 | 16 | ¿Bloques 2 y 3 en un solo PR? | Sí (≈ 650 líneas, mismos archivos) | Plan, sección 7 |
 | 17 | ¿CM-251 y CM-179 esperan a 1A–3 o solo a 1A? | Solo a 1A | Plan, sección 7 |
+| 18 | Forma del 422 de un error de dominio de un solo campo | `VALIDATION_FAILED` arriba y `errors` de un elemento («estándar siempre») | REQ-RV-02, D9 |
+| 19 | `detail` del 422 | Texto fijo; la corrección del ejemplo del estándar va en el PR 1A, no en uno aparte | REQ-RV-02, D9 |
+| 20 | Causa `TOO_COMMON` | Aprobada | REQ-RV-05, sección 6 |
+| 21 | `VALIDATION_FAILED` e `INTERNAL_ERROR` fuera de la forma `<SUJETO>_<CAUSA>`; que ningún error conocido caiga en ellos | Se conservan como excepciones; ningún error conocido puede terminar en ellos | REQ-RV-05 y 07, D8 |
+| 22 | Errores del framework (404 de ruta, 405, 415) | Se agregan `ROUTE_NOT_FOUND`, `METHOD_NOT_ALLOWED` y `MEDIA_TYPE_NOT_ALLOWED` | REQ-RV-08 |
+| 23 | Firebase caído: 500 o 503 | 503 `DEPENDENCY_UNAVAILABLE`; comunicarlo | REQ-RV-09, D10 |
+| 24 | Violación de restricciones de la base | «Lo mejor, más seguro y usable»: clasificación por escrito y sin traducción (explicado a Paula) | REQ-RV-19, D11 |
+| 25 | Registro de errores (`firebaseUid`, nivel, contenido) y compensación fallida | Lo más seguro; prueba de la compensación fallida | REQ-RV-27, D12 |
+| 26 | Regex del `requestId` | Confirmada (`^[A-Za-z0-9._-]{1,64}$`; UUID v4 si no cumple); el `MDC` queda para CM-283 | REQ-RV-03 |
+| 27 | Bloque 4 y el tope de 1000 líneas | Dos PR (código y datos); la excepción del PR de datos es de Paula | D13 |
+| 28 | Estimación de 25 h, fecha de fin del Sprint 2, CM-246 y libro de pruebas v4 | No importa por ahora; se comunica a Vela cuando Paula lo decida | Sección 17 |
 
 ### Abiertas (otras personas)
 
@@ -340,7 +371,7 @@ Idempotency-Key (HU-1.1 no la usa: C-12).
 
 | Bloque | Código | Pruebas y documentación | Total estimado | Líneas de diff (aprox.) |
 |---|---|---|---|---|
-| 1A | 3 h | 2 h | 5 h | 600 |
+| 1A | 4,5 h | 3 h | 7,5 h | 850 (si supera 1000, las tarjetas T-1A.8 a T-1A.10 salen como un PR 1A-bis apilado) |
 | 1B | 2 h | 2,5 h | 4,5 h | 550 |
 | 2 | 1,5 h | 1,5 h | 3 h | 350 |
 | 3 | 1 h | 1,5 h | 2,5 h | 300 |
@@ -348,4 +379,4 @@ Idempotency-Key (HU-1.1 no la usa: C-12).
 | 5 | 1,5 h | 1,5 h | 3 h | 350 |
 | 6 | 2 h | 3 h | 5 h | 700 |
 
-Total ≈ 25 h, frente a las 5 h de la HU: se informa a Vela. Riesgos: el diff del bloque 4 por los datos (se propone entregarlos en un commit aparte, que Paula revisa como datos y no como código); la dependencia nueva del bloque 5; el cambio de textos del bloque 6 afecta a las pruebas de Frontend (se avisa).
+Total ≈ 27,5 h, frente a las 5 h de la HU: se informa a Vela. Riesgos: el diff del bloque 4 por los datos (se propone entregarlos en un commit aparte, que Paula revisa como datos y no como código); la dependencia nueva del bloque 5; el cambio de textos del bloque 6 afecta a las pruebas de Frontend (se avisa).

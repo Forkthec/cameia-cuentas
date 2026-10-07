@@ -7,8 +7,10 @@ Base: `origin/develop` `908112c`. Estado: pendiente de aprobación de Paula. Est
 
 **1A — formato de error.** Se agrega un catálogo `ErrorCode` junto a las excepciones; `BusinessException` pasa a recibir su código; el único manejador
 (`BusinessExceptionHandler`) lo escribe en el miembro `code` de cada respuesta y en cada elemento de `errors[]`, y asigna el código de cada restricción del
-contrato con una tabla `campo + restricción`. No cambia ningún texto ni ningún estado HTTP, salvo el texto del 500 (RT-05-CA01). Una prueba garantiza que ninguna
-restricción del DTO quede sin código.
+contrato con una tabla `campo + restricción`. No cambia el mensaje de ningún campo; cambian tres `detail` (500, 422 con `errors` y el nuevo 503) y el estado cuando
+Firebase no está disponible (500 → 503, REQ-RV-09). Además: códigos de 404, 405 y 415 (REQ-RV-08), registro seguro de cada error (REQ-RV-27), clasificación de las restricciones
+de la base (REQ-RV-19) y corrección del ejemplo del estándar en la copia de Cuentas. Una prueba garantiza que ninguna restricción del DTO quede sin código y otra, que todo código
+esté documentado en `docs/errores.md`.
 
 **1B — tres correcciones.** (a) `birthDate` pasa a texto con una restricción propia de formato estricto; el controlador lo convierte con `RegisterUserRequest.toCommand()`.
 (b) El mensaje de contraseña común pasa al literal del backlog. (c) El pronombre pasa a obligatorio en la API y la base repite los valores admitidos (migración V3).
@@ -23,7 +25,10 @@ Se documenta el contrato en OpenAPI.
 | 1A | Modificar | `domain/exception/EmailAlreadyRegisteredException.java`, `AccountNotFoundException.java`, `EmailNotVerifiedException.java` | Pasan su código al padre |
 | 1A | Modificar | `domain/exception/InvalidBirthDateException.java` | Cada `Reason` lleva su `ErrorCode` |
 | 1A | Modificar | `domain/exception/WeakPasswordException.java`, `domain/policy/PasswordPolicy.java`, `domain/policy/AgePolicy.java` | Reciben/pasan el código |
-| 1A | Modificar | `presentation/advice/BusinessExceptionHandler.java` | `code`, `errors[].code`, tabla de restricciones, texto del 500, registro 4xx con `code` |
+| 1A | Modificar | `presentation/advice/BusinessExceptionHandler.java` | `code`, `errors[].code`, tabla de restricciones, `detail` fijo, texto del 500, `requestId`, registro seguro, manejadores de 404, 405, 415, 503 y de integridad de la base |
+| 1A | Crear | `domain/exception/DependencyUnavailableException.java` | Firebase no disponible (503) |
+| 1A | Modificar | `infrastructure/client/FirebaseUserDirectoryAdapter.java` | `createUser`, `assignFreePlanClaim` y `deleteUser` lanzan `DependencyUnavailableException` ante indisponibilidad |
+| 1A | Modificar | `docs/errores.md`, `docs/estandar-backend.md` | Una fila por código emitido; ejemplo de `detail` del estándar |
 | 1A | Modificar | `src/test/.../presentation/controller/UserRegistrationControllerTest.java`, `AccountActivationControllerTest.java`, `domain/policy/*Test.java` | Aserciones de `code`; constructores nuevos |
 | 1A | Crear | `src/test/.../domain/exception/ErrorCodeTest.java`, `src/test/.../presentation/advice/BusinessExceptionHandlerTest.java` | Vocabulario cerrado; tabla completa; 500 genérico |
 | 1B | Crear | `presentation/dto/BirthDateFormat.java`, `presentation/dto/BirthDateFormatValidator.java` | Restricción y validador de formato estricto |
@@ -33,7 +38,8 @@ Se documenta el contrato en OpenAPI.
 | 1B | Crear | `src/main/resources/db/migration/V3__restringir_pronombres.sql` | `ck_cuenta_pronombres_valor` |
 | 1B | Modificar | `domain/model/Pronoun.java` | Javadoc: ya no es opcional en el registro |
 | 1B | Pruebas | `src/test/.../presentation/dto/BirthDateFormatValidatorTest.java` (nuevo), `UserRegistrationControllerTest`, `PasswordPolicyTest`, `CuentaSchemaMigrationTest`, `AccountRegistrationEndToEndTest` | Ver `tasks.md` |
-| No se tocan | `application/**`, `infrastructure/**` (salvo la migración), `pom.xml`, `Dockerfile`, `.github/**`, `docker-compose.yml`, migraciones V1 y V2 | |
+| 1A | Crear (pruebas) | `ErrorCodeDocumentationTest`, `FirebaseUserDirectoryAdapterTest` (o ampliar el existente), `CuentaConstraintsClassificationTest` (Testcontainers), `FrameworkErrorsTest` | Ver tarjetas T-1A.8 a T-1A.10 |
+| No se tocan | `application/**`, `pom.xml`, `Dockerfile`, `.github/**`, `docker-compose.yml`, migraciones V1 y V2; `infrastructure/**` solo lo de la tabla (y la migración V3 de 1B) | |
 
 ## 3. Reutiliza / por qué se crea algo nuevo
 
@@ -60,8 +66,11 @@ Ver spec, sección 13 (D1 a D6). Resumen de lo que el plan agrega:
 | El orden de `FieldError` de Spring no está garantizado | Las pruebas buscan por `field` (`$.errors[?(@.field=='x')]`), nunca por posición |
 | Un nombre de componente del `record` cambia | La prueba de la tabla recorre los componentes del DTO por reflexión y falla |
 | V3 falla en una base con datos distintos de `HE`, `SHE`, `THEY` | El código solo escribe el enumerado; acción para DevOps (pregunta 12); la migración se prueba contra una base con filas |
-| 1A + 1B superan 1000 líneas | Dos PR: 1A (≈ 600) y 1B (≈ 550). Si 1A supera 900 líneas medidas, la tarjeta T-1A.5 pasa a un PR aparte |
-| Choque con CM-283 (`docs/errores.md`, ADR del `code`) | CM-283 va primero en Cuentas (orden A, B, C1, C2). Si `docs/errores.md` existe en `develop` al abrir el PR, 1A agrega las filas de sus códigos; si no, el PR lo declara y no lo crea |
+| 1A + 1B superan 1000 líneas | Dos PR: 1A (≈ 850) y 1B (≈ 550). Si 1A supera 900 líneas medidas, las tarjetas T-1A.8 a T-1A.10 salen como un PR 1A-bis apilado sobre 1A |
+| `docs/errores.md`, ADR 0001 y `docs/estandar-backend.md` | Ya existen en `develop` (CM-283, #37). 1A agrega las filas de sus códigos, corrige el ejemplo del `detail` en la copia de Cuentas (Perfil, Gateway y Entrevista la reciben en su PR; mientras tanto la copia de Cuentas es distinta, se declara en el PR) y quita de «Respuestas publicadas que difieren» lo que corrige (500 sin `charset`, texto del 500) |
+| El SDK de Firebase no lanza lo que supone la tarjeta T-1A.9 | V-07 antes de escribir el código; si no coincide, se detiene y se reporta |
+| `cameia-web` lee el `detail` del 422 del registro | La búsqueda en su `develop` no encontró lectura de `detail` fuera de los mocks; `ADR-0007` de Frontend solo exige `title`, `detail`, `status` y `errors`. Se avisa en el documento a Frontend |
+| Rebase de la rama sobre `develop` | La rama solo tiene commits de documentación y no está en el remoto; la tarjeta T-1A.0 la rebasa en local (nunca force-push) |
 
 ## 6. Matriz de pruebas del bloque 1
 
@@ -97,7 +106,7 @@ Paralelo posible: bloque 4 con 2 y 3; el resto es secuencial porque comparten `R
 
 ## 8. Estimación
 
-1A ≈ 5 h (≈ 600 líneas con pruebas) · 1B ≈ 4,5 h (≈ 550 líneas). Total del bloque 1 ≈ 9,5 h (la HU entera estima 5 h; se informa a Vela).
+1A ≈ 7,5 h (≈ 850 líneas con pruebas) · 1B ≈ 4,5 h (≈ 550 líneas). Total del bloque 1 ≈ 12 h (la HU entera estima 5 h; se informa a Vela cuando Paula lo decida). El bloque 4 va en dos PR: 4a (código) y 4b (solo el archivo de datos).
 
 ## 9. Bloque 2 — recorte, NFC y un mensaje por campo (PR 2)
 

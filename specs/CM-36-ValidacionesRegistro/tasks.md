@@ -18,6 +18,12 @@ agregan aquí antes de ejecutar cada bloque. Se marca `[x]` solo con la salida r
 
 # PR 1A — formato de error con `code`
 
+## [ ] T-1A.0 · Preparar la rama — ≤ 15 min, sin cambios de código
+
+- **Hacer:** `git fetch`; comprobar que `git branch -r` no lista `CM-36-validaciones-registro` (la rama no está en el remoto); `git rebase origin/develop` **en local** (solo hay commits de documentación; si hay conflictos en `specs/`, resolverlos conservando la versión de la rama). Comprobar que existen `docs/errores.md`, `docs/estandar-backend.md` y `docs/adr/0001-codigo-de-error-y-request-id.md`.
+- **Detenerse y reportar si:** la rama existe en el remoto (el rebase exigiría force-push, prohibido sin orden expresa), o falta alguno de los tres documentos.
+- **Verificación:** `git log --oneline origin/develop..HEAD` solo lista commits `docs(...)`; `./mvnw.cmd -B test` en verde antes de tocar nada.
+
 ## [ ] T-1A.1 · Catálogo `ErrorCode` — ≤ 20 min, ≈ 90 líneas
 
 - **Cubre:** REQ-RV-05. **Crear:** `domain/exception/ErrorCode.java` y `src/test/.../domain/exception/ErrorCodeTest.java`. **No tocar** nada más.
@@ -56,11 +62,15 @@ agregan aquí antes de ejecutar cada bloque. Se marca `[x]` solo con la salida r
       /** El cuerpo de la petición no se puede interpretar. */ REQUEST_BODY_INVALID_FORMAT,
       /** Falta el encabezado de identidad que pone el Gateway. */ IDENTITY_REQUIRED,
       /** El usuario no tiene cuenta local. */ ACCOUNT_NOT_FOUND,
-      /** El correo aún no está verificado. */ EMAIL_NOT_VERIFIED
+      /** El correo aún no está verificado. */ EMAIL_NOT_VERIFIED,
+      /** Firebase no está disponible; la persona puede reintentar. */ DEPENDENCY_UNAVAILABLE,
+      /** La ruta solicitada no existe. */ ROUTE_NOT_FOUND,
+      /** El método HTTP no está permitido en esa ruta. */ METHOD_NOT_ALLOWED,
+      /** El tipo de contenido de la petición no se admite. */ MEDIA_TYPE_NOT_ALLOWED
   }
   ```
   (Escribir cada Javadoc en su propia línea, como el resto del repo; aquí se compactó para ahorrar espacio.)
-- **Prueba** `ErrorCodeTest` (en el estilo de `AgePolicyTest`): `@ParameterizedTest @EnumSource(ErrorCode.class) void todoCodigoUsaUnaCausaDelVocabularioCerrado(ErrorCode codigo)`: si el código es `VALIDATION_FAILED` o `INTERNAL_ERROR`, `return`; si no, `assertThat(codigo.name()).matches("^[A-Z]+(_[A-Z]+)+$")` y `assertThat(CAUSAS).anyMatch(causa -> codigo.name().endsWith("_" + causa))`, con `CAUSAS = List.of("REQUIRED","TOO_SHORT","TOO_LONG","INVALID_FORMAT","INVALID_CHARACTERS","INVALID_VALUE","OUT_OF_RANGE","IN_THE_FUTURE","UNDERAGE","NOT_FOUND","ALREADY_REGISTERED","NOT_VERIFIED")`. Más `@Test void noHayCodigosRepetidos` que compruebe `Arrays.stream(values()).map(Enum::name).distinct().count()` igual a `values().length`.
+- **Prueba** `ErrorCodeTest` (en el estilo de `AgePolicyTest`): `@ParameterizedTest @EnumSource(ErrorCode.class) void todoCodigoUsaUnaCausaDelVocabularioCerrado(ErrorCode codigo)`: si el código es `VALIDATION_FAILED` o `INTERNAL_ERROR`, `return`; si no, `assertThat(codigo.name()).matches("^[A-Z]+(_[A-Z]+)+$")` y `assertThat(CAUSAS).anyMatch(causa -> codigo.name().endsWith("_" + causa))`, con `CAUSAS = List.of("REQUIRED","TOO_SHORT","TOO_LONG","TOO_COMMON","INVALID_FORMAT","INVALID_CHARACTERS","INVALID_VALUE","OUT_OF_RANGE","IN_THE_FUTURE","UNDERAGE","NOT_FOUND","ALREADY_REGISTERED","NOT_ALLOWED","NOT_VERIFIED","UNAVAILABLE")` (`TOO_COMMON` es la causa nueva aprobada con esta spec; las dos excepciones del `return` son las únicas permitidas). Más `@Test void noHayCodigosRepetidos` que compruebe `Arrays.stream(values()).map(Enum::name).distinct().count()` igual a `values().length`.
 - **Verificación:** `./mvnw.cmd -q -B -Dtest=ErrorCodeTest test` en verde.
 
 ## [ ] T-1A.2 · Las excepciones de negocio llevan su código — ≤ 30 min, ≈ 90 líneas
@@ -122,15 +132,23 @@ agregan aquí antes de ejecutar cada bloque. Se marca `[x]` solo con la salida r
              Map.entry("email.NotBlank", ErrorCode.EMAIL_REQUIRED),
              Map.entry("password.NotBlank", ErrorCode.PASSWORD_REQUIRED));
      ```
-  2. `problema(HttpStatus estado, String titulo, String detalle)` pasa a `problema(HttpStatus estado, String titulo, String detalle, ErrorCode codigo)`: agrega `problema.setProperty("code", codigo.name())` y, **solo si** `estado.is4xxClientError()`, `logger.warn("Error atendiendo la petición [status={}, code={}]", estado.value(), codigo)` (sin datos de la petición). Los 5xx ya se registran completos en `falloInterno`.
+  2. `problema(HttpStatus estado, String titulo, String detalle)` pasa a `problema(HttpStatus estado, String titulo, String detalle, ErrorCode codigo)`: agrega `problema.setProperty("code", codigo.name())` y, **solo si** `estado.is4xxClientError()`, `logger.warn("Error atendiendo la petición [status={}, code={}]", estado.value(), codigo)` (sin datos de la petición; T-1A.5 agrega `requestId` y la lista de campos). Los 5xx se registran completos en `falloInterno`. Cada error se registra **una sola vez**: ningún servicio ni controlador registra el mismo error otra vez. Constante nueva `private static final String DETALLE_VALIDACION = "Revisa los campos marcados.";`.
   3. `campo(String nombre, String mensaje)` pasa a `campo(String nombre, ErrorCode codigo, String mensaje)` y devuelve `Map.of("field", nombre, "code", codigo.name(), "message", mensaje == null ? "Valor no válido" : mensaje)`.
-  4. Cada método usa el código de la excepción: `correoRepetido` → `error.getErrorCode()`; `fechaInvalida` y `contraseniaDebil` → `error.getErrorCode()` en el `problema` **y** en `campo(...)`; `correoSinVerificar` y `cuentaInexistente` → `error.getErrorCode()`.
-  5. `camposInvalidos`: código de nivel superior `VALIDATION_FAILED`; **un elemento por campo** (el primer `FieldError` de cada campo) con
+  4. Cada método usa el código de la excepción: `correoRepetido` → `error.getErrorCode()` (409); `correoSinVerificar` y `cuentaInexistente` → `error.getErrorCode()`; **`fechaInvalida` y `contraseniaDebil` (422 de dominio de un solo campo)**: código de nivel superior `VALIDATION_FAILED`, `detail` fijo `"Revisa los campos marcados."` (constante `DETALLE_VALIDACION`, la misma de `camposInvalidos`) y `errors` con **un** elemento `campo("birthDate" o "password", error.getErrorCode(), error.getMessage())`. El texto del mensaje no cambia (hoy sale en `detail`; pasa solo a `errors[].message`).
+  5. `camposInvalidos`: código de nivel superior `VALIDATION_FAILED`, `detail` = `DETALLE_VALIDACION`; **un elemento por campo** (el primer `FieldError` de cada campo) con
      ```java
      private ErrorCode codigoDe(FieldError fallo) {
-         return FIELD_ERROR_CODES.getOrDefault(fallo.getField() + "." + fallo.getCode(), ErrorCode.VALIDATION_FAILED);
+         String clave = fallo.getField() + "." + fallo.getCode();
+         ErrorCode codigo = FIELD_ERROR_CODES.get(clave);
+         if (codigo == null) {
+             // Nunca VALIDATION_FAILED en un elemento: ese código es de la operación entera.
+             logger.error("Restricción del contrato sin código de error: {}", clave);
+             return ErrorCode.REQUEST_INVALID_VALUE;
+         }
+         return codigo;
      }
      ```
+     (La prueba `todaRestriccionDelContratoTieneCodigo` de T-1A.4 impide que esa rama ocurra; existe para que un descuido no deje pasar un código genérico en silencio.)
      Recorrer `error.getBindingResult().getFieldErrors()` con un `LinkedHashMap<String, Map<String,String>>` y `putIfAbsent(fallo.getField(), campo(fallo.getField(), codigoDe(fallo), fallo.getDefaultMessage()))`; `errors` = `new ArrayList<>(mapa.values())`.
   6. `cuerpoIlegible` → código `REQUEST_BODY_INVALID_FORMAT`, **sin cambiar el texto** (el bloque 6 lo cambia). `peticionIncompleta` → `IDENTITY_REQUIRED`. `valorInvalido` (`IllegalArgumentException`) → código propio `REQUEST_INVALID_VALUE`, **nunca** `VALIDATION_FAILED` (que significa «mira la lista `errors`»). El `detail` conserva el mensaje solo si la excepción nace en el dominio (`error.getStackTrace()[0].getClassName()` empieza por `tech.cameia.cuentas.domain`): son textos escritos para la persona. Si nace en otra parte (una librería), `detail` = «Revisa los datos enviados.». Se registra `WARN` «Valor rechazado sin campo: code=REQUEST_INVALID_VALUE requestId={} origen={}» con `clase.método` del primer elemento de la traza, **sin** el mensaje. Los bloques 3, 5 y 6 eliminan este camino. `falloInterno` → `INTERNAL_ERROR` y `detalle` = `"Ocurrió un error. Inténtalo de nuevo."`.
 - **Trampas:** el nombre de la restricción que devuelve `FieldError.getCode()` es el nombre simple de la anotación (`NotBlank`, `NotNull`, `Size`); `Map.of` solo admite 10 pares, por eso `Map.ofEntries`; el orden de `getFieldErrors()` no está garantizado, no se asume.
@@ -146,8 +164,8 @@ agregan aquí antes de ejecutar cada bloque. Se marca `[x]` solo con la salida r
   4. `unValorInvalidoDeLibreriaNoMuestraSuMensaje`: el controlador interno lanza `new IllegalArgumentException("No enum constant tech.cameia.X")` → 422, `REQUEST_INVALID_VALUE`, `$.detail` = «Revisa los datos enviados.»; la salida del log (capturada) contiene `origen=` y no contiene `No enum constant`.
 - **`UserRegistrationControllerTest` (agregar a las pruebas existentes, no duplicarlas):**
   - 409 (línea 73): `jsonPath("$.code").value("EMAIL_ALREADY_REGISTERED")`.
-  - menor de edad (línea 84): `$.code` = `BIRTH_DATE_UNDERAGE`; `$.errors[0].code` = `BIRTH_DATE_UNDERAGE`; `$.errors[0].field` = `birthDate`.
-  - contraseña débil (línea 96): `$.errors[0].code` = `PASSWORD_TOO_SHORT`.
+  - menor de edad (línea 84): `$.code` = `VALIDATION_FAILED`; `$.detail` = «Revisa los campos marcados.»; `$.errors.length()` = 1; `$.errors[0].code` = `BIRTH_DATE_UNDERAGE`; `$.errors[0].field` = `birthDate`; `$.errors[0].message` conserva el texto vigente.
+  - contraseña débil (línea 96): `$.code` = `VALIDATION_FAILED`; `$.errors[0].code` = `PASSWORD_TOO_SHORT`; `$.errors[0].field` = `password`.
   - campo obligatorio (línea 106): `$.code` = `VALIDATION_FAILED` y `$.errors[?(@.field=='firstName')].code` contiene `FIRST_NAME_REQUIRED` (buscar por `field`, nunca por posición).
   - fecha con otro formato (línea 120) y pronombre `OTRO` (línea 132): `$.code` = `REQUEST_BODY_INVALID_FORMAT`.
   - Un caso nuevo `variosCamposInvalidosDevuelvenUnElementoPorCampo`: cuerpo con `firstName` y `lastName` en blanco y `email` en blanco → `$.errors.length()` = 3 y un código por campo (`FIRST_NAME_REQUIRED`, `LAST_NAME_REQUIRED`, `EMAIL_REQUIRED`).
@@ -157,9 +175,9 @@ agregan aquí antes de ejecutar cada bloque. Se marca `[x]` solo con la salida r
 
 ## [ ] T-1A.5 · `requestId` en el cuerpo y en el encabezado — ≤ 30 min, ≈ 70 líneas
 
-Solo si Paula responde «sí, desde esta tarea». Si responde «no», se omite y el `requestId` lo agrega la pieza P2-05 de CM-283.
+Decidido por Paula (6-oct-2026): el `requestId` entra desde 1A, sin filtro ni `MDC` (el `MDC` llega con CM-283, parte 2). La expresión del identificador quedó confirmada el 7-oct-2026.
 
-- **Cubre:** REQ-RV-03. **Modificar:** `BusinessExceptionHandler.java` y `BusinessExceptionHandlerTest`.
+- **Cubre:** REQ-RV-03 y REQ-RV-27 (registro seguro). **Modificar:** `BusinessExceptionHandler.java` y `BusinessExceptionHandlerTest`.
 - **Código de referencia** (dentro de `problema(...)`; sin cambiar las firmas de los manejadores):
   ```java
   private static final Pattern REQUEST_ID_VALIDO = Pattern.compile("^[A-Za-z0-9._-]{1,64}$");
@@ -178,6 +196,8 @@ Solo si Paula responde «sí, desde esta tarea». Si responde «no», se omite y
   ```
   y `problema.setProperty("requestId", requestId)`; el `logger.warn` de T-1A.3 agrega `requestId`, y `falloInterno` registra `logger.error("Fallo no controlado: code=INTERNAL_ERROR requestId={}", requestId, error)` (con la traza). Así el `requestId` que la persona ve en la respuesta lleva a una sola línea del log. Prueba: un 500 deja en el log capturado el mismo `requestId` del cuerpo.
 - **Pruebas:** encabezado válido `abc-123` → mismo valor en `$.requestId` y en el encabezado de la respuesta; ausente → UUID v4 (`matches("[0-9a-f-]{36}")`) y mismo valor en el encabezado; `abc 123` (con espacio) y 65 caracteres → UUID nuevo; el valor nunca es el enviado cuando no cumple la expresión.
+- **Registro seguro (REQ-RV-27), en esta misma tarjeta:** (a) el WARN de 4xx lleva `code`, `requestId` y, en `camposInvalidos`, los nombres de campo separados por coma (`fallo.getField()`, que sale del contrato); nunca `getRejectedValue()` ni `getDefaultMessage()` en el log; (b) `cuerpoIlegible` y los demás manejadores de deserialización registran solo `error.getClass().getSimpleName()` (ya es así: conservarlo); (c) el `requestId` solo se escribe en el log y en la respuesta después de pasar `REQUEST_ID_VALIDO`; (d) en `RegisterUserService.compensar` la línea `ERROR` existente ya lleva `firebaseUid`: no se toca, solo se le agrega la prueba siguiente.
+- **Pruebas de registro (en `RegisterUserServiceTest`, con captura del log como en las pruebas existentes de esa clase; si no hay captura de log, usar `OutputCaptureExtension` de Spring Boot):** (1) si la base falla y `deleteUser` también falla, el log contiene `ERROR`, el `firebaseUid` y `conciliación manual`, y no contiene el correo ni la contraseña; (2) una respuesta 422 con contraseña débil no deja la contraseña en el log; (3) un 500 deja en el log el mismo `requestId` del cuerpo.
 - **Trampa:** con `standaloneSetup`, `RequestContextHolder` está disponible durante el despacho; si lanza `IllegalStateException`, **detenerse** y reportar (alternativa: recibir `HttpServletRequest` y `HttpServletResponse` como parámetros de cada manejador).
 
 ## [ ] T-1A.6 · Prueba de punta a punta y `charset` del tipo de contenido — ≤ 30 min, ≈ 35 líneas
@@ -188,11 +208,81 @@ Solo si Paula responde «sí, desde esta tarea». Si responde «no», se omite y
 - **Si sigue fallando con la propiedad**, no cambiar cada método del manejador ni dejar la aserción comentada: **detenerse** y reportar el valor real del encabezado.
 - **Verificación:** con Docker en marcha, `./mvnw.cmd -B -Dtest=AccountRegistrationEndToEndTest test` en verde; sin Docker, decir que se omitió.
 
-## [ ] T-1A.7 · Cierre del PR 1A — ≤ 30 min
+## [ ] T-1A.8 · Errores del propio framework: 404, 405 y 415 — ≤ 30 min, ≈ 90 líneas
 
-- `./mvnw.cmd -B clean verify` con salida real; número de pruebas; cobertura JaCoCo de `BusinessExceptionHandler`, `ErrorCode`, `BusinessException`, `InvalidBirthDateException`, `WeakPasswordException`, `PasswordPolicy`: líneas y ramas reales (meta ≥ 90 %), cada una sin cubrir con su razón; la cobertura global del repo no baja.
+- **Cubre:** REQ-RV-08, V-08. **Modificar:** `presentation/advice/BusinessExceptionHandler.java`. **Crear:** `src/test/.../presentation/advice/FrameworkErrorsTest.java`.
+- **Primero (V-08), sin cambiar código:** con `MockMvc` (contexto completo, como `UserRegistrationControllerTest`) enviar `GET /ruta-que-no-existe`, `DELETE /api/v1/users` y `POST /api/v1/users` con `Content-Type: text/plain`, y anotar estado y cuerpo reales en el informe. **Detenerse y reportar** si alguno responde 500 o un cuerpo que no sea `application/problem+json`: esa información decide si basta con los manejadores de abajo.
+- **Código de referencia** (tres manejadores nuevos; Spring 6 y 7 lanzan `NoResourceFoundException`, `HttpRequestMethodNotSupportedException` y `HttpMediaTypeNotSupportedException`):
+  ```java
+  /** Ruta que no existe. */
+  @ExceptionHandler(NoResourceFoundException.class)
+  ProblemDetail rutaInexistente(NoResourceFoundException error) {
+      return problema(HttpStatus.NOT_FOUND, "Ruta no encontrada", "No existe la ruta solicitada.", ErrorCode.ROUTE_NOT_FOUND);
+  }
+
+  /** Método HTTP no permitido en la ruta. */
+  @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+  ProblemDetail metodoNoPermitido(HttpRequestMethodNotSupportedException error) {
+      return problema(HttpStatus.METHOD_NOT_ALLOWED, "Método no permitido", "Método no permitido.", ErrorCode.METHOD_NOT_ALLOWED);
+  }
+
+  /** Tipo de contenido que la ruta no admite. */
+  @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+  ProblemDetail tipoDeContenidoNoAdmitido(HttpMediaTypeNotSupportedException error) {
+      return problema(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Tipo de contenido no admitido", "Tipo de contenido no admitido.", ErrorCode.MEDIA_TYPE_NOT_ALLOWED);
+  }
+  ```
+  El `Allow` del 405 que pone Spring se conserva si la excepción lo trae: no sobrescribirlo.
+- **Pruebas** (`FrameworkErrorsTest`, contexto completo): `GET /ruta-que-no-existe` → 404, `$.code` = `ROUTE_NOT_FOUND`; `DELETE /api/v1/users` → 405, `$.code` = `METHOD_NOT_ALLOWED`; `POST /api/v1/users` con `Content-Type: text/plain` → 415, `$.code` = `MEDIA_TYPE_NOT_ALLOWED`; los tres con `$.requestId` presente y sin el texto de la excepción de Spring en el cuerpo.
+- **Trampa:** si Spring ya resuelve alguno con `ResponseStatusExceptionResolver` antes del manejador, la prueba lo detecta (el cuerpo no tendrá `code`); entonces agregar el manejador en vez de cambiar la prueba.
+- **Verificación:** `./mvnw.cmd -B -Dtest='FrameworkErrorsTest,UserRegistrationControllerTest' test` en verde.
+
+## [ ] T-1A.9 · Firebase no disponible responde 503 — ≤ 30 min, ≈ 110 líneas
+
+- **Cubre:** REQ-RV-09, V-07. **Crear:** `domain/exception/DependencyUnavailableException.java`. **Modificar:** `infrastructure/client/FirebaseUserDirectoryAdapter.java` (métodos `createUser`, `assignFreePlanClaim`, `deleteUser`), `presentation/advice/BusinessExceptionHandler.java`, `infrastructure/client/FirebaseUserDirectoryAdapterTest.java`, `presentation/controller/UserRegistrationControllerTest.java`. **No tocar** `isEmailVerified` (el usuario inexistente en Firebase es de otra tarea y está listado en `docs/errores.md`).
+- **Primero (V-07), sin cambiar código:** con el emulador detenido (o con `FIREBASE_AUTH_EMULATOR_HOST` apuntando a un puerto cerrado), llamar a `createUser` desde una prueba desechable y anotar en el informe la clase de excepción, `getErrorCode()` de Firebase y `getAuthErrorCode()`. **Detenerse y reportar** si no es `FirebaseAuthException` con `ErrorCode.UNAVAILABLE`, `DEADLINE_EXCEEDED` o `INTERNAL` (o una causa `IOException`): el criterio de abajo se ajusta con Paula antes de seguir.
+- **Código de referencia:**
+  ```java
+  /** Una dependencia externa (Firebase) no está disponible; la persona puede reintentar. */
+  public class DependencyUnavailableException extends BusinessException {
+      public DependencyUnavailableException(Throwable causa) {
+          super(ErrorCode.DEPENDENCY_UNAVAILABLE, "Ocurrió un error. Inténtalo de nuevo.");
+          initCause(causa);
+      }
+  }
+  ```
+  En el adaptador, un método privado `indisponible(FirebaseAuthException error)` devuelve `true` si `error.getErrorCode()` es `UNAVAILABLE`, `DEADLINE_EXCEEDED` o `INTERNAL`, o si `error.getCause() instanceof IOException`. En `createUser`, `assignFreePlanClaim` y `deleteUser`: `if (indisponible(error)) throw new DependencyUnavailableException(error);` antes del `IllegalStateException` existente, que se conserva para cualquier otro rechazo (un dato propio que Firebase rechaza no es indisponibilidad: sigue siendo `INTERNAL_ERROR`). En el manejador: `@ExceptionHandler(DependencyUnavailableException.class)` → `problema(HttpStatus.SERVICE_UNAVAILABLE, "Servicio no disponible", "Ocurrió un error. Inténtalo de nuevo.", error.getErrorCode())`, que registra `WARN`.
+- **Pruebas:** en `FirebaseUserDirectoryAdapterTest` con un `FirebaseAuth` simulado: `createUser` con `FirebaseAuthException` de `UNAVAILABLE` → `DependencyUnavailableException`; con `DEADLINE_EXCEEDED` → igual; con `INVALID_ARGUMENT` → `IllegalStateException` (no es indisponibilidad); con `EMAIL_ALREADY_EXISTS` → `EmailAlreadyRegisteredException` (sin cambio). En `UserRegistrationControllerTest`: el servicio lanza `DependencyUnavailableException` → 503, `$.code` = `DEPENDENCY_UNAVAILABLE`, `$.detail` = «Ocurrió un error. Inténtalo de nuevo.». En `RegisterUserServiceTest`: si `assignFreePlanClaim` lanza `DependencyUnavailableException`, se compensa (`deleteUser` llamado una vez) y la excepción se relanza.
+- **Trampa:** la compensación de `RegisterUserService` captura `RuntimeException` y relanza la misma: `DependencyUnavailableException` pasa intacta; no envolverla.
+- **Verificación:** `./mvnw.cmd -B -Dtest='FirebaseUserDirectoryAdapterTest,UserRegistrationControllerTest,RegisterUserServiceTest' test` en verde.
+
+## [ ] T-1A.10 · Restricciones de la base: registro seguro y clasificación — ≤ 30 min, ≈ 100 líneas
+
+- **Cubre:** REQ-RV-19, D11. **Modificar:** `presentation/advice/BusinessExceptionHandler.java`. **Crear:** `src/test/.../infrastructure/persistence/CuentaConstraintsClassificationTest.java` (con Testcontainers, como `CuentaSchemaMigrationTest`).
+- **Manejador nuevo** (la excepción cita el valor de la columna en su mensaje: no se registra el mensaje ni la traza completa):
+  ```java
+  /** Violación de una restricción de la base: es un defecto, no un error de la persona. */
+  @ExceptionHandler(DataIntegrityViolationException.class)
+  ProblemDetail integridadDeDatos(DataIntegrityViolationException error) {
+      String restriccion = error.getCause() instanceof org.hibernate.exception.ConstraintViolationException hibernate
+              ? hibernate.getConstraintName() : "desconocida";
+      // El mensaje de la base incluye el valor de la columna (dato personal): solo se registra el nombre.
+      logger.error("Violación de restricción de la base [constraint={}, code={}]", restriccion, ErrorCode.INTERNAL_ERROR);
+      return problema(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno", DETALLE_INTERNO, ErrorCode.INTERNAL_ERROR);
+  }
+  ```
+  (`DETALLE_INTERNO` = «Ocurrió un error. Inténtalo de nuevo.», la constante que ya usa `falloInterno`; si no existe como constante, crearla y usarla en ambos.) T-1A.5 agrega el `requestId` a esta línea.
+- **Prueba de la clasificación** (`CuentaConstraintsClassificationTest`): con la base migrada, `SELECT conname FROM pg_constraint WHERE conrelid = 'microcuentas.cuenta'::regclass` debe ser igual, como conjunto, a `CLASIFICADAS = Set.of("cuenta_pkey", "uq_cuenta_firebase_uid", "ck_cuenta_nombre", "ck_cuenta_apellido", "ck_cuenta_estado", "ck_cuenta_version", "ck_cuenta_telefono_e164", "ck_cuenta_pronombres_no_vacio", "ck_cuenta_fecha_actualizacion", "ck_cuenta_fecha_eliminacion", "ck_cuenta_anonimizacion")`. La clave primaria de la migración V1 no tiene nombre, así que PostgreSQL la llama `cuenta_pkey` (no sigue el prefijo `pk_` del estándar; una migración aplicada no se edita). El mensaje de falla dice: «Hay una restricción sin clasificar: agrégala a la sección 7 de la spec y decide si necesita código propio». La migración V3 de 1B agrega `ck_cuenta_pronombres_valor` a este conjunto.
+- **Prueba del manejador:** un controlador interno que lanza `new DataIntegrityViolationException("duplicate key value (nombre)=(Ana Pérez) viola uq_cuenta_firebase_uid")` → 500, `$.code` = `INTERNAL_ERROR`, el cuerpo y el log capturado **no** contienen `Ana Pérez`.
+- **Trampa:** `org.hibernate.exception.ConstraintViolationException` está en el classpath por Spring Data JPA; si `LayeredArchitectureTest` prohíbe a `presentation` importar Hibernate, mover solo la extracción del nombre a un método estático de `infrastructure/persistence` (por ejemplo `ConstraintNames.of(Throwable)`) y llamarlo desde el manejador solo si la regla lo permite; si tampoco, **detenerse y reportar**.
+- **Verificación:** `./mvnw.cmd -B -Dtest='CuentaConstraintsClassificationTest,BusinessExceptionHandlerTest,LayeredArchitectureTest' test` en verde (con Docker; sin Docker decir que la clasificación se omitió).
+
+## [ ] T-1A.11 · Cierre del PR 1A — ≤ 45 min
+
+- **Documentación formal:** (1) `docs/errores.md`: una fila por código emitido (`Código | HTTP | Mensaje | Origen | Prueba`), quitar de «Códigos que el servicio emite» la frase «Todavía no emite el campo `code`», quitar de «Respuestas publicadas que difieren del estándar» el `charset` (corregido en T-1A.6), actualizar el texto del 500 y agregar `DEPENDENCY_UNAVAILABLE`, `ROUTE_NOT_FOUND`, `METHOD_NOT_ALLOWED` y `MEDIA_TYPE_NOT_ALLOWED`; (2) `docs/estandar-backend.md`, sección 6: en el ejemplo, `"detail": "Revisa los campos marcados."` en lugar de «La contraseña es demasiado común.», una línea que diga «`detail` de un 422 con `errors` es fijo; el mensaje de cada campo va en `errors[].message`» y la causa `TOO_COMMON` en el vocabulario cerrado; la misma corrección se aplica a la copia de la skill `backend-estandar` (`estandar-estricto.md`, sección A) y el PR declara que Perfil, Gateway y Entrevista reciben el archivo en el PR de cada uno (la copia de Cuentas queda distinta hasta entonces); (3) `ErrorCodeDocumentationTest`: cada valor de `ErrorCode` aparece en `docs/errores.md` (lee el archivo con `Files.readString(Path.of("docs/errores.md"))` y comprueba `contains(codigo.name())`).
+- **Verificación:** `./mvnw.cmd -B clean verify` con salida real; número de pruebas; cobertura JaCoCo de `BusinessExceptionHandler`, `ErrorCode`, `BusinessException`, `InvalidBirthDateException`, `WeakPasswordException`, `PasswordPolicy`: líneas y ramas reales (meta ≥ 90 %), cada una sin cubrir con su razón; la cobertura global del repo no baja.
 - Revisión (`backend-estandar` §6): `/simplify`, `/code-review high`, autochequeo (¿algún `getMessage()` de librería llega al cliente? ¿algún log con dato personal? ¿algún comentario con `CM-NNN`?).
-- Documentación: si `docs/errores.md` existe en `develop`, agregar una fila por código emitido (`Código | HTTP | Mensaje | Origen | Prueba`); si no existe, declararlo en el PR (lo crea otra tarea). Aviso a Frontend: el cuerpo de error agrega `code` y `errors[].code`; el 500 cambia de texto; nada se elimina.
+- Aviso a Frontend (documento por rol de `comunicaciones/`): el cuerpo de error agrega `code`, `requestId` y `errors[].code`; el `detail` de los 422 con `errors` pasa a ser fijo; el 500 cambia de texto; Firebase no disponible responde 503 en lugar de 500; nada se elimina.
 - Entrega: commits `CM-36 | feat(cuentas): código de error en las respuestas de registro [IA-ASISTIDO]`; PR con el título `CM-36 | feat(cuentas): código de error estable en las respuestas de error de Cuentas [IA-ASISTIDO]`; descripción con la plantilla completa, atributos de calidad (seguridad, compatibilidad de contrato, mantenibilidad, observabilidad), qué es mecánico (cambios de constructor en las excepciones y pruebas) y qué importa revisar (`BusinessExceptionHandler`, `ErrorCode`). Tarjeta de Jira a «En revisión» solo al abrir el PR.
 
 ---
