@@ -3,6 +3,7 @@ package tech.cameia.cuentas.domain.policy;
 import java.util.Locale;
 import java.util.Set;
 
+import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
 import tech.cameia.cuentas.domain.model.RawPassword;
 
@@ -63,15 +64,15 @@ public class PasswordPolicy {
         int length = value.codePointCount(0, value.length());
 
         if (length < MINIMUM_LENGTH) {
-            throw new WeakPasswordException(
+            throw new WeakPasswordException(ErrorCode.PASSWORD_TOO_SHORT,
                     "La contraseña debe tener al menos " + MINIMUM_LENGTH + " caracteres");
         }
         if (length > MAXIMUM_LENGTH) {
-            throw new WeakPasswordException(
+            throw new WeakPasswordException(ErrorCode.PASSWORD_TOO_LONG,
                     "La contraseña no puede superar los " + MAXIMUM_LENGTH + " caracteres");
         }
         if (esConocida(value)) {
-            throw new WeakPasswordException(
+            throw new WeakPasswordException(ErrorCode.PASSWORD_TOO_COMMON,
                     "La contraseña es demasiado común brother, cambiala si no quieres que te terminen robando la cuenta");
         }
     }

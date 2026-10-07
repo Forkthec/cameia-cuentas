@@ -14,6 +14,6 @@ public class EmailAlreadyRegisteredException extends BusinessException {
 
     /** Crea la excepción con el mensaje que ve la persona que se registra. */
     public EmailAlreadyRegisteredException() {
-        super(MENSAJE);
+        super(ErrorCode.EMAIL_ALREADY_REGISTERED, MENSAJE);
     }
 }

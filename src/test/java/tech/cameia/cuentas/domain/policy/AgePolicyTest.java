@@ -10,6 +10,7 @@ import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.Test;
 
+import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException.Reason;
 import tech.cameia.cuentas.domain.model.BirthDate;
@@ -75,6 +76,22 @@ class AgePolicyTest {
                 .isInstanceOf(InvalidBirthDateException.class)
                 .extracting(excepcion -> ((InvalidBirthDateException) excepcion).getReason())
                 .isEqualTo(Reason.IMPLAUSIBLE);
+    }
+
+    @Test
+    void cadaCausaDeFechaInvalidaLlevaSuCodigo() {
+        assertThatThrownBy(() -> policy.verify(new BirthDate(HOY.minusYears(18).plusDays(1))))
+                .isInstanceOf(InvalidBirthDateException.class)
+                .extracting(excepcion -> ((InvalidBirthDateException) excepcion).getErrorCode())
+                .isEqualTo(ErrorCode.BIRTH_DATE_UNDERAGE);
+        assertThatThrownBy(() -> policy.verify(new BirthDate(HOY.plusDays(1))))
+                .isInstanceOf(InvalidBirthDateException.class)
+                .extracting(excepcion -> ((InvalidBirthDateException) excepcion).getErrorCode())
+                .isEqualTo(ErrorCode.BIRTH_DATE_IN_THE_FUTURE);
+        assertThatThrownBy(() -> policy.verify(new BirthDate(HOY.minusYears(111))))
+                .isInstanceOf(InvalidBirthDateException.class)
+                .extracting(excepcion -> ((InvalidBirthDateException) excepcion).getErrorCode())
+                .isEqualTo(ErrorCode.BIRTH_DATE_OUT_OF_RANGE);
     }
 
     @Test

@@ -12,6 +12,6 @@ public class EmailNotVerifiedException extends BusinessException {
 
     /** Crea la excepción con el mensaje que ve la persona. */
     public EmailNotVerifiedException() {
-        super(MENSAJE);
+        super(ErrorCode.EMAIL_NOT_VERIFIED, MENSAJE);
     }
 }

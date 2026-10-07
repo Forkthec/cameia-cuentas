@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import tech.cameia.cuentas.application.command.RegisterUserCommand;
 import tech.cameia.cuentas.application.service.RegisterUserService;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
+import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException.Reason;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
@@ -77,7 +78,9 @@ class UserRegistrationControllerTest {
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoValido()))
                 .andExpect(status().isConflict())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.detail").value("Este correo ya se encuentra registrado"));
+                .andExpect(jsonPath("$.detail").value("Este correo ya se encuentra registrado"))
+                .andExpect(jsonPath("$.code").value("EMAIL_ALREADY_REGISTERED"))
+                .andExpect(jsonPath("$.errors").doesNotExist());
     }
 
     @Test
@@ -88,18 +91,27 @@ class UserRegistrationControllerTest {
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoValido()))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.detail").value("Debes ser mayor de edad"))
-                .andExpect(jsonPath("$.errors[0].field").value("birthDate"));
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").value("Revisa los campos marcados."))
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value("birthDate"))
+                .andExpect(jsonPath("$.errors[0].code").value("BIRTH_DATE_UNDERAGE"))
+                .andExpect(jsonPath("$.errors[0].message").value("Debes ser mayor de edad"));
     }
 
     @Test
     void laContraseniaDebilSeSenialaEnSuCampo() throws Exception {
         when(servicio.register(any(RegisterUserCommand.class)))
-                .thenThrow(new WeakPasswordException("La contraseña debe tener al menos 12 caracteres"));
+                .thenThrow(new WeakPasswordException(ErrorCode.PASSWORD_TOO_SHORT,
+                        "La contraseña debe tener al menos 12 caracteres"));
 
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoValido()))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.errors[0].field").value("password"));
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value("password"))
+                .andExpect(jsonPath("$.errors[0].code").value("PASSWORD_TOO_SHORT"))
+                .andExpect(jsonPath("$.errors[0].message").value("La contraseña debe tener al menos 12 caracteres"));
     }
 
     @Test
@@ -111,9 +123,46 @@ class UserRegistrationControllerTest {
 
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(sinNombres))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.errors[0].field").value("firstName"));
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").value("Revisa los campos marcados."))
+                .andExpect(jsonPath("$.errors[?(@.field=='firstName')].code")
+                        .value(org.hamcrest.Matchers.contains("FIRST_NAME_REQUIRED")))
+                .andExpect(jsonPath("$.errors[?(@.field=='firstName')].message")
+                        .value(org.hamcrest.Matchers.contains("Los nombres son obligatorios")));
 
         verify(servicio, never()).register(any(RegisterUserCommand.class));
+    }
+
+    @Test
+    void variosCamposInvalidosDevuelvenUnElementoPorCampo() throws Exception {
+        String camposEnBlanco = cuerpoValido()
+                .replace("\"Ana\"", "\"   \"")
+                .replace("\"Pérez\"", "\"\"")
+                .replace("\"ana@cameia.tech\"", "\" \"");
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(camposEnBlanco))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errors.length()").value(3))
+                .andExpect(jsonPath("$.errors[?(@.field=='firstName')].code")
+                        .value(org.hamcrest.Matchers.contains("FIRST_NAME_REQUIRED")))
+                .andExpect(jsonPath("$.errors[?(@.field=='lastName')].code")
+                        .value(org.hamcrest.Matchers.contains("LAST_NAME_REQUIRED")))
+                .andExpect(jsonPath("$.errors[?(@.field=='email')].code")
+                        .value(org.hamcrest.Matchers.contains("EMAIL_REQUIRED")));
+
+        verify(servicio, never()).register(any(RegisterUserCommand.class));
+    }
+
+    @Test
+    void unCampoQueIncumpleDosRestriccionesTieneUnSoloElemento() throws Exception {
+        // Una cadena vacía de más de 120 caracteres no existe; para que el mismo campo falle
+        // en dos restricciones a la vez se usan 121 espacios: incumple @NotBlank y @Size.
+        String nombreLargoEnBlanco = cuerpoValido().replace("\"Ana\"", "\"" + " ".repeat(121) + "\"");
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(nombreLargoEnBlanco))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value("firstName"));
     }
 
     @Test
@@ -122,6 +171,7 @@ class UserRegistrationControllerTest {
 
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(fechaISO))
                 .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("REQUEST_BODY_INVALID_FORMAT"))
                 .andExpect(jsonPath("$.detail").value(
                         org.hamcrest.Matchers.containsString("DD/MM/AAAA")));
 
@@ -133,9 +183,27 @@ class UserRegistrationControllerTest {
         String pronombreInvalido = cuerpoValido().replace("\"SHE\"", "\"OTRO\"");
 
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(pronombreInvalido))
-                .andExpect(status().isUnprocessableEntity());
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("REQUEST_BODY_INVALID_FORMAT"))
+                .andExpect(jsonPath("$.detail").value(
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("OTRO"))));
 
         verify(servicio, never()).register(any(RegisterUserCommand.class));
+    }
+
+    @Test
+    void elCelularSinIndicativoResponde422ConCodigoDeRespaldoYSinElValor() throws Exception {
+        // El objeto de valor del celular aún no tiene excepción propia: sale con el código
+        // de respaldo y el texto del dominio, nunca con el número recibido.
+        when(servicio.register(any(RegisterUserCommand.class)))
+                .thenAnswer(invocacion -> new tech.cameia.cuentas.domain.model.PhoneNumber("3109998877"));
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoValido()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("REQUEST_INVALID_VALUE"))
+                .andExpect(jsonPath("$.errors").doesNotExist())
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("3109998877"))));
     }
 
     private Account cuentaCreada() {

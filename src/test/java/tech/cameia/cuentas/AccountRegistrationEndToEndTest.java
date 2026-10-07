@@ -64,6 +64,7 @@ class AccountRegistrationEndToEndTest {
 
         assertThat(registro.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(registro.getBody()).contains("PENDING_VERIFICATION").contains("FREE");
+        assertThat(registro.getHeaders().getContentType().toString()).containsIgnoringCase("charset=UTF-8");
 
         String uid = uidGuardado();
         assertThat(estadoGuardado()).isEqualTo("PENDING_VERIFICATION");
@@ -86,7 +87,13 @@ class AccountRegistrationEndToEndTest {
         ResponseEntity<String> repetido = registrar(cuerpoValido());
 
         assertThat(repetido.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-        assertThat(repetido.getBody()).contains("Este correo ya se encuentra registrado");
+        assertThat(repetido.getBody()).contains("Este correo ya se encuentra registrado")
+                .contains("\"code\":\"EMAIL_ALREADY_REGISTERED\"");
+        assertThat(repetido.getHeaders().getContentType()).isNotNull();
+        assertThat(repetido.getHeaders().getContentType().toString())
+                .startsWith("application/problem+json")
+                .containsIgnoringCase("charset=UTF-8");
+        assertThat(repetido.getHeaders().getFirst("X-Request-Id")).isNotBlank();
         assertThat(cuentasGuardadas()).isEqualTo(1);
     }
 

@@ -2,6 +2,8 @@ package tech.cameia.cuentas.presentation.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -63,6 +65,7 @@ class AccountActivationControllerTest {
 
         mockMvc.perform(post(RUTA).header("X-User-Id", "uid-firebase"))
                 .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("EMAIL_NOT_VERIFIED"))
                 .andExpect(jsonPath("$.detail").value(
                         org.hamcrest.Matchers.containsString("verificar tu correo")));
     }
@@ -73,14 +76,19 @@ class AccountActivationControllerTest {
                 .thenThrow(new AccountNotFoundException());
 
         mockMvc.perform(post(RUTA).header("X-User-Id", "uid-sin-cuenta"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_FOUND"));
     }
 
     @Test
     void sinIdentidadDelGatewayLaPeticionNoLlegaAlCasoDeUso() throws Exception {
         // Falta X-User-Id: el Gateway siempre lo emite en las rutas autenticadas, así que
         // una petición sin él no viene del camino previsto.
-        mockMvc.perform(post(RUTA)).andExpect(status().isBadRequest());
+        mockMvc.perform(post(RUTA))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("IDENTITY_REQUIRED"));
+
+        verify(servicio, never()).activate(any(ActivateAccountCommand.class));
     }
 
     private Account cuenta(AccountStatus estado) {
