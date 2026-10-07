@@ -19,10 +19,10 @@ class SingleLineTextTest {
     @ParameterizedTest(name = "[{index}] se recorta a {1}")
     @CsvSource(delimiter = '|', value = {
         "'  Ana  '|Ana",
-        "' Ana '|Ana",
+        "'\u00A0Ana\u00A0'|Ana",
         "'\tAna\n'|Ana",
-        "'﻿Ana'|Ana",
-        "' Ana　'|Ana",
+        "'\uFEFFAna'|Ana",
+        "'\u2003Ana\u3000'|Ana",
         "'\r\nAna\u000B'|Ana"})
     void recortaLosEspaciosQueRecortaElCliente(String recibido, String esperado) {
         assertThat(SingleLineText.normalize(recibido)).isEqualTo(esperado);
@@ -31,7 +31,7 @@ class SingleLineTextTest {
 
     @Test
     void unEspacioDeAnchoCeroNoEsUnEspacioYSeConserva() {
-        assertThat(SingleLineText.normalize("​Ana")).isEqualTo("​Ana");
+        assertThat(SingleLineText.normalize("\u200BAna")).isEqualTo("\u200BAna");
     }
 
     @Test
@@ -42,10 +42,10 @@ class SingleLineTextTest {
     @ParameterizedTest(name = "[{index}] el nombre queda {1}")
     @CsvSource(delimiter = '|', value = {
         "'María  José'|María José",
-        "'Ana  Luz'|Ana Luz",
+        "'Ana\u00A0\u00A0Luz'|Ana Luz",
         "'  Ana \t Luz  '|Ana Luz",
         "'Ana Luz'|Ana Luz",
-        "'Ana​ Luz'|Ana​ Luz"})
+        "'Ana\u200B Luz'|Ana\u200B Luz"})
     void unNombreUneLosEspaciosInternosRepetidosEnUno(String recibido, String esperado) {
         assertThat(SingleLineText.normalizeName(recibido)).isEqualTo(esperado);
     }
@@ -57,7 +57,7 @@ class SingleLineTextTest {
 
     @Test
     void normalizaAFormaNfcYCuentaUnCaracterCompuestoComoUno() {
-        SingleLineText texto = new SingleLineText("é");
+        SingleLineText texto = new SingleLineText("e\u0301");
 
         assertThat(texto.value()).isEqualTo("é");
         assertThat(texto.length()).isEqualTo(1);
@@ -72,7 +72,7 @@ class SingleLineTextTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "   ", " ", "﻿\t\n"})
+    @ValueSource(strings = {"", "   ", "\u00A0", "\uFEFF\t\n"})
     void soloEspaciosQuedaVacio(String recibido) {
         assertThat(new SingleLineText(recibido).isEmpty()).isTrue();
         assertThat(new SingleLineText(recibido).length()).isZero();
