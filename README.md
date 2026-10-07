@@ -90,8 +90,7 @@ la configuración de la aplicación.
 Requiere un PostgreSQL 16 accesible en `DB_HOST:DB_PORT`.
 
 ```powershell
-./mvnw.cmd test            # pruebas
-./mvnw.cmd clean package   # build
+./mvnw.cmd clean verify    # build, pruebas y cobertura (target/site/jacoco/index.html)
 ./mvnw.cmd spring-boot:run # inicio
 ```
 
@@ -133,14 +132,4 @@ Ver [specs/CM-103-DocumentacionApi/spec.md](specs/CM-103-DocumentacionApi/spec.m
 
 ## Contribución
 
-- `main` es estable y solo recibe promociones `develop → main` mediante Merge commit.
-- `develop` integra ramas `<tipo>/CM-NNN-<descripcion-kebab-case>` mediante Squash.
-- Todo cambio ordinario entra mediante PR y revisión distinta del autor.
-
-Tipos admitidos: `feat`, `fix`, `test`, `docs`, `refactor`, `perf`, `build`, `ci` y `chore`.
-
-
-
-
-
-
+Rama, commit, tipos, título de PR, revisión y merge: rige [CONTRIBUTING.md](CONTRIBUTING.md).

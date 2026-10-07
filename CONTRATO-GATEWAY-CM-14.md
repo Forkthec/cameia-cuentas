@@ -2,7 +2,7 @@
 
 - **Origen:** [specs/CM-14-RegistroUsuario/spec.md](specs/CM-14-RegistroUsuario/spec.md)
 - **Fecha:** 17/09/2026
-- **Responsable de llevarlo al Gateway:** Juan David Vela Coronado
+- **Responsable de llevarlo al Gateway:** Product Owner
 - **Destinatario:** quien mantenga `cameia-gateway`
 
 Este documento no cambia nada en cameia-cuentas. Recoge lo que la spec del registro decidió y que
@@ -51,7 +51,7 @@ responde `403` si es `false`. Para que eso funcione, el Gateway tiene que cumpli
 - Cuentas nunca recibe la contraseña por ningún otro canal: viaja en el cuerpo de esa petición y de
   ninguna otra. El Gateway no debe registrar el cuerpo, como ya fija `REQ-REG-08`.
 - Las respuestas de error del registro pasan intactas al cliente (`REQ-REG-09`). Con una precisión
-  nueva: **el tipo de contenido es `application/problem+json`** (RFC 7807), no
+  nueva: **el tipo de contenido es `application/problem+json`** (RFC 9457), no
   `application/json`. Si algún filtro del Gateway reescribe cuerpos o tipos de contenido según el
   `Content-Type`, hay que comprobar que este pasa sin tocarse.
 - Códigos que Cuentas devuelve en el registro: `201`, `409` (correo ya registrado), `422`
