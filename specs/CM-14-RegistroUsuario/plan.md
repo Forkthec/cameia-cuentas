@@ -13,7 +13,7 @@ Este documento dice **cómo** se implementa la spec. Las decisiones de negocio y
 ## 0. Trabajo previo: la ruta de la sonda de salud
 
 Antes de tocar el registro hay que resolver el desajuste que documenta
-[CONTRATO-GATEWAY-CM-14.md](../../CONTRATO-GATEWAY-CM-14.md) §3: el Gateway enruta
+[CLAUDE.md](../../CLAUDE.md) §3: el Gateway enruta
 `Path=/api/v1/users/**` sin `StripPrefix` ni `RewritePath`, así que la petición llega a Cuentas con
 la ruta completa, y hoy la sonda vive en `GET /health`.
 
@@ -208,7 +208,7 @@ edad (`REQ-CU-11`).
 
 `AccountActivationController` recibe `POST /api/v1/users/me/verification` sin cuerpo. La identidad
 sale de `X-User-Id` y la verificación de `X-User-Email-Verified`, según
-[CONTRATO-GATEWAY-CM-14.md](../../CONTRATO-GATEWAY-CM-14.md) §1. Si el encabezado no llega o dice
+[CLAUDE.md](../../CLAUDE.md) §3. Si el encabezado no llega o dice
 `false`, Cuentas consulta `isEmailVerified` en Firebase antes de responder `403`: así la ruta
 funciona aunque el Gateway todavía no propague el encabezado.
 

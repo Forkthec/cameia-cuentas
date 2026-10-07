@@ -68,7 +68,7 @@ El servicio solo debe aceptar peticiones autenticadas del API Gateway, con dos c
 | `X-User-Email` | Sí | Correo del usuario |
 | `X-User-Roles` | Sí | Roles del usuario |
 | `X-Request-Id` | Sí | Identificador de la petición |
-| `X-User-Plan` | No | Plan del usuario |
+| `X-User-Plan` | No | Plan del usuario; no respalda ningún derecho ni cuota hasta que exista la spec de planes |
 | `X-User-Email-Verified` | No | Si el correo está verificado |
 
 No se confía en un encabezado enviado directamente por un cliente externo, y no se agregan campos derivados del JWT sin justificar su necesidad y documentar el contrato.
