@@ -5,7 +5,7 @@ package tech.cameia.cuentas.domain.exception;
  *
  * <p>El mensaje no repite el correo recibido.</p>
  */
-public class InvalidEmailException extends BusinessException {
+public class InvalidEmailException extends InvalidFieldException {
 
     /**
      * Crea la excepción con la causa y su texto.
@@ -14,15 +14,18 @@ public class InvalidEmailException extends BusinessException {
      * @param mensaje texto del criterio de aceptación
      */
     public InvalidEmailException(ErrorCode errorCode, String mensaje) {
-        super(errorCode, mensaje);
+        super("email", errorCode, mensaje);
     }
 
     /**
-     * Indica el campo rechazado.
+     * Crea la excepción del correo sin forma de correo, con el texto de CA-1.1.20.
      *
-     * @return nombre del campo en el contrato JSON
+     * <p>Es la misma respuesta si la forma la rechaza {@code EmailAddress} o el directorio de
+     * usuarios: para la persona, en los dos casos el correo no es válido.</p>
+     *
+     * @return excepción con {@code EMAIL_INVALID_FORMAT}
      */
-    public String getField() {
-        return "email";
+    public static InvalidEmailException createInvalidFormat() {
+        return new InvalidEmailException(ErrorCode.EMAIL_INVALID_FORMAT, "Ingresa un correo electrónico válido.");
     }
 }

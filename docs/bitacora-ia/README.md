@@ -7,3 +7,4 @@ Cada entrada es un archivo `NN_tema_prompt.md`, con `NN` consecutivo.
 | Entrada | Decisión | Salida |
 |---|---|---|
 | [01_alinear-estandar-backend_prompt.md](01_alinear-estandar-backend_prompt.md) | Alinear los documentos y el estándar de los cuatro repositorios de Backend | [Spec de CM-283](../../specs/CM-283-AlinearEstandar/spec.md) |
+| [02_errores-conocidos-en-el-respaldo_prompt.md](02_errores-conocidos-en-el-respaldo_prompt.md) | Errores conocidos que terminaban en `INTERNAL_ERROR`, cerrados con los CA y una prueba de guarda | [Spec de CM-36](../../specs/CM-36-ValidacionesRegistro/spec.md), D14 a D17 |

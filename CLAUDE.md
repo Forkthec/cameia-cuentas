@@ -133,7 +133,7 @@ La tabla no guarda correo ni contraseña: son de Firebase. Las restricciones lle
 
 - JUnit 5, con las pruebas de cada capa bajo `src/test/java/tech/cameia/cuentas` (`application`, `domain`, `infrastructure`, `presentation`) y una prueba de extremo a extremo del registro.
 - Las pruebas de persistencia y de integración usan PostgreSQL real en Testcontainers (`postgres:16-alpine`) y las de integración, puerto aleatorio.
-- `LayeredArchitectureTest` vigila las capas.
+- `LayeredArchitectureTest` vigila las capas y `UntypedExceptionClassificationTest`, que todo método que pueda lanzar una excepción sin código (las que terminan en `500 INTERNAL_ERROR`) esté clasificado: un fallo previsible lleva su excepción de negocio y su código.
 - Las clases `*Test` las ejecuta Surefire. Las reglas de pruebas y de cobertura están en la [sección 9 del estándar](docs/estandar-backend.md#9-pruebas-y-cobertura).
 
 ## 8. Verificación

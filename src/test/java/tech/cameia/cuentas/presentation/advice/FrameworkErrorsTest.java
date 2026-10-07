@@ -3,9 +3,11 @@ package tech.cameia.cuentas.presentation.advice;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import com.jayway.jsonpath.JsonPath;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -22,8 +24,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
- * Comprueba que los errores del propio framework web (ruta inexistente, método no permitido
- * y tipo de contenido no admitido) salen con el formato de error del servicio y no como un
+ * Comprueba que los errores del propio framework web (ruta inexistente, método no permitido,
+ * tipo de contenido y tipo de respuesta no admitidos) salen con el formato de error del servicio y no como un
  * {@code 500} ni como la página de error por defecto.
  *
  * <p>Usa el contexto completo con un puerto aleatorio porque el comportamiento depende de
@@ -70,6 +72,34 @@ class FrameworkErrorsTest {
 
         assertThat(respuesta.getStatusCode().value()).isEqualTo(415);
         assertEsErrorDelServicio(respuesta, "MEDIA_TYPE_NOT_ALLOWED", "Tipo de contenido no admitido.");
+    }
+
+    @Test
+    @DisplayName("Un tipo de respuesta no admitido devuelve su código y un 406")
+    void anyRoute_shouldReturn406WithItsCode_whenAcceptedResponseTypeIsNotSupported() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(List.of(MediaType.IMAGE_PNG));
+
+        ResponseEntity<String> response = cliente.exchange("/api/v1/users/health", HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(406);
+        assertEsErrorDelServicio(response, "MEDIA_TYPE_NOT_ACCEPTABLE", "Tipo de respuesta no admitido.");
+    }
+
+    @Test
+    @DisplayName("El servicio no responde en XML")
+    void anyRoute_shouldReturn406_whenClientAsksForXml() {
+        // El contrato es solo JSON. Una dependencia de Firebase traía un convertidor XML con el
+        // que el servicio respondía en XML a quien lo pidiera.
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(List.of(MediaType.APPLICATION_XML));
+
+        ResponseEntity<String> response = cliente.exchange("/api/v1/users/health", HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(406);
+        assertEsErrorDelServicio(response, "MEDIA_TYPE_NOT_ACCEPTABLE", "Tipo de respuesta no admitido.");
     }
 
     @Test

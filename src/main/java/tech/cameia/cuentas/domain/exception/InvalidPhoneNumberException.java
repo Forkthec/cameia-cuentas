@@ -5,21 +5,12 @@ package tech.cameia.cuentas.domain.exception;
  *
  * <p>El mensaje no repite el número recibido.</p>
  */
-public class InvalidPhoneNumberException extends BusinessException {
+public class InvalidPhoneNumberException extends InvalidFieldException {
 
     private static final String MENSAJE = "Revisa el número, no coincide con el formato del país elegido.";
 
     /** Crea la excepción con el mensaje del criterio de aceptación. */
     public InvalidPhoneNumberException() {
-        super(ErrorCode.PHONE_NUMBER_INVALID_FORMAT, MENSAJE);
-    }
-
-    /**
-     * Indica el campo rechazado.
-     *
-     * @return nombre del campo en el contrato JSON
-     */
-    public String getField() {
-        return "phoneNumber";
+        super("phoneNumber", ErrorCode.PHONE_NUMBER_INVALID_FORMAT, MENSAJE);
     }
 }

@@ -64,6 +64,15 @@
 			<groupId>com.google.firebase</groupId>
 			<artifactId>firebase-admin</artifactId>
 			<version>${firebase-admin.version}</version>
+			<exclusions>
+				<!-- Llega por google-cloud-storage, que el servicio no usa. Con él en el classpath, Spring
+				     registra un convertidor XML y el servicio responde en XML a quien pida application/xml:
+				     el contrato es solo JSON. -->
+				<exclusion>
+					<groupId>com.fasterxml.jackson.dataformat</groupId>
+					<artifactId>jackson-dataformat-xml</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<!-- Valida el celular con la misma librería que usa el formulario web (version Java de libphonenumber, Apache 2.0). -->
 		<dependency>

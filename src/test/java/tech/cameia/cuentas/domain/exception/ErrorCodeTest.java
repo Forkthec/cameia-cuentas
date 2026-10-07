@@ -24,7 +24,7 @@ class ErrorCodeTest {
     private static final List<String> CAUSAS = List.of(
             "REQUIRED", "TOO_SHORT", "TOO_LONG", "TOO_COMMON", "INVALID_FORMAT",
             "INVALID_CHARACTERS", "INVALID_VALUE", "OUT_OF_RANGE", "IN_THE_FUTURE", "UNDERAGE",
-            "NOT_FOUND", "ALREADY_REGISTERED", "NOT_ALLOWED", "NOT_VERIFIED", "UNAVAILABLE");
+            "NOT_FOUND", "ALREADY_REGISTERED", "NOT_ALLOWED", "NOT_ACCEPTABLE", "NOT_VERIFIED", "UNAVAILABLE");
 
     @ParameterizedTest
     @EnumSource(ErrorCode.class)

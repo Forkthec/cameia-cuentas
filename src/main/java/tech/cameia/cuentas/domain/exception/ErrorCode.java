@@ -112,5 +112,8 @@ public enum ErrorCode {
     METHOD_NOT_ALLOWED,
 
     /** El tipo de contenido de la petición no se admite. */
-    MEDIA_TYPE_NOT_ALLOWED
+    MEDIA_TYPE_NOT_ALLOWED,
+
+    /** Ninguno de los tipos de respuesta que acepta quien llama ({@code Accept}) se puede producir. */
+    MEDIA_TYPE_NOT_ACCEPTABLE
 }

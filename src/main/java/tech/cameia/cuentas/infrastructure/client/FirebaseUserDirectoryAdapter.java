@@ -2,8 +2,11 @@ package tech.cameia.cuentas.infrastructure.client;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.google.firebase.ErrorCode;
+import com.google.firebase.IncomingHttpResponse;
 import com.google.firebase.auth.AuthErrorCode;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
@@ -11,8 +14,11 @@ import com.google.firebase.auth.UserRecord;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
+import tech.cameia.cuentas.domain.exception.InvalidEmailException;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.RawPassword;
 import tech.cameia.cuentas.domain.port.FirebaseUserDirectory;
@@ -41,6 +47,17 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
     /** Valor del plan gratuito. */
     private static final String FREE_PLAN = "FREE";
 
+    /** Código de Identity Toolkit para un correo que no considera válido. */
+    private static final String INVALID_EMAIL_CODE = "INVALID_EMAIL";
+
+    /** Valor cuando la respuesta de Firebase no trae un código legible. */
+    private static final String UNKNOWN_CODE = "desconocido";
+
+    /** El código es el comienzo del mensaje: mayúsculas y guiones bajos. */
+    private static final Pattern SERVICE_CODE_PATTERN = Pattern.compile("^[A-Z][A-Z_]*");
+
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+
     private final FirebaseAuth firebaseAuth;
 
     /**
@@ -62,6 +79,7 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
      * @param password contraseña ya validada por la política del dominio
      * @return identificador del usuario creado
      * @throws EmailAlreadyRegisteredException si ese correo ya tiene credencial
+     * @throws InvalidEmailException si Firebase rechaza el correo ({@code INVALID_EMAIL})
      * @throws DependencyUnavailableException si Firebase no respondió o falló de su lado
      * @throws IllegalStateException si Firebase rechaza la creación por cualquier otro motivo
      */
@@ -78,7 +96,46 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
             if (AuthErrorCode.EMAIL_ALREADY_EXISTS.equals(error.getAuthErrorCode())) {
                 throw new EmailAlreadyRegisteredException();
             }
-            throw indisponibleOEnRechazo(error, "Firebase rechazó la creación del usuario");
+            String serviceCode = serviceErrorCode(error);
+            if (INVALID_EMAIL_CODE.equals(serviceCode)) {
+                // EmailAddress es permisiva a propósito y Firebase podría ser más estricta. No se
+                // conoce un correo que pase la regla propia y Firebase rechace (el emulador los
+                // acepta todos), así que es una defensa. Para la persona es un correo inválido
+                // (CA-1.1.20); el aviso deja ver en el log que las dos reglas difieren.
+                logger.warn("Firebase rechazó como inválido un correo que pasó la validación propia");
+                throw InvalidEmailException.createInvalidFormat();
+            }
+            // Cualquier otro rechazo (una política de contraseñas o un proveedor deshabilitado en
+            // Firebase) es un defecto de configuración que la persona no puede corregir: el código
+            // del servicio va al log para diagnosticarlo.
+            throw unavailableOrRejection(error,
+                    "Firebase rechazó la creación del usuario [serviceCode=" + serviceCode + "]");
+        }
+    }
+
+    /**
+     * Código de error que devolvió Identity Toolkit, leído del cuerpo de la respuesta.
+     *
+     * <p>El SDK no tiene código propio para varios rechazos: {@code INVALID_EMAIL},
+     * {@code WEAK_PASSWORD}, {@code PASSWORD_DOES_NOT_MEET_REQUIREMENTS} u
+     * {@code OPERATION_NOT_ALLOWED} llegan todos como {@code INVALID_ARGUMENT} sin código de
+     * autenticación. El servicio los distingue en {@code error.message}, que empieza por el código
+     * documentado y puede seguir con un detalle ({@code WEAK_PASSWORD : …}). Solo se devuelve el
+     * código, nunca el detalle.</p>
+     *
+     * @return el código, o {@code desconocido} si la respuesta no lo trae
+     */
+    static String serviceErrorCode(FirebaseAuthException error) {
+        IncomingHttpResponse response = error.getHttpResponse();
+        if (response == null || response.getContent() == null) {
+            return UNKNOWN_CODE;
+        }
+        try {
+            String message = JSON.readTree(response.getContent()).path("error").path("message").asString("");
+            Matcher matcher = SERVICE_CODE_PATTERN.matcher(message);
+            return matcher.find() ? matcher.group() : UNKNOWN_CODE;
+        } catch (JacksonException unreadable) {
+            return UNKNOWN_CODE;
         }
     }
 
@@ -97,7 +154,7 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
         try {
             firebaseAuth.setCustomUserClaims(firebaseUid, Map.of(PLAN_CLAIM, FREE_PLAN));
         } catch (FirebaseAuthException error) {
-            throw indisponibleOEnRechazo(error, "Firebase rechazó la escritura del plan del usuario");
+            throw unavailableOrRejection(error, "Firebase rechazó la escritura del plan del usuario");
         }
     }
 
@@ -115,7 +172,7 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
             firebaseAuth.deleteUser(firebaseUid);
             logger.info("Credencial eliminada en Firebase para el usuario {}", firebaseUid);
         } catch (FirebaseAuthException error) {
-            throw indisponibleOEnRechazo(error, "Firebase rechazó la eliminación del usuario");
+            throw unavailableOrRejection(error, "Firebase rechazó la eliminación del usuario");
         }
     }
 
@@ -129,17 +186,22 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
      * Cualquier otro error es un rechazo de un dato que pasó la validación propia: un
      * defecto, no algo pasajero.</p>
      *
+     * <p>La causa de E/S solo cuenta si no hubo respuesta: ante un rechazo HTTP (un 400 o un 404)
+     * el SDK también adjunta una {@code HttpResponseException}, que es de E/S, y confundirla con
+     * una conexión fallida respondía 503 «inténtalo de nuevo» a un rechazo que no se resuelve
+     * reintentando.</p>
+     *
      * @param error excepción del SDK
-     * @param rechazo texto técnico para el log si no es indisponibilidad
+     * @param rejectionMessage texto técnico para el log si no es indisponibilidad
      * @return la excepción que se debe lanzar
      */
-    private static RuntimeException indisponibleOEnRechazo(FirebaseAuthException error, String rechazo) {
-        ErrorCode codigo = error.getErrorCode();
-        boolean indisponible = codigo == ErrorCode.UNAVAILABLE
-                || codigo == ErrorCode.DEADLINE_EXCEEDED
-                || codigo == ErrorCode.INTERNAL
-                || error.getCause() instanceof IOException;
-        return indisponible ? new DependencyUnavailableException(error) : new IllegalStateException(rechazo, error);
+    private static RuntimeException unavailableOrRejection(FirebaseAuthException error, String rejectionMessage) {
+        ErrorCode code = error.getErrorCode();
+        boolean unavailable = code == ErrorCode.UNAVAILABLE
+                || code == ErrorCode.DEADLINE_EXCEEDED
+                || code == ErrorCode.INTERNAL
+                || (error.getHttpResponse() == null && error.getCause() instanceof IOException);
+        return unavailable ? new DependencyUnavailableException(error) : new IllegalStateException(rejectionMessage, error);
     }
 
     /**

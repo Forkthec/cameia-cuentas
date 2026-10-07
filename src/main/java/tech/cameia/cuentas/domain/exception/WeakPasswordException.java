@@ -6,7 +6,7 @@ package tech.cameia.cuentas.domain.exception;
  * <p>El mensaje describe la regla incumplida, nunca la contraseña recibida: ese valor no
  * sale del objeto que lo transporta.</p>
  */
-public class WeakPasswordException extends BusinessException {
+public class WeakPasswordException extends InvalidFieldException {
 
     /**
      * Crea la excepción con el código de la regla incumplida y su texto.
@@ -15,6 +15,6 @@ public class WeakPasswordException extends BusinessException {
      * @param mensaje texto en español que explica qué exige la política
      */
     public WeakPasswordException(ErrorCode errorCode, String mensaje) {
-        super(errorCode, mensaje);
+        super("password", errorCode, mensaje);
     }
 }

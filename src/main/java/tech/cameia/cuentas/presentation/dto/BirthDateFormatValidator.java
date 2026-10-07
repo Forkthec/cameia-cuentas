@@ -2,8 +2,10 @@ package tech.cameia.cuentas.presentation.dto;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
+import java.time.temporal.ChronoField;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -23,12 +25,20 @@ public class BirthDateFormatValidator implements ConstraintValidator<BirthDateFo
      * Formato del contrato, el mismo con el que {@link RegisterUserRequest#toCommand()}
      * convierte el texto: un solo formato para validar y para convertir.
      *
-     * <p>El año se escribe {@code uuuu} (año calendario) y no {@code yyyy} (año de la era):
-     * con resolución estricta, {@code yyyy} exige además la era y rechaza toda fecha.</p>
+     * <p>Cada parte tiene un ancho fijo y sin signo: dos dígitos de día, dos de mes y cuatro de
+     * año (CA-1.1.8, dd/mm/aaaa). El patrón {@code uuuu} no sirve: admite un año con signo
+     * ({@code -2000} o {@code +12345}), que pasaría como fecha real y lo rechazaría después la
+     * política de edad con otro código. El año es el calendario ({@code YEAR}), no el de la era:
+     * con resolución estricta, el de la era exige además la era y rechaza toda fecha.</p>
      */
-    static final DateTimeFormatter FORMAT = DateTimeFormatter.ofPattern("dd/MM/uuuu")
-            .withResolverStyle(ResolverStyle.STRICT)
-            .withLocale(Locale.ROOT);
+    static final DateTimeFormatter FORMAT = new DateTimeFormatterBuilder()
+            .appendValue(ChronoField.DAY_OF_MONTH, 2)
+            .appendLiteral('/')
+            .appendValue(ChronoField.MONTH_OF_YEAR, 2)
+            .appendLiteral('/')
+            .appendValue(ChronoField.YEAR, 4)
+            .toFormatter(Locale.ROOT)
+            .withResolverStyle(ResolverStyle.STRICT);
 
     /**
      * Indica si el texto es aceptable para esta restricción.

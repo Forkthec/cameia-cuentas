@@ -13,6 +13,7 @@ import java.util.Set;
 import org.springframework.core.io.Resource;
 
 import tech.cameia.cuentas.domain.model.SingleLineText;
+import tech.cameia.cuentas.domain.policy.PasswordPolicy;
 
 /**
  * Lee la lista de contraseñas comunes y comprueba que cumple lo que la política supone de ella.
@@ -27,9 +28,6 @@ public final class CommonPasswordsLoader {
     /** Entradas mínimas de la lista que usa la aplicación. */
     static final int MINIMUM_ENTRIES = 3000;
 
-    /** Longitud mínima de una entrada: una más corta ya la rechaza la regla de longitud. */
-    static final int MINIMUM_LENGTH = 12;
-
     private CommonPasswordsLoader() {
     }
 
@@ -42,8 +40,8 @@ public final class CommonPasswordsLoader {
      * @return conjunto inmutable de contraseñas
      * @throws IllegalStateException con la causa exacta si el recurso falta, no es UTF-8 válido,
      *                               está vacío, tiene menos entradas de las exigidas, una línea
-     *                               vacía, una entrada de menos de 12 caracteres, con mayúsculas,
-     *                               con espacios en los extremos o repetida
+     *                               vacía, una entrada de menos de 12 o más de 64 caracteres, con
+     *                               mayúsculas, con espacios en los extremos o repetida
      */
     public static Set<String> load(Resource resource, int minimumEntries) {
         if (!resource.exists()) {
@@ -85,8 +83,15 @@ public final class CommonPasswordsLoader {
             throw new IllegalStateException(failure("tiene espacios en los extremos o no está en forma NFC",
                     lineNumber));
         }
-        if (line.codePointCount(0, line.length()) < MINIMUM_LENGTH) {
-            throw new IllegalStateException(failure("tiene menos de " + MINIMUM_LENGTH + " caracteres",
+        // Una entrada fuera de los límites de la contraseña nunca se consultaría: la regla de
+        // longitud la rechaza antes. Que esté en la lista indica que la lista se generó mal.
+        int length = line.codePointCount(0, line.length());
+        if (length < PasswordPolicy.MINIMUM_LENGTH) {
+            throw new IllegalStateException(failure("tiene menos de " + PasswordPolicy.MINIMUM_LENGTH + " caracteres",
+                    lineNumber));
+        }
+        if (length > PasswordPolicy.MAXIMUM_LENGTH) {
+            throw new IllegalStateException(failure("tiene más de " + PasswordPolicy.MAXIMUM_LENGTH + " caracteres",
                     lineNumber));
         }
         if (!line.equals(line.toLowerCase(Locale.ROOT))) {
