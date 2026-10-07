@@ -180,11 +180,12 @@ Solo si Paula responde «sí, desde esta tarea». Si responde «no», se omite y
 - **Pruebas:** encabezado válido `abc-123` → mismo valor en `$.requestId` y en el encabezado de la respuesta; ausente → UUID v4 (`matches("[0-9a-f-]{36}")`) y mismo valor en el encabezado; `abc 123` (con espacio) y 65 caracteres → UUID nuevo; el valor nunca es el enviado cuando no cumple la expresión.
 - **Trampa:** con `standaloneSetup`, `RequestContextHolder` está disponible durante el despacho; si lanza `IllegalStateException`, **detenerse** y reportar (alternativa: recibir `HttpServletRequest` y `HttpServletResponse` como parámetros de cada manejador).
 
-## [ ] T-1A.6 · Prueba de punta a punta y revisión del tipo de contenido — ≤ 20 min, ≈ 30 líneas
+## [ ] T-1A.6 · Prueba de punta a punta y `charset` del tipo de contenido — ≤ 30 min, ≈ 35 líneas
 
 - **Cubre:** REQ-RV-01 de punta a punta. **Modificar:** `AccountRegistrationEndToEndTest` (`elSegundoRegistroConElMismoCorreoRespondeConflicto`, línea 83).
 - **Agregar** a esa prueba: el cuerpo de la respuesta contiene `"code":"EMAIL_ALREADY_REGISTERED"`; y el encabezado `Content-Type` es `application/problem+json` con `charset=UTF-8` (`assertThat(respuesta.getHeaders().getContentType().toString()).containsIgnoringCase("charset=UTF-8")`).
-- **Si la aserción del charset falla** (es posible: Spring y Tomcat no siempre lo declaran en `problem+json`): **no corregirlo aquí**. Dejar la aserción comentada, pegar el valor real del encabezado en el informe y reportarlo: es un defecto de ASVS 4.1.1 para decidir (misma clase que el del Gateway) y la corrección va en su propia tarea.
+- **Si la aserción del charset falla** (es lo esperado: Spring y Tomcat no lo declaran en `problem+json`), **se corrige en esta tarjeta** (ASVS 4.1.1): agregar a `src/main/resources/application.properties` la línea `spring.servlet.encoding.force-response=true` con un comentario de una línea («Declara charset=UTF-8 en toda respuesta, también en application/problem+json.»). Es el nombre de la propiedad en Spring Boot 4.1.1 (`spring-boot-servlet`, `spring.servlet.encoding.*`); no usar `server.servlet.encoding.*`, que en esta versión no existe. Volver a correr la prueba y pegar en el informe el valor del encabezado antes y después.
+- **Si sigue fallando con la propiedad**, no cambiar cada método del manejador ni dejar la aserción comentada: **detenerse** y reportar el valor real del encabezado.
 - **Verificación:** con Docker en marcha, `./mvnw.cmd -B -Dtest=AccountRegistrationEndToEndTest test` en verde; sin Docker, decir que se omitió.
 
 ## [ ] T-1A.7 · Cierre del PR 1A — ≤ 30 min
