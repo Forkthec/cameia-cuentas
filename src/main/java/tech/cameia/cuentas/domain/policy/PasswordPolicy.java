@@ -26,6 +26,9 @@ public class PasswordPolicy {
     /** Longitud máxima admitida; por encima se rechaza en vez de recortar. */
     private static final int MAXIMUM_LENGTH = 64;
 
+    /** Texto del criterio de aceptación para una contraseña común; nunca repite la contraseña. */
+    private static final String COMMON_PASSWORD_MESSAGE = "Esta contraseña es demasiado común, elige otra.";
+
     /**
      * Contraseñas rechazadas aunque cumplan la longitud exigida.
      *
@@ -72,8 +75,7 @@ public class PasswordPolicy {
                     "La contraseña no puede superar los " + MAXIMUM_LENGTH + " caracteres");
         }
         if (esConocida(value)) {
-            throw new WeakPasswordException(ErrorCode.PASSWORD_TOO_COMMON,
-                    "La contraseña es demasiado común brother, cambiala si no quieres que te terminen robando la cuenta");
+            throw new WeakPasswordException(ErrorCode.PASSWORD_TOO_COMMON, COMMON_PASSWORD_MESSAGE);
         }
     }
 

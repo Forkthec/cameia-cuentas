@@ -7,7 +7,8 @@ package tech.cameia.cuentas.domain.model;
  * van en inglés por la convención de idioma del proyecto, y es ese nombre el que se
  * guarda en la columna {@code pronombres}.</p>
  *
- * <p>El dato es opcional: una cuenta sin pronombres declarados guarda {@code null}.</p>
+ * <p>El registro lo exige; la cuenta guarda {@code null} solo después de la anonimización,
+ * que vacía el dato.</p>
  */
 public enum Pronoun {
 

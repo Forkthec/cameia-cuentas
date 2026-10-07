@@ -101,6 +101,56 @@ class CuentaSchemaMigrationTest {
 	}
 
 	/**
+	 * Verifica que la base solo admite los pronombres del enumerado del dominio.
+	 */
+	@Test
+	void pronombreFueraDeLaListaEsRechazado() {
+		assertThatThrownBy(() -> insertarCuentaConPronombre("uid-pronombre-invalido", "OTRO"))
+				.isInstanceOf(DataIntegrityViolationException.class)
+				.hasMessageContaining("ck_cuenta_pronombres_valor");
+	}
+
+	/**
+	 * Verifica que la restricción distingue mayúsculas: {@code he} no es un valor del enumerado.
+	 */
+	@Test
+	void pronombreEnMinusculasEsRechazado() {
+		assertThatThrownBy(() -> insertarCuentaConPronombre("uid-pronombre-minusculas", "he"))
+				.isInstanceOf(DataIntegrityViolationException.class)
+				.hasMessageContaining("ck_cuenta_pronombres_valor");
+	}
+
+	/**
+	 * Verifica que los tres pronombres y el nulo (cuenta anonimizada) se aceptan.
+	 */
+	@Test
+	void losTresPronombresYElNuloSeAceptan() {
+		insertarCuentaConPronombre("uid-he", "HE");
+		insertarCuentaConPronombre("uid-she", "SHE");
+		insertarCuentaConPronombre("uid-they", "THEY");
+		insertarCuentaConPronombre("uid-sin-pronombre", null);
+
+		Integer guardadas = jdbcTemplate.queryForObject("""
+				SELECT count(*) FROM microcuentas.cuenta
+				 WHERE firebase_uid IN ('uid-he', 'uid-she', 'uid-they', 'uid-sin-pronombre')
+				""", Integer.class);
+		assertThat(guardadas).isEqualTo(4);
+	}
+
+	/**
+	 * Inserta una cuenta mínima con un pronombre dado.
+	 *
+	 * @param firebaseUid identificador del usuario en Firebase
+	 * @param pronombre valor de la columna {@code pronombres}, o {@code null}
+	 */
+	private void insertarCuentaConPronombre(String firebaseUid, String pronombre) {
+		jdbcTemplate.update("""
+				INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido, pronombres)
+				VALUES (gen_random_uuid(), ?, 'Ana', 'Perez', ?)
+				""", firebaseUid, pronombre);
+	}
+
+	/**
 	 * Inserta una cuenta mínima.
 	 *
 	 * @param firebaseUid identificador del usuario en Firebase

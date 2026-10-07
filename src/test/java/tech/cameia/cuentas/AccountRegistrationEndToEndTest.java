@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -20,6 +22,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import tech.cameia.cuentas.domain.model.Pronoun;
 import tech.cameia.cuentas.infrastructure.client.InMemoryFirebaseUserDirectory;
 
 /**
@@ -108,6 +111,51 @@ class AccountRegistrationEndToEndTest {
         assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
         assertThat(respuesta.getBody()).contains("Debes ser mayor de edad");
         assertThat(cuentasGuardadas()).isZero();
+    }
+
+    @Test
+    void unaFechaImposibleNoDejaRastroNiEnFirebaseNiEnLaBase() {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("12/04/1995", "31/02/2000"));
+
+        assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
+        assertThat(respuesta.getBody()).contains("\"code\":\"BIRTH_DATE_INVALID_FORMAT\"")
+                .contains("\"field\":\"birthDate\"");
+        assertThat(cuentasGuardadas()).isZero();
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
+    }
+
+    @Test
+    void sinPronombreNoDejaRastroNiEnFirebaseNiEnLaBase() {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace(",\"pronoun\":\"SHE\"", ""));
+
+        assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
+        assertThat(respuesta.getBody()).contains("\"code\":\"PRONOUN_REQUIRED\"").contains("\"field\":\"pronoun\"");
+        assertThat(cuentasGuardadas()).isZero();
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
+    }
+
+    @Test
+    void unPronombreVacioSeTrataComoAusenteDePuntaAPunta() {
+        // Comprueba que la aplicación real lee "" como ausente, no solo el MockMvc de las pruebas.
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("\"SHE\"", "\"\""));
+
+        assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
+        assertThat(respuesta.getBody()).contains("\"code\":\"PRONOUN_REQUIRED\"");
+        assertThat(cuentasGuardadas()).isZero();
+    }
+
+    @ParameterizedTest
+    @EnumSource(Pronoun.class)
+    void cadaPronombreSeGuardaTalCual(Pronoun pronombre) {
+        String cuerpo = cuerpoValido()
+                .replace("\"SHE\"", "\"" + pronombre.name() + "\"")
+                .replace("ana@cameia.tech", pronombre.name().toLowerCase(java.util.Locale.ROOT) + "@cameia.tech");
+
+        ResponseEntity<String> respuesta = registrar(cuerpo);
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(jdbcTemplate.queryForObject("SELECT pronombres FROM microcuentas.cuenta", String.class))
+                .isEqualTo(pronombre.name());
     }
 
     @Test

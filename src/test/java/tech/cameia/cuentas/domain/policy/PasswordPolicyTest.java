@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
@@ -99,6 +101,18 @@ class PasswordPolicyTest {
     void laContraseniaConocidaLlevaElCodigoDeContraseniaComun() {
         assertThatThrownBy(() -> policy.verify(new RawPassword("123456789012")))
                 .isInstanceOf(WeakPasswordException.class)
+                .extracting(excepcion -> ((WeakPasswordException) excepcion).getErrorCode())
+                .isEqualTo(ErrorCode.PASSWORD_TOO_COMMON);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"123456789012", "password1234", "qwertyuiop123", "PASSWORD1234", "  password1234  "})
+    void unaContraseniaComunRecibeElMensajeLiteralDelCriterioSinRepetirla(String comun) {
+        assertThatThrownBy(() -> policy.verify(new RawPassword(comun)))
+                .isInstanceOf(WeakPasswordException.class)
+                .hasMessage("Esta contraseña es demasiado común, elige otra.")
+                .hasMessageNotContaining("brother")
+                .hasMessageNotContaining(comun.trim())
                 .extracting(excepcion -> ((WeakPasswordException) excepcion).getErrorCode())
                 .isEqualTo(ErrorCode.PASSWORD_TOO_COMMON);
     }

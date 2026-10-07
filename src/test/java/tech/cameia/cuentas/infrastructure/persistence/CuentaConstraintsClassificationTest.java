@@ -40,7 +40,7 @@ class CuentaConstraintsClassificationTest {
             "cuenta_pkey", "uq_cuenta_firebase_uid", "ck_cuenta_nombre", "ck_cuenta_apellido",
             "ck_cuenta_estado", "ck_cuenta_version", "ck_cuenta_telefono_e164",
             "ck_cuenta_pronombres_no_vacio", "ck_cuenta_fecha_actualizacion",
-            "ck_cuenta_fecha_eliminacion", "ck_cuenta_anonimizacion");
+            "ck_cuenta_fecha_eliminacion", "ck_cuenta_anonimizacion", "ck_cuenta_pronombres_valor");
 
     @Container
     @ServiceConnection

@@ -1,5 +1,6 @@
 package tech.cameia.cuentas.presentation.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -17,8 +18,14 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
+import org.springframework.http.converter.json.ProblemDetailJacksonMixin;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -32,7 +39,10 @@ import tech.cameia.cuentas.domain.exception.InvalidBirthDateException.Reason;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.BirthDate;
+import tech.cameia.cuentas.domain.model.Pronoun;
+import tech.cameia.cuentas.infrastructure.config.JacksonConfiguration;
 import tech.cameia.cuentas.presentation.advice.ProblemDetailTestSupport;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Prueba del contrato HTTP del registro descrito en
@@ -51,7 +61,20 @@ class UserRegistrationControllerTest {
     private final MockMvc mockMvc = MockMvcBuilders
             .standaloneSetup(new UserRegistrationController(servicio))
             .setControllerAdvice(ProblemDetailTestSupport.manejadorDeErrores())
+            .setMessageConverters(convertidorComoLaAplicacion())
             .build();
+
+    /**
+     * Lee el JSON con las mismas reglas que la aplicación (enumerados vacíos como ausentes) y
+     * escribe los errores igual que ella: el mixin publica {@code code} y {@code requestId}
+     * en el nivel superior del documento de error.
+     */
+    private static JacksonJsonHttpMessageConverter convertidorComoLaAplicacion() {
+        JsonMapper.Builder constructor = JsonMapper.builder()
+                .addMixIn(ProblemDetail.class, ProblemDetailJacksonMixin.class);
+        JacksonConfiguration.aplicarReglas(constructor);
+        return new JacksonJsonHttpMessageConverter(constructor.build());
+    }
 
     @Test
     void elRegistroExitosoDevuelveCreadoConElEstadoYElPlan() throws Exception {
@@ -222,16 +245,130 @@ class UserRegistrationControllerTest {
     }
 
     @Test
-    void unaFechaConOtroFormatoDaErrorDeFormatoYNoDeMayoriaDeEdad() throws Exception {
+    void unaFechaIsoSeRechazaPorFormatoEnSuCampo() throws Exception {
         String fechaISO = cuerpoValido().replace("12/04/1995", "1995-04-12");
 
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(fechaISO))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.code").value("REQUEST_BODY_INVALID_FORMAT"))
-                .andExpect(jsonPath("$.detail").value(
-                        org.hamcrest.Matchers.containsString("DD/MM/AAAA")));
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value("birthDate"))
+                .andExpect(jsonPath("$.errors[0].code").value("BIRTH_DATE_INVALID_FORMAT"));
 
         verify(servicio, never()).register(any(RegisterUserCommand.class));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"31/02/2000", "29/02/2001", "31/04/2000", "15/13/2000", "1/1/2000", "00/01/2000",
+        "01/00/2000", "abc", "2000-01-01", "12-04-1995", "12/04/95", " 12/04/1995", "12/04/1995 "})
+    void unaFechaImposibleSeRechazaEnElCampoDeLaFecha(String fecha) throws Exception {
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoConFecha(fecha)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value("birthDate"))
+                .andExpect(jsonPath("$.errors[0].code").value("BIRTH_DATE_INVALID_FORMAT"))
+                .andExpect(jsonPath("$.errors[0].message").value("Formato de fecha inválido."));
+
+        verify(servicio, never()).register(any(RegisterUserCommand.class));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "\"birthDate\":\"\"", "\"birthDate\":\"   \"", "\"birthDate\":null", "\"sinFecha\":1"})
+    void unaFechaVaciaEnBlancoNulaOAusenteEsObligatoriaYNoDeFormato(String fragmento) throws Exception {
+        String cuerpo = cuerpoValido().replace("\"birthDate\":\"12/04/1995\"", fragmento);
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value("birthDate"))
+                .andExpect(jsonPath("$.errors[0].code").value("BIRTH_DATE_REQUIRED"));
+
+        verify(servicio, never()).register(any(RegisterUserCommand.class));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"20000101", "true", "12.5"})
+    void unaFechaQueLlegaComoNumeroOBooleanoSeLeeComoTextoYFallaPorFormato(String valor) throws Exception {
+        String cuerpo = cuerpoValido().replace("\"12/04/1995\"", valor);
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errors[0].field").value("birthDate"))
+                .andExpect(jsonPath("$.errors[0].code").value("BIRTH_DATE_INVALID_FORMAT"));
+
+        verify(servicio, never()).register(any(RegisterUserCommand.class));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"[]", "{}", "[\"12/04/1995\"]"})
+    void unaFechaQueLlegaComoArregloUObjetoEsUnCuerpoIlegible(String valor) throws Exception {
+        String cuerpo = cuerpoValido().replace("\"12/04/1995\"", valor);
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("REQUEST_BODY_INVALID_FORMAT"))
+                .andExpect(jsonPath("$.errors").doesNotExist());
+
+        verify(servicio, never()).register(any(RegisterUserCommand.class));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"29/02/2000", "12/04/1995", "01/01/2000", "29/02/1996"})
+    void unaFechaValidaLlegaAlCasoDeUsoComoFecha(String fecha) throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoConFecha(fecha)))
+                .andExpect(status().isCreated());
+
+        verify(servicio).register(comando.capture());
+        assertThat(comando.getValue().birthDate())
+                .isEqualTo(LocalDate.parse(fecha, java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\"sinPronombre\":1", "\"pronoun\":null", "\"pronoun\":\"\"", "\"pronoun\":\"   \""})
+    void faltarElPronombreSeRechazaEnSuCampo(String fragmento) throws Exception {
+        String cuerpo = cuerpoValido().replace("\"pronoun\":\"SHE\"", fragmento);
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value("pronoun"))
+                .andExpect(jsonPath("$.errors[0].code").value("PRONOUN_REQUIRED"))
+                .andExpect(jsonPath("$.errors[0].message").value("Selecciona una opción."));
+
+        verify(servicio, never()).register(any(RegisterUserCommand.class));
+    }
+
+    @ParameterizedTest
+    @EnumSource(Pronoun.class)
+    void cadaPronombreValidoLlegaAlCasoDeUso(Pronoun pronombre) throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON)
+                        .content(cuerpoValido().replace("\"SHE\"", "\"" + pronombre.name() + "\"")))
+                .andExpect(status().isCreated());
+
+        verify(servicio).register(comando.capture());
+        assertThat(comando.getValue().pronoun()).isEqualTo(pronombre);
+    }
+
+    @Test
+    void laContraseniaComunSeSenialaEnSuCampoConElTextoDelCriterio() throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class)))
+                .thenThrow(new WeakPasswordException(ErrorCode.PASSWORD_TOO_COMMON,
+                        "Esta contraseña es demasiado común, elige otra."));
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoValido()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errors[0].field").value("password"))
+                .andExpect(jsonPath("$.errors[0].code").value("PASSWORD_TOO_COMMON"))
+                .andExpect(jsonPath("$.errors[0].message").value("Esta contraseña es demasiado común, elige otra."));
     }
 
     @Test
@@ -266,6 +403,10 @@ class UserRegistrationControllerTest {
         return Account.rebuild(UUID.randomUUID(), "uid-firebase", "Ana", "Pérez",
                 new BirthDate(LocalDate.of(1995, 4, 12)), null, null,
                 tech.cameia.cuentas.domain.model.AccountStatus.PENDING_VERIFICATION);
+    }
+
+    private String cuerpoConFecha(String fecha) {
+        return cuerpoValido().replace("12/04/1995", fecha);
     }
 
     private String cuerpoValido() {

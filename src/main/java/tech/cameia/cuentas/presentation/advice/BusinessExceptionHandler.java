@@ -107,9 +107,11 @@ class BusinessExceptionHandler {
             Map.entry("firstName.Size", ErrorCode.FIRST_NAME_TOO_LONG),
             Map.entry("lastName.NotBlank", ErrorCode.LAST_NAME_REQUIRED),
             Map.entry("lastName.Size", ErrorCode.LAST_NAME_TOO_LONG),
-            Map.entry("birthDate.NotNull", ErrorCode.BIRTH_DATE_REQUIRED),
+            Map.entry("birthDate.NotBlank", ErrorCode.BIRTH_DATE_REQUIRED),
+            Map.entry("birthDate.BirthDateFormat", ErrorCode.BIRTH_DATE_INVALID_FORMAT),
             Map.entry("email.NotBlank", ErrorCode.EMAIL_REQUIRED),
-            Map.entry("password.NotBlank", ErrorCode.PASSWORD_REQUIRED));
+            Map.entry("password.NotBlank", ErrorCode.PASSWORD_REQUIRED),
+            Map.entry("pronoun.NotNull", ErrorCode.PRONOUN_REQUIRED));
 
     /**
      * Un campo rechazado dentro de la lista {@code errors}.
