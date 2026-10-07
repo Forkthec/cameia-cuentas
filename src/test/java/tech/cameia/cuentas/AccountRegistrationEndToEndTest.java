@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -190,6 +191,37 @@ class AccountRegistrationEndToEndTest {
                 .isEqualTo("José Luis");
         assertThat(jdbcTemplate.queryForObject("SELECT apellido FROM microcuentas.cuenta", String.class))
                 .isEqualTo("Pérez");
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}/{1} -> {2}")
+    @CsvSource(delimiter = '|', value = {
+        "Ana3|Pérez|firstName|FIRST_NAME_INVALID_CHARACTERS",
+        "Ana|Pérez_|lastName|LAST_NAME_INVALID_CHARACTERS",
+        "<script>|Pérez|firstName|FIRST_NAME_INVALID_CHARACTERS"})
+    void unNombreOApellidoConCaracteresNoAdmitidosNoDejaRastro(String nombre, String apellido, String campo,
+            String codigo) {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido()
+                .replace("\"Ana\"", "\"" + nombre + "\"")
+                .replace("\"Pérez\"", "\"" + apellido + "\""));
+
+        assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
+        assertThat(respuesta.getBody()).contains("\"field\":\"" + campo + "\"").contains("\"code\":\"" + codigo + "\"")
+                .doesNotContain("<script>");
+        assertThat(cuentasGuardadas()).isZero();
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
+    }
+
+    @ParameterizedTest(name = "[{index}] {0} {1}")
+    @CsvSource(delimiter = '|', quoteCharacter = '"', value = {"María José|Gómez-Ruiz", "O'Neill|Müller", "A|B"})
+    void unNombreSoloConLetrasSeGuardaTalCual(String nombre, String apellido) {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido()
+                .replace("\"Ana\"", "\"" + nombre + "\"")
+                .replace("\"Pérez\"", "\"" + apellido + "\""));
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(jdbcTemplate.queryForObject("SELECT nombre FROM microcuentas.cuenta", String.class)).isEqualTo(nombre);
+        assertThat(jdbcTemplate.queryForObject("SELECT apellido FROM microcuentas.cuenta", String.class))
+                .isEqualTo(apellido);
     }
 
     @Test

@@ -37,6 +37,7 @@ import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.EmailNotVerifiedException;
 import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException;
+import tech.cameia.cuentas.domain.exception.InvalidPersonNameException;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
 
 /**
@@ -155,6 +156,17 @@ class BusinessExceptionHandler {
     @ExceptionHandler(WeakPasswordException.class)
     ProblemDetail contraseniaDebil(WeakPasswordException error) {
         return campoDeDominioInvalido("password", error);
+    }
+
+    /**
+     * Nombre o apellido con caracteres que no son letras, espacios, apóstrofo ni guion.
+     *
+     * @param error excepción con el campo rechazado
+     * @return {@code 422 Unprocessable Entity} con un elemento para ese campo
+     */
+    @ExceptionHandler(InvalidPersonNameException.class)
+    ProblemDetail nombreInvalido(InvalidPersonNameException error) {
+        return campoDeDominioInvalido(error.getField(), error);
     }
 
     /**

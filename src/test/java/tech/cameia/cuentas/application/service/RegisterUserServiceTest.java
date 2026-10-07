@@ -18,6 +18,7 @@ import tech.cameia.cuentas.application.command.RegisterUserCommand;
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException;
+import tech.cameia.cuentas.domain.exception.InvalidPersonNameException;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
@@ -88,6 +89,43 @@ class RegisterUserServiceTest {
         assertThatThrownBy(() -> servicio.register(contraseniaCorta))
                 .isInstanceOf(WeakPasswordException.class);
         assertThat(repositorio.guardadas).isEmpty();
+    }
+
+    @Test
+    void unNombreConNumerosNoCreaCredencialNiCuenta() {
+        RegisterUserCommand nombreInvalido = new RegisterUserCommand("Ana3", "Pérez", LocalDate.of(1995, 4, 12),
+                "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE);
+
+        assertThatThrownBy(() -> servicio.register(nombreInvalido))
+                .isInstanceOf(InvalidPersonNameException.class)
+                .extracting(error -> ((InvalidPersonNameException) error).getField())
+                .isEqualTo("firstName");
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
+        assertThat(repositorio.guardadas).isEmpty();
+    }
+
+    @Test
+    void unApellidoConGuionBajoNoCreaCredencialNiCuenta() {
+        RegisterUserCommand apellidoInvalido = new RegisterUserCommand("Ana", "Pérez_", LocalDate.of(1995, 4, 12),
+                "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE);
+
+        assertThatThrownBy(() -> servicio.register(apellidoInvalido))
+                .isInstanceOf(InvalidPersonNameException.class)
+                .extracting(error -> ((InvalidPersonNameException) error).getField())
+                .isEqualTo("lastName");
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
+        assertThat(repositorio.guardadas).isEmpty();
+    }
+
+    @Test
+    void unNombreConTildesYGuionSeGuardaNormalizado() {
+        RegisterUserCommand conTildes = new RegisterUserCommand("María  José", "Gómez-Ruiz",
+                LocalDate.of(1995, 4, 12), "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE);
+
+        Account cuenta = servicio.register(conTildes);
+
+        assertThat(cuenta.getFirstName()).isEqualTo("María José");
+        assertThat(cuenta.getLastName()).isEqualTo("Gómez-Ruiz");
     }
 
     @Test

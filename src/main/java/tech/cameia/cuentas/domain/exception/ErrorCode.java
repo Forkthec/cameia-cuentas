@@ -27,11 +27,17 @@ public enum ErrorCode {
     /** El nombre supera el máximo de caracteres. */
     FIRST_NAME_TOO_LONG,
 
+    /** El nombre tiene caracteres que no son letras, espacios, apóstrofo ni guion. */
+    FIRST_NAME_INVALID_CHARACTERS,
+
     /** Falta el apellido. */
     LAST_NAME_REQUIRED,
 
     /** El apellido supera el máximo de caracteres. */
     LAST_NAME_TOO_LONG,
+
+    /** El apellido tiene caracteres que no son letras, espacios, apóstrofo ni guion. */
+    LAST_NAME_INVALID_CHARACTERS,
 
     /** Falta la fecha de nacimiento. */
     BIRTH_DATE_REQUIRED,

@@ -58,9 +58,10 @@ class UserRegistrationController {
                 content = @Content(mediaType = "application/problem+json",
                         schema = @Schema(implementation = ProblemDetail.class))),
         @ApiResponse(responseCode = "422", description = "VALIDATION_FAILED con errors[].code: FIRST_NAME_REQUIRED, "
-                + "FIRST_NAME_TOO_LONG, LAST_NAME_REQUIRED, LAST_NAME_TOO_LONG, BIRTH_DATE_REQUIRED, "
+                + "FIRST_NAME_TOO_LONG, FIRST_NAME_INVALID_CHARACTERS, LAST_NAME_REQUIRED, LAST_NAME_TOO_LONG, "
+                + "LAST_NAME_INVALID_CHARACTERS, BIRTH_DATE_REQUIRED, "
                 + "BIRTH_DATE_INVALID_FORMAT, BIRTH_DATE_IN_THE_FUTURE, BIRTH_DATE_UNDERAGE, BIRTH_DATE_OUT_OF_RANGE, "
-                + "EMAIL_REQUIRED, PASSWORD_REQUIRED, PASSWORD_TOO_SHORT, PASSWORD_TOO_LONG, PASSWORD_TOO_COMMON, "
+                + "EMAIL_REQUIRED, EMAIL_TOO_LONG, PASSWORD_REQUIRED, PASSWORD_TOO_SHORT, PASSWORD_TOO_LONG, PASSWORD_TOO_COMMON, "
                 + "PRONOUN_REQUIRED; o REQUEST_BODY_INVALID_FORMAT y REQUEST_INVALID_VALUE sin errors",
                 content = @Content(mediaType = "application/problem+json",
                         schema = @Schema(implementation = ProblemDetail.class))),
