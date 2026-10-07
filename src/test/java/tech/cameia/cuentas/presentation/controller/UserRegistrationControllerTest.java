@@ -36,6 +36,8 @@ import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException;
+import tech.cameia.cuentas.domain.exception.InvalidPersonNameException;
+import tech.cameia.cuentas.domain.model.PersonName;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException.Reason;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
 import tech.cameia.cuentas.domain.model.Account;
@@ -504,6 +506,20 @@ class UserRegistrationControllerTest {
 
         verify(servicio).register(comando.capture());
         assertThat(comando.getValue().pronoun()).isEqualTo(pronombre);
+    }
+
+    @ParameterizedTest
+    @EnumSource(PersonName.Part.class)
+    void unNombreOApellidoConCaracteresNoAdmitidosSeSenialaEnSuCampo(PersonName.Part parte) throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class))).thenThrow(new InvalidPersonNameException(parte));
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoValido()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value(parte.field()))
+                .andExpect(jsonPath("$.errors[0].code").value(parte.code().name()))
+                .andExpect(jsonPath("$.errors[0].message").value(parte.message()));
     }
 
     @Test

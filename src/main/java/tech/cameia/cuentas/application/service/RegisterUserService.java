@@ -8,6 +8,7 @@ import tech.cameia.cuentas.application.command.RegisterUserCommand;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.BirthDate;
 import tech.cameia.cuentas.domain.model.EmailAddress;
+import tech.cameia.cuentas.domain.model.PersonName;
 import tech.cameia.cuentas.domain.model.PhoneNumber;
 import tech.cameia.cuentas.domain.model.RawPassword;
 import tech.cameia.cuentas.domain.policy.AgePolicy;
@@ -60,6 +61,8 @@ public class RegisterUserService {
      * @return la cuenta creada, pendiente de verificar el correo
      * @throws tech.cameia.cuentas.domain.exception.InvalidBirthDateException si la fecha
      *         de nacimiento no permite registrarse
+     * @throws tech.cameia.cuentas.domain.exception.InvalidPersonNameException si el nombre o
+     *         el apellido tienen caracteres que no son letras, espacios, apóstrofo ni guion
      * @throws tech.cameia.cuentas.domain.exception.WeakPasswordException si la contraseña
      *         no cumple la política
      * @throws tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException si el
@@ -76,6 +79,8 @@ public class RegisterUserService {
         PhoneNumber phoneNumber = command.phoneNumber() == null
                 ? null
                 : new PhoneNumber(command.phoneNumber());
+        PersonName firstName = new PersonName(command.firstName(), PersonName.Part.FIRST_NAME);
+        PersonName lastName = new PersonName(command.lastName(), PersonName.Part.LAST_NAME);
 
         politicaDeEdad.verify(birthDate);
         politicaDeContrasenia.verify(password);
@@ -85,7 +90,7 @@ public class RegisterUserService {
         try {
             directorio.assignFreePlanClaim(firebaseUid);
 
-            Account cuenta = Account.register(firebaseUid, command.firstName(), command.lastName(),
+            Account cuenta = Account.register(firebaseUid, firstName.value(), lastName.value(),
                     birthDate, phoneNumber, command.pronoun());
             Account guardada = repositorio.save(cuenta);
 
