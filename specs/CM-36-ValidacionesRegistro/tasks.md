@@ -12,7 +12,7 @@ agregan aquí antes de ejecutar cada bloque. Se marca `[x]` solo con la salida r
 - **Detenerse y reportar** si: la tarjeta contradice el código real, falta un dato, una prueba existente se rompe sin causa clara, el comportamiento de una librería difiere de lo que la tarjeta afirma, o hace falta algo no listado. No improvisar el diseño.
 - Definición de terminado de cada tarjeta: pruebas nuevas en verde, suite completa en verde, `LayeredArchitectureTest` en verde, diff dentro de lo estimado.
 - Rama: `CM-36-validaciones-registro` desde `origin/develop`. PR 1B sale de una rama nueva `CM-36-validaciones-registro-fecha-pronombre` creada desde `develop` **después** de fusionar 1A (o apilada sobre 1A si Paula lo autoriza).
-- Mensaje de commit: `CM-36 | <tipo>(cuentas): <resultado> [IA-ASISTIDO]`.
+- Mensaje de commit: `CM-36 | <tipo>(cuentas): <resultado>`, sin `[IA-ASISTIDO]` (lo lleva solo el título del PR, como pide el `CLAUDE.md` del repositorio) y con el trailer `Co-Authored-By` del modelo.
 
 ---
 
@@ -283,7 +283,7 @@ Decidido por Paula (6-oct-2026): el `requestId` entra desde 1A, sin filtro ni `M
 - **Verificación:** `./mvnw.cmd -B clean verify` con salida real; número de pruebas; cobertura JaCoCo de `BusinessExceptionHandler`, `ErrorCode`, `BusinessException`, `InvalidBirthDateException`, `WeakPasswordException`, `PasswordPolicy`: líneas y ramas reales (meta ≥ 90 %), cada una sin cubrir con su razón; la cobertura global del repo no baja.
 - Revisión (`backend-estandar` §6): `/simplify`, `/code-review high`, autochequeo (¿algún `getMessage()` de librería llega al cliente? ¿algún log con dato personal? ¿algún comentario con `CM-NNN`?).
 - Aviso a Frontend (documento por rol de `comunicaciones/`): el cuerpo de error agrega `code`, `requestId` y `errors[].code`; el `detail` de los 422 con `errors` pasa a ser fijo; el 500 cambia de texto; Firebase no disponible responde 503 en lugar de 500; nada se elimina.
-- Entrega: commits `CM-36 | feat(cuentas): código de error en las respuestas de registro [IA-ASISTIDO]`; PR con el título `CM-36 | feat(cuentas): código de error estable en las respuestas de error de Cuentas [IA-ASISTIDO]`; descripción con la plantilla completa, atributos de calidad (seguridad, compatibilidad de contrato, mantenibilidad, observabilidad), qué es mecánico (cambios de constructor en las excepciones y pruebas) y qué importa revisar (`BusinessExceptionHandler`, `ErrorCode`). Tarjeta de Jira a «En revisión» solo al abrir el PR.
+- Entrega: commit `CM-36 | feat(cuentas): código de error en las respuestas de registro`; PR con el título `CM-36 | feat(cuentas): código de error estable en las respuestas de error de Cuentas [IA-ASISTIDO]`; descripción con la plantilla completa, atributos de calidad (seguridad, compatibilidad de contrato, mantenibilidad, observabilidad), qué es mecánico (cambios de constructor en las excepciones y pruebas) y qué importa revisar (`BusinessExceptionHandler`, `ErrorCode`). Tarjeta de Jira a «En revisión» solo al abrir el PR.
 
 ---
 
@@ -449,7 +449,7 @@ Decidido por Paula (6-oct-2026): el `requestId` entra desde 1A, sin filtro ni `M
 
 # PR 2 — recorte, NFC y un mensaje por campo
 
-Se ejecuta **después de fusionar 1A y 1B**; revalidar las rutas y líneas contra `origin/develop` ese día. Rama: `CM-36-recorte-nfc-registro` desde `develop`. Mensaje de commit: `CM-36 | fix(cuentas): <resultado> [IA-ASISTIDO]`. Aplican las reglas del inicio de este archivo.
+Se ejecuta **después de fusionar 1A y 1B**; revalidar las rutas y líneas contra `origin/develop` ese día. Rama: `CM-36-recorte-nfc-registro` desde `develop`. Mensaje de commit: `CM-36 | fix(cuentas): <resultado>`. Aplican las reglas del inicio de este archivo.
 **Pregunta 13 respondida (Paula, 6-oct-2026): «espacio» es el conjunto de `trim` de JavaScript (opción a), que es lo que se escribe aquí.** Este bloque y el 3 van en el mismo PR.
 
 ## [ ] T-2.1 · Objeto de valor `SingleLineText` — ≤ 30 min, ≈ 140 líneas
@@ -753,7 +753,7 @@ Rama `CM-36-contrasenas-comunes` desde `develop`. **Fuente decidida (pregunta 3)
 - **Cubre:** REQ-RV-40, 42; CA-1.1.27. **Crear:** `src/main/resources/security/common-passwords.txt` y `src/main/resources/security/common-passwords.README.md`; **Crear (prueba):** `src/test/.../infrastructure/config/CommonPasswordsFileTest.java`.
 - **Procedimiento (en una carpeta temporal vacía, fuera del repositorio; la fuente es un archivo no confiable: se lee, nunca se ejecuta):** (1) descargar la fuente elegida y registrar URL, fecha y licencia; (2) filtrar las entradas de 12 o más puntos de código, pasar a minúsculas, recortar, quitar repetidas y conservar el orden de popularidad de la fuente; (3) tomar las primeras 3000; si hay menos, completar con la segunda fuente y registrarla; (4) comprobar que están `123456789012`, `password1234` y `qwertyuiop123` (si falta alguna, **detenerse y reportar**); (5) escribir el archivo con saltos de línea `\n`, UTF-8 sin BOM. El `README` registra: fuente(s), URL, licencia, fecha, el comando exacto con que se generó y la frase «La lista se entrega a `cameia-web` de la forma decidida en la pregunta 9».
 - **Prueba** (`CommonPasswordsFileTest`, sin contexto): cargar el recurso real con `CommonPasswordsLoader.load(..., 3000)`; exactamente 3000 entradas; las tres del CA presentes; `PasswordPolicy` con esa lista rechaza `123456789012`, `PASSWORD1234` y `  qwertyuiop123  ` con `PASSWORD_TOO_COMMON`.
-- **Entrega:** commit aparte `CM-36 | chore(cuentas): lista de 3000 contraseñas comunes [IA-ASISTIDO]`; en el PR, decir qué es dato (no se revisa línea por línea) y qué es código.
+- **Entrega:** commit aparte `CM-36 | chore(cuentas): lista de 3000 contraseñas comunes`; en el PR, decir qué es dato (no se revisa línea por línea) y qué es código.
 - **Verificación:** `./mvnw.cmd -B test` en verde, contexto completo incluido.
 
 ## [ ] T-4.4 · Cierre del PR 4 — ≤ 30 min
