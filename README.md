@@ -65,6 +65,17 @@ levanta desde el `docker-compose.yml` de `cameia-gateway` en la misma red `camei
 niega a arrancar si esa variable aparece en un despliegue (Cloud Run o perfil `prod`), aunque
 esté vacía.
 
+**Levante primero el compose de `cameia-gateway`**: Cuentas no tiene emulador propio y, sin él,
+el registro falla. El ID de proyecto (`demo-cameia`) debe ser el mismo en el emulador, el Gateway
+y Cuentas. Por ahora el emulador no está en `cameia-infra` porque el proyecto sigue en etapa de
+pruebas (ver [specs/CM-188-correcciones/spec.md](specs/CM-188-correcciones/spec.md)).
+
+El emulador trae la **Emulator UI** en `http://localhost:4000`, disponible desde la rama
+`CM-188-correcciones` de `cameia-gateway`. Para comprobar un registro: abra la pestaña
+*Authentication*, busque el correo registrado y, en el menú del usuario, *Edit user*: en
+*Custom claims* debe aparecer `{"plan":"FREE"}`, y el *User UID* debe coincidir con el
+`firebaseUid` de la respuesta `201`.
+
 Para usar un proyecto **real** de Firebase, comente esa variable, defina
 `FIREBASE_PROJECT_ID` con el ID real y `FIREBASE_KEY_PATH` con la ruta al JSON de la cuenta
 de servicio, que no está en el repositorio: pídaselo a quien administra el proyecto. Sin
@@ -88,6 +99,11 @@ la configuración de la aplicación.
 ### Sin Docker
 
 Requiere un PostgreSQL 16 accesible en `DB_HOST:DB_PORT`.
+
+Con el emulador, `FIREBASE_AUTH_EMULATOR_HOST=localhost:9099` debe ser una **variable de entorno
+del sistema operativo** (la de la configuración de ejecución del IDE sirve), no una propiedad
+`-D`, un argumento ni una entrada de YAML: el Admin SDK solo lee el entorno del proceso y, si no
+la encuentra ahí, la aplicación se niega a arrancar. `FIREBASE_PROJECT_ID` debe empezar por `demo-`.
 
 ```powershell
 ./mvnw.cmd test            # pruebas
