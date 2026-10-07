@@ -119,6 +119,17 @@ Hipótesis: `httpClient.ts` de `cameia-web` aborta a los 10 s y muestra «No hay
 | 2 | D3: ¿la credencial sin cuenta se registra en `ERROR` (alguien debe actuar) y la vía de carrera en `WARN`? | **Respondida (Paula, 6-oct): sí** | Sí | Solo el nivel del registro |
 | 3 | ¿CM-251 es el hogar del CA-1.1.30? (Jira no tiene una «Ajustes v4 – Backend» de Cuentas para HU-1.1) | **No era pregunta: se comunica. CA-1.1.30 se registra en CM-251; se informa a Vela** | Sí, CM-251 | Dónde se registra y cierra el trabajo; nada de código |
 
+### Pendientes que deja CM-36 (revisión final, 7-oct-2026)
+
+- **El 409 en su campo** (decisión de Paula). CA-1.1.2 pide el mensaje «en el campo Correo electrónico». El 409
+  `EMAIL_ALREADY_REGISTERED` conserva su estado y su `code` arriba (lo que Frontend ya lee) y **agrega**
+  `errors: [{field: "email", code: "EMAIL_ALREADY_REGISTERED", message: "Ese correo ya tiene una cuenta."}]`, igual que los demás errores
+  de un campo (D9 de CM-36). Es aditivo; se avisa a Frontend junto con el 200 de esta tarea.
+- **Firebase caído responde 503, no 500.** S5 y REQ-RR-05 dicen 500 `INTERNAL_ERROR`, pero CM-36 fijó 503 `DEPENDENCY_UNAVAILABLE`
+  (D10) y la regla de Paula es que ningún error previsible termine en el genérico. La consulta `getUserByEmail` debe usar la misma
+  clasificación de `FirebaseUserDirectoryAdapter` (indisponibilidad solo sin respuesta HTTP; `USER_NOT_FOUND` es «no existe», no un fallo).
+- **Credencial sin cuenta** (S4): CM-36 dejó en `docs/errores.md` que esta tarea agrega el registro del `firebase_uid` para conciliación.
+
 ## 13. Fuera de alcance
 
 Completar la fila de una credencial huérfana · verificar la contraseña con la API REST de Firebase (descartado) · reenvío del correo de verificación y la sesión transitoria (`cameia-web`) · el tiempo de espera de 10 s del navegador y su texto (CM-250) · textos del 409 (CM-36, PR 6) · la purga de cuentas sin verificar (CM-179, bloque 2) · el límite de tamaño del cuerpo (CM-36, pregunta 14 de su spec).
