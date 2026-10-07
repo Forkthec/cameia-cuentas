@@ -38,6 +38,7 @@ import tech.cameia.cuentas.domain.exception.EmailNotVerifiedException;
 import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException;
 import tech.cameia.cuentas.domain.exception.InvalidPersonNameException;
+import tech.cameia.cuentas.domain.exception.InvalidPhoneNumberException;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
 
 /**
@@ -166,6 +167,17 @@ class BusinessExceptionHandler {
      */
     @ExceptionHandler(InvalidPersonNameException.class)
     ProblemDetail nombreInvalido(InvalidPersonNameException error) {
+        return campoDeDominioInvalido(error.getField(), error);
+    }
+
+    /**
+     * Celular que no es un número válido para el país de su indicativo.
+     *
+     * @param error excepción con el campo rechazado
+     * @return {@code 422 Unprocessable Entity} con un elemento para el campo {@code phoneNumber}
+     */
+    @ExceptionHandler(InvalidPhoneNumberException.class)
+    ProblemDetail celularInvalido(InvalidPhoneNumberException error) {
         return campoDeDominioInvalido(error.getField(), error);
     }
 

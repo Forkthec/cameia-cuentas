@@ -63,6 +63,8 @@ public class RegisterUserService {
      *         de nacimiento no permite registrarse
      * @throws tech.cameia.cuentas.domain.exception.InvalidPersonNameException si el nombre o
      *         el apellido tienen caracteres que no son letras, espacios, apóstrofo ni guion
+     * @throws tech.cameia.cuentas.domain.exception.InvalidPhoneNumberException si el celular
+     *         no es un número válido para el país de su indicativo
      * @throws tech.cameia.cuentas.domain.exception.WeakPasswordException si la contraseña
      *         no cumple la política
      * @throws tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException si el
@@ -78,7 +80,7 @@ public class RegisterUserService {
         BirthDate birthDate = new BirthDate(command.birthDate());
         PhoneNumber phoneNumber = command.phoneNumber() == null
                 ? null
-                : new PhoneNumber(command.phoneNumber());
+                : PhoneNumber.fromInput(command.phoneNumber());
         PersonName firstName = new PersonName(command.firstName(), PersonName.Part.FIRST_NAME);
         PersonName lastName = new PersonName(command.lastName(), PersonName.Part.LAST_NAME);
 

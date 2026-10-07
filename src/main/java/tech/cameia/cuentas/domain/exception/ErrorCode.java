@@ -78,6 +78,9 @@ public enum ErrorCode {
     /** Falta elegir los pronombres. */
     PRONOUN_REQUIRED,
 
+    /** El celular no es un número válido para el país de su indicativo. */
+    PHONE_NUMBER_INVALID_FORMAT,
+
     /** El cuerpo de la petición no se puede interpretar. */
     REQUEST_BODY_INVALID_FORMAT,
 

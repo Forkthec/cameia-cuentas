@@ -107,6 +107,10 @@ public record RegisterUserRequest(
      */
     public RegisterUserCommand toCommand() {
         LocalDate fecha = BirthDateFormatValidator.parse(birthDate).orElseThrow();
-        return new RegisterUserCommand(firstName, lastName, fecha, email, password, phoneNumber, pronoun);
+        // Un celular vacío o en blanco es «sin celular»: el formulario envía el campo aunque la
+        // persona no lo llene.
+        String celular = SingleLineText.normalize(phoneNumber);
+        String celularDeclarado = celular == null || celular.isEmpty() ? null : celular;
+        return new RegisterUserCommand(firstName, lastName, fecha, email, password, celularDeclarado, pronoun);
     }
 }

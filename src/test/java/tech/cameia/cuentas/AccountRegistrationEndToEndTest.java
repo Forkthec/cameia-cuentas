@@ -224,6 +224,37 @@ class AccountRegistrationEndToEndTest {
                 .isEqualTo(apellido);
     }
 
+    @ParameterizedTest
+    @CsvSource({"+573000000000", "+34612345678", "+6903101"})
+    void unCelularValidoSeGuardaTalCual(String celular) {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("+573001234567", celular));
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(jdbcTemplate.queryForObject("SELECT telefono FROM microcuentas.cuenta", String.class))
+                .isEqualTo(celular);
+    }
+
+    @Test
+    void unCelularInvalidoNoDejaRastro() {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("+573001234567", "12345"));
+
+        assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
+        assertThat(respuesta.getBody()).contains("\"code\":\"PHONE_NUMBER_INVALID_FORMAT\"")
+                .contains("\"field\":\"phoneNumber\"").doesNotContain("12345");
+        assertThat(cuentasGuardadas()).isZero();
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {"\"phoneNumber\":\"\"", "\"phoneNumber\":\"   \"", "\"phoneNumber\":null"})
+    void sinCelularLaCuentaSeCreaConElTelefonoNulo(String fragmento) {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("\"phoneNumber\":\"+573001234567\"",
+                fragmento));
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(jdbcTemplate.queryForObject("SELECT telefono FROM microcuentas.cuenta", String.class)).isNull();
+    }
+
     @Test
     void sinVerificarElCorreoLaActivacionSeRechazaYLaCuentaSigueIgual() {
         registrar(cuerpoValido());

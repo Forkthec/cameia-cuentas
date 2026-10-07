@@ -91,7 +91,14 @@ Una ruta nueva no se suma a esta lista sin una spec que lo justifique.
 
 ## 5. Datos
 
-Base PostgreSQL propia, esquema `microcuentas`, migraciones Flyway en `src/main/resources/db/migration` (`V1__esquema_inicial_cuenta.sql`, `V2__ajustar_version_inicial_cuenta.sql` y `V3__restringir_pronombres.sql`).
+Base PostgreSQL propia, esquema `microcuentas`, migraciones Flyway en `src/main/resources/db/migration` (`V1__esquema_inicial_cuenta.sql`, `V2__ajustar_version_inicial_cuenta.sql`, `V3__restringir_pronombres.sql` y `V4__relajar_minimo_telefono_e164.sql`).
+
+Flyway corre al arrancar la aplicación y anota cada migración aplicada en `microcuentas.flyway_schema_history`: reiniciar o
+recrear el contenedor no vuelve a aplicar nada ni toca las filas, y una migración nueva se aplica una sola vez, dentro de una
+transacción. Si falla, se deshace entera y la aplicación no arranca (en Cloud Run la revisión nueva no recibe tráfico y sigue la
+anterior). Por eso una migración que restringe datos se prueba antes sobre una base con filas (`MigracionPronombresConDatosTest`,
+`MigracionTelefonoConDatosTest`) y, antes de desplegarla, se consulta qué valores hay en el entorno. Una migración aplicada no se
+edita: su suma de verificación cambiaría y la aplicación dejaría de arrancar en toda base que la tenga.
 
 Tabla `microcuentas.cuenta`:
 
@@ -102,7 +109,7 @@ Tabla `microcuentas.cuenta`:
 | `nombre` | `varchar(120)` | No nulo y no vacío |
 | `apellido` | `varchar(120)` | No nulo y no vacío |
 | `fecha_nacimiento` | `date` | Opcional |
-| `telefono` | `varchar(16)` | Opcional; formato E.164 |
+| `telefono` | `varchar(16)` | Opcional; formato E.164 de 6 a 15 dígitos (`ck_cuenta_telefono_e164`) |
 | `pronombres` | `varchar(60)` | `HE`, `SHE` o `THEY` (`ck_cuenta_pronombres_valor`); nulo solo tras la anonimización |
 | `estado` | `varchar(24)` | `PENDING_VERIFICATION` (por defecto), `ACTIVE`, `DISABLED` o `ANONYMIZED` |
 | `version` | `bigint` | Control de concurrencia; ≥ 0 |
