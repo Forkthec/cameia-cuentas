@@ -196,7 +196,7 @@ Plantilla del correo y DNS (CM-255) · pantallas y llamadas de `cameia-web` · e
 | 7 | Índice parcial `ix_cuenta_pendiente_fecha_creacion` (migración nueva): ¿se aprueba o se difiere hasta que haya un problema medido? | **Respondida (Paula, 6-oct): sí, la recomendación** | Aprobarlo: es un filtro diario fijo y el estándar lo pide | Bloque 2 |
 | 8 | D6: ¿se acepta la ventana entre «¿verificada?» y el borrado? | **Respondida (Paula, 6-oct): sí, la recomendación** | Sí | Bloque 2 |
 | 9 | Crear el Cloud Run Job de la purga y su Cloud Scheduler (03:00 America/Bogota) y su cuenta de servicio | **PENDIENTE de Juan Diego Gomez**, por una tarea que abre Vela | Pedirlo en el documento a DevOps ya existente (pedido del 5-oct) | Prueba en staging del bloque 4 |
-| 10 | Estimación: Backend suma ≈ 16 h (bloque 1: 4 h; bloque 2: 6 h; bloque 3: 3 h; bloque 4: 3 h) frente a 9 h de toda la HU | **PENDIENTE de Vela** | Informar el sobrecosto y repartir | — |
+| 10 | Estimación: Backend suma ≈ 16 h (bloque 1: 4 h; bloque 2: 6 h; bloque 3: 3 h; bloque 4: 3 h) frente a 9 h de toda la HU | **No era pregunta: se comunica. la estimación se informa a Vela** | Informar el sobrecosto y repartir | — |
 | 11 | D7: ¿cuatro PR (1, 2, 3, 4)? | **Respondida (Paula, 6-oct): sí, la recomendación** | Sí | Orden de entrega |
 | 12 | Orden: el bloque 3 (Gateway) depende de CM-260 (charset); ¿se hace CM-260 antes? | **Respondida (Paula, 6-oct): sí, la recomendación** | Sí, CM-260 primero (≈ 1 h) | Bloque 3 |
 | 13 | ¿Los bloques 1 y 2 de Cuentas se ejecutan después de los PR de CM-36 y CM-251, que tocan el mismo manejador de errores? | **Respondida (Paula, 6-oct): sí, la recomendación** | Solo el PR 1A de CM-36 antes (no CM-251) | Orden del bloque 1 |
