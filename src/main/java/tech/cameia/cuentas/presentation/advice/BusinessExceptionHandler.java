@@ -1,5 +1,6 @@
 package tech.cameia.cuentas.presentation.advice;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -326,6 +327,11 @@ class BusinessExceptionHandler {
     /**
      * Identificador de trazabilidad de la petición: el del Gateway si cumple la forma
      * admitida; si no, uno nuevo. Se devuelve también en el encabezado de la respuesta.
+     *
+     * <p>Además fija la codificación de la respuesta en UTF-8. Al resolver una excepción,
+     * Spring limpia el tipo de contenido de la respuesta y el contenedor de servlets borra
+     * con él la codificación que había puesto el filtro de codificación; sin esto, el
+     * {@code Content-Type} del error saldría sin {@code charset} (ASVS 4.1.1).</p>
      */
     private String resolverRequestId() {
         RequestAttributes atributos = RequestContextHolder.getRequestAttributes();
@@ -338,6 +344,7 @@ class BusinessExceptionHandler {
                 : UUID.randomUUID().toString();
         if (servlet.getResponse() != null) {
             servlet.getResponse().setHeader(REQUEST_ID_HEADER, requestId);
+            servlet.getResponse().setCharacterEncoding(StandardCharsets.UTF_8.name());
         }
         return requestId;
     }
