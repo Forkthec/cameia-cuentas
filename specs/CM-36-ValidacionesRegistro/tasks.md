@@ -7,6 +7,7 @@ agregan aquí antes de ejecutar cada bloque. Se marca `[x]` solo con la salida r
 
 - Ruta base del código: `src/main/java/tech/cameia/cuentas/`; pruebas: `src/test/java/tech/cameia/cuentas/`. Identificadores en inglés; Javadoc, comentarios, mensajes y `@DisplayName` en español; **sin** `CM-NNN` ni rutas a otros archivos en comentarios; sin abreviaturas; en una clase existente se mantiene su estilo (nombres de pruebas en español camelCase como `elCorreoRepetidoDevuelve…`).
 - Prohibido: agregar dependencias, tocar las migraciones V1 y V2, registrar contraseñas, correos o tokens, cambiar un texto de mensaje que la tarjeta no nombre, refactorizar fuera de la tarjeta.
+- Todo código de error nuevo, o cuyo estado o texto cambia, se agrega o actualiza en `docs/errores.md` en el mismo PR, con las columnas `Código | HTTP | Endpoints | Campo | Mensaje | Origen | Prueba` (una fila por código; «Endpoints» lista cada método y ruta que lo emite). Si `docs/errores.md` aún no existe en `develop`, el PR lo dice y la pieza B de CM-283 lo recoge (su verificación V-12 compara el catálogo con el código).
 - Comandos: `./mvnw.cmd -q -B -Dtest=<Clase> test` para una clase; `./mvnw.cmd -B test` para la suite; `./mvnw.cmd -B clean verify` al cerrar (genera `target/site/jacoco/`). Las pruebas con Testcontainers se omiten sin Docker (`disabledWithoutDocker`): si se omiten, decirlo en el informe.
 - **Detenerse y reportar** si: la tarjeta contradice el código real, falta un dato, una prueba existente se rompe sin causa clara, el comportamiento de una librería difiere de lo que la tarjeta afirma, o hace falta algo no listado. No improvisar el diseño.
 - Definición de terminado de cada tarjeta: pruebas nuevas en verde, suite completa en verde, `LayeredArchitectureTest` en verde, diff dentro de lo estimado.
@@ -36,6 +37,8 @@ agregan aquí antes de ejecutar cada bloque. Se marca `[x]` solo con la salida r
       VALIDATION_FAILED,
       /** Falló algo que la persona no puede corregir. */
       INTERNAL_ERROR,
+      /** Un objeto de valor rechazó un dato sin decir el campo; respaldo hasta que cada objeto de valor tenga su código. */
+      REQUEST_INVALID_VALUE,
       /** Falta el nombre. */ FIRST_NAME_REQUIRED,
       /** El nombre supera 120 caracteres. */ FIRST_NAME_TOO_LONG,
       /** Falta el apellido. */ LAST_NAME_REQUIRED,
@@ -129,7 +132,7 @@ agregan aquí antes de ejecutar cada bloque. Se marca `[x]` solo con la salida r
      }
      ```
      Recorrer `error.getBindingResult().getFieldErrors()` con un `LinkedHashMap<String, Map<String,String>>` y `putIfAbsent(fallo.getField(), campo(fallo.getField(), codigoDe(fallo), fallo.getDefaultMessage()))`; `errors` = `new ArrayList<>(mapa.values())`.
-  6. `cuerpoIlegible` → código `REQUEST_BODY_INVALID_FORMAT`, **sin cambiar el texto** (el bloque 6 lo cambia). `peticionIncompleta` → `IDENTITY_REQUIRED`. `valorInvalido` (`IllegalArgumentException`) → `VALIDATION_FAILED`, sin `errors` y texto sin cambio (defecto conocido, lo resuelven los bloques 3, 5 y 6). `falloInterno` → `INTERNAL_ERROR` y `detalle` = `"Ocurrió un error. Inténtalo de nuevo."`.
+  6. `cuerpoIlegible` → código `REQUEST_BODY_INVALID_FORMAT`, **sin cambiar el texto** (el bloque 6 lo cambia). `peticionIncompleta` → `IDENTITY_REQUIRED`. `valorInvalido` (`IllegalArgumentException`) → código propio `REQUEST_INVALID_VALUE`, **nunca** `VALIDATION_FAILED` (que significa «mira la lista `errors`»). El `detail` conserva el mensaje solo si la excepción nace en el dominio (`error.getStackTrace()[0].getClassName()` empieza por `tech.cameia.cuentas.domain`): son textos escritos para la persona. Si nace en otra parte (una librería), `detail` = «Revisa los datos enviados.». Se registra `WARN` «Valor rechazado sin campo: code=REQUEST_INVALID_VALUE requestId={} origen={}» con `clase.método` del primer elemento de la traza, **sin** el mensaje. Los bloques 3, 5 y 6 eliminan este camino. `falloInterno` → `INTERNAL_ERROR` y `detalle` = `"Ocurrió un error. Inténtalo de nuevo."`.
 - **Trampas:** el nombre de la restricción que devuelve `FieldError.getCode()` es el nombre simple de la anotación (`NotBlank`, `NotNull`, `Size`); `Map.of` solo admite 10 pares, por eso `Map.ofEntries`; el orden de `getFieldErrors()` no está garantizado, no se asume.
 - **Verificación:** `./mvnw.cmd -B -Dtest='UserRegistrationControllerTest,AccountActivationControllerTest' test` en verde (los textos y estados no cambiaron).
 
@@ -139,7 +142,8 @@ agregan aquí antes de ejecutar cada bloque. Se marca `[x]` solo con la salida r
 - **`BusinessExceptionHandlerTest`:**
   1. `todaRestriccionDelContratoTieneCodigo`: para cada `Field campo : RegisterUserRequest.class.getDeclaredFields()` y cada `Annotation anotacion : campo.getAnnotations()` cuya `annotationType().isAnnotationPresent(jakarta.validation.Constraint.class)`, `assertThat(BusinessExceptionHandler.FIELD_ERROR_CODES).containsKey(campo.getName() + "." + anotacion.annotationType().getSimpleName())`. Y a la inversa: cada clave de la tabla corresponde a una restricción existente (evita códigos huérfanos).
   2. `unFalloTecnicoDevuelveElMensajeGenericoSinDetalle`: `MockMvc` con `standaloneSetup(new ControladorQueFalla())` y `setControllerAdvice(ProblemDetailTestSupport.manejadorDeErrores())`; el controlador es una clase interna `@RestController` con `@GetMapping("/falla")` que lanza `new IllegalStateException("detalle interno secreto")`. Esperar: estado 500; `$.code` = `INTERNAL_ERROR`; `$.detail` = `Ocurrió un error. Inténtalo de nuevo.`; el cuerpo **no** contiene `secreto` ni `IllegalStateException`.
-  3. `unValorInvalidoDelDominioDevuelveCodigoDeValidacion`: controlador interno que lanza `new IllegalArgumentException("El correo electrónico no tiene un formato válido")` → 422, `$.code` = `VALIDATION_FAILED`.
+  3. `unValorInvalidoDelDominioTieneSuPropioCodigo`: `new EmailAddress("ana@")` invocado desde un controlador interno (la excepción nace en el dominio) → 422, `$.code` = `REQUEST_INVALID_VALUE`, `$.detail` = el mensaje del dominio, sin `$.errors`.
+  4. `unValorInvalidoDeLibreriaNoMuestraSuMensaje`: el controlador interno lanza `new IllegalArgumentException("No enum constant tech.cameia.X")` → 422, `REQUEST_INVALID_VALUE`, `$.detail` = «Revisa los datos enviados.»; la salida del log (capturada) contiene `origen=` y no contiene `No enum constant`.
 - **`UserRegistrationControllerTest` (agregar a las pruebas existentes, no duplicarlas):**
   - 409 (línea 73): `jsonPath("$.code").value("EMAIL_ALREADY_REGISTERED")`.
   - menor de edad (línea 84): `$.code` = `BIRTH_DATE_UNDERAGE`; `$.errors[0].code` = `BIRTH_DATE_UNDERAGE`; `$.errors[0].field` = `birthDate`.
@@ -172,7 +176,7 @@ Solo si Paula responde «sí, desde esta tarea». Si responde «no», se omite y
       return requestId;
   }
   ```
-  y `problema.setProperty("requestId", requestId)`; el `logger.warn` de T-1A.3 agrega `requestId`.
+  y `problema.setProperty("requestId", requestId)`; el `logger.warn` de T-1A.3 agrega `requestId`, y `falloInterno` registra `logger.error("Fallo no controlado: code=INTERNAL_ERROR requestId={}", requestId, error)` (con la traza). Así el `requestId` que la persona ve en la respuesta lleva a una sola línea del log. Prueba: un 500 deja en el log capturado el mismo `requestId` del cuerpo.
 - **Pruebas:** encabezado válido `abc-123` → mismo valor en `$.requestId` y en el encabezado de la respuesta; ausente → UUID v4 (`matches("[0-9a-f-]{36}")`) y mismo valor en el encabezado; `abc 123` (con espacio) y 65 caracteres → UUID nuevo; el valor nunca es el enviado cuando no cumple la expresión.
 - **Trampa:** con `standaloneSetup`, `RequestContextHolder` está disponible durante el despacho; si lanza `IllegalStateException`, **detenerse** y reportar (alternativa: recibir `HttpServletRequest` y `HttpServletResponse` como parámetros de cada manejador).
 

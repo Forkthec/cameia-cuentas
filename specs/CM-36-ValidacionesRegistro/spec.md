@@ -90,6 +90,7 @@ nombre del contrato JSON. Los mensajes van entre comillas y con su punto final, 
 - **REQ-RV-03.** Cuando el servicio responda un error, debe incluir el miembro `requestId` con el `X-Request-Id` recibido o, si falta o no cumple `^[A-Za-z0-9._-]{1,64}$`, un UUID v4 generado, y devolver el mismo valor en el encabezado `X-Request-Id`. (PD-08 respondida por Paula el 6-oct-2026: desde el PR 1A.)
 - **REQ-RV-04.** Si un fallo no es de negocio, el servicio debe responder 500 con `code` `INTERNAL_ERROR` y el `detail` «Ocurrió un error. Inténtalo de nuevo.», sin traza, SQL, nombre de clase ni mensaje de excepción; el detalle va al log. (Texto del RT-05-CA01: hoy dice «No pudimos completar la operación. Inténtalo de nuevo en unos minutos».)
 - **REQ-RV-05.** Mientras el servicio emita un código, el catálogo no debe reutilizar ni renombrar un código publicado; todo valor de `ErrorCode` debe cumplir `^[A-Z]+(_[A-Z]+)+$` y terminar en una causa del vocabulario cerrado del estándar (§A).
+- **REQ-RV-07 (trazabilidad).** Ningún código debe significar dos cosas: `VALIDATION_FAILED` solo acompaña a una lista `errors` no vacía; un dato rechazado sin campo usa `REQUEST_INVALID_VALUE`. Cada error 4xx se registra en `WARN` con `code` y `requestId` (y el origen `clase.método` cuando es el respaldo), y cada 500 en `ERROR` con `requestId` y la traza, de modo que el `requestId` de la respuesta lleve a una sola entrada del log. Ninguna respuesta lleva el mensaje de una librería.
 - **REQ-RV-06.** Si una restricción de Bean Validation del contrato no tiene `code` asignado, una prueba debe fallar (ninguna restricción cae al código `VALIDATION_FAILED` por omisión).
 
 ### Bloque 1B — tres correcciones de validación
@@ -208,6 +209,7 @@ lugar de la causa nueva «implausible»).
 | `IDENTITY_REQUIRED` | 400 | encabezado de identidad ausente (`ServletRequestBindingException`) | 1A |
 | `ACCOUNT_NOT_FOUND` | 404 | `AccountNotFoundException` (activación) | 1A |
 | `EMAIL_NOT_VERIFIED` | 403 | `EmailNotVerifiedException` (activación; código reservado por el contrato) | 1A |
+| `REQUEST_INVALID_VALUE` | 422 | `IllegalArgumentException` de un objeto de valor sin campo (respaldo; deja de emitirse en el bloque 6) | 1A |
 | `INTERNAL_ERROR` | 500 | cualquier otro fallo | 1A |
 
 En 1A, los códigos se agregan **sin cambiar ningún texto** de los vigentes, con una sola excepción: el `detail` del 500, cuyo texto literal fija el RT-05-CA01 (REQ-RV-04). Los textos del catálogo se aplican en el bloque 6 una vez respondida la pregunta 2.
