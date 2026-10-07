@@ -292,6 +292,7 @@ Cobertura: ≥ 90 % de líneas y ramas de lo nuevo o modificado, medida con JaCo
 | 13 | Toda falla de Firebase en el registro (también la indisponibilidad) termina en `IllegalStateException` y por tanto en el 500 genérico | `FirebaseUserDirectoryAdapter.java:73-75, 94` | 1A (REQ-RV-09) |
 | 14 | Una violación de restricción de la base cae al manejador genérico, que registra la excepción completa: el mensaje de PostgreSQL incluye el valor de la columna (dato personal en el log) | `BusinessExceptionHandler` (`falloInterno`) | 1A (REQ-RV-19) |
 | 15 | Rutas inexistentes, método no permitido y tipo de contenido no admitido no pasan por el formato de error con `code` | por comprobar en 1A (T-1A.8) | 1A (REQ-RV-08) |
+| 16 | Identificadores en español en el código y en las pruebas (estándar §2): variables, métodos, constantes y campos como `cuenta`, `problema`, `restriccionDe`, `claseMasEspecifica`, `MAX_CAUSAS`, `manejador`, `recurso`; y pruebas sin la forma `metodo_shouldResultado_whenCondicion` con `@DisplayName`. Vienen de antes de esta tarea y los PR 1A a 6 los imitaron. Desde el PR de la revisión final, lo nuevo y lo modificado cumple el estándar | Revisión de Paula, 7-oct-2026 | PR propio de renombrado al cerrar CM-36, sin cambios de comportamiento: renombrar los archivos completos aquí haría pasar el PR de 1000 líneas |
 
 ## 13. Decisiones
 

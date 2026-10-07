@@ -48,13 +48,13 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
     private static final String FREE_PLAN = "FREE";
 
     /** Código de Identity Toolkit para un correo que no considera válido. */
-    private static final String CORREO_INVALIDO = "INVALID_EMAIL";
+    private static final String INVALID_EMAIL_CODE = "INVALID_EMAIL";
 
     /** Valor cuando la respuesta de Firebase no trae un código legible. */
-    private static final String DESCONOCIDO = "desconocido";
+    private static final String UNKNOWN_CODE = "desconocido";
 
     /** El código es el comienzo del mensaje: mayúsculas y guiones bajos. */
-    private static final Pattern CODIGO_DEL_SERVICIO = Pattern.compile("^[A-Z][A-Z_]*");
+    private static final Pattern SERVICE_CODE_PATTERN = Pattern.compile("^[A-Z][A-Z_]*");
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
@@ -96,20 +96,20 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
             if (AuthErrorCode.EMAIL_ALREADY_EXISTS.equals(error.getAuthErrorCode())) {
                 throw new EmailAlreadyRegisteredException();
             }
-            String codigoDelServicio = codigoDelServicio(error);
-            if (CORREO_INVALIDO.equals(codigoDelServicio)) {
+            String serviceCode = serviceErrorCode(error);
+            if (INVALID_EMAIL_CODE.equals(serviceCode)) {
                 // EmailAddress es permisiva a propósito y Firebase podría ser más estricta. No se
                 // conoce un correo que pase la regla propia y Firebase rechace (el emulador los
                 // acepta todos), así que es una defensa. Para la persona es un correo inválido
                 // (CA-1.1.20); el aviso deja ver en el log que las dos reglas difieren.
                 logger.warn("Firebase rechazó como inválido un correo que pasó la validación propia");
-                throw InvalidEmailException.invalidFormat();
+                throw InvalidEmailException.createInvalidFormat();
             }
             // Cualquier otro rechazo (una política de contraseñas o un proveedor deshabilitado en
             // Firebase) es un defecto de configuración que la persona no puede corregir: el código
             // del servicio va al log para diagnosticarlo.
-            throw indisponibleOEnRechazo(error,
-                    "Firebase rechazó la creación del usuario [codigoDelServicio=" + codigoDelServicio + "]");
+            throw unavailableOrRejection(error,
+                    "Firebase rechazó la creación del usuario [serviceCode=" + serviceCode + "]");
         }
     }
 
@@ -125,17 +125,17 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
      *
      * @return el código, o {@code desconocido} si la respuesta no lo trae
      */
-    static String codigoDelServicio(FirebaseAuthException error) {
-        IncomingHttpResponse respuesta = error.getHttpResponse();
-        if (respuesta == null || respuesta.getContent() == null) {
-            return DESCONOCIDO;
+    static String serviceErrorCode(FirebaseAuthException error) {
+        IncomingHttpResponse response = error.getHttpResponse();
+        if (response == null || response.getContent() == null) {
+            return UNKNOWN_CODE;
         }
         try {
-            String mensaje = JSON.readTree(respuesta.getContent()).path("error").path("message").asString("");
-            Matcher codigo = CODIGO_DEL_SERVICIO.matcher(mensaje);
-            return codigo.find() ? codigo.group() : DESCONOCIDO;
-        } catch (JacksonException ilegible) {
-            return DESCONOCIDO;
+            String message = JSON.readTree(response.getContent()).path("error").path("message").asString("");
+            Matcher matcher = SERVICE_CODE_PATTERN.matcher(message);
+            return matcher.find() ? matcher.group() : UNKNOWN_CODE;
+        } catch (JacksonException unreadable) {
+            return UNKNOWN_CODE;
         }
     }
 
@@ -154,7 +154,7 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
         try {
             firebaseAuth.setCustomUserClaims(firebaseUid, Map.of(PLAN_CLAIM, FREE_PLAN));
         } catch (FirebaseAuthException error) {
-            throw indisponibleOEnRechazo(error, "Firebase rechazó la escritura del plan del usuario");
+            throw unavailableOrRejection(error, "Firebase rechazó la escritura del plan del usuario");
         }
     }
 
@@ -172,7 +172,7 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
             firebaseAuth.deleteUser(firebaseUid);
             logger.info("Credencial eliminada en Firebase para el usuario {}", firebaseUid);
         } catch (FirebaseAuthException error) {
-            throw indisponibleOEnRechazo(error, "Firebase rechazó la eliminación del usuario");
+            throw unavailableOrRejection(error, "Firebase rechazó la eliminación del usuario");
         }
     }
 
@@ -192,16 +192,16 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
      * reintentando.</p>
      *
      * @param error excepción del SDK
-     * @param rechazo texto técnico para el log si no es indisponibilidad
+     * @param rejectionMessage texto técnico para el log si no es indisponibilidad
      * @return la excepción que se debe lanzar
      */
-    private static RuntimeException indisponibleOEnRechazo(FirebaseAuthException error, String rechazo) {
-        ErrorCode codigo = error.getErrorCode();
-        boolean indisponible = codigo == ErrorCode.UNAVAILABLE
-                || codigo == ErrorCode.DEADLINE_EXCEEDED
-                || codigo == ErrorCode.INTERNAL
+    private static RuntimeException unavailableOrRejection(FirebaseAuthException error, String rejectionMessage) {
+        ErrorCode code = error.getErrorCode();
+        boolean unavailable = code == ErrorCode.UNAVAILABLE
+                || code == ErrorCode.DEADLINE_EXCEEDED
+                || code == ErrorCode.INTERNAL
                 || (error.getHttpResponse() == null && error.getCause() instanceof IOException);
-        return indisponible ? new DependencyUnavailableException(error) : new IllegalStateException(rechazo, error);
+        return unavailable ? new DependencyUnavailableException(error) : new IllegalStateException(rejectionMessage, error);
     }
 
     /**

@@ -53,7 +53,7 @@ public record EmailAddress(String value) {
             throw new InvalidEmailException(ErrorCode.EMAIL_TOO_LONG, "El correo no puede superar los 254 caracteres.");
         }
         if (!FORMAT.matcher(value).matches()) {
-            throw InvalidEmailException.invalidFormat();
+            throw InvalidEmailException.createInvalidFormat();
         }
     }
 }

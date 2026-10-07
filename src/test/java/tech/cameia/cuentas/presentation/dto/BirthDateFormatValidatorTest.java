@@ -12,6 +12,7 @@ import jakarta.validation.ValidatorFactory;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
@@ -77,7 +78,8 @@ class BirthDateFormatValidatorTest {
     }
 
     @Test
-    void unAnioConSignoODeMasDeCuatroCifrasNoSeInterpreta() {
+    @DisplayName("Un año con signo o de más de cuatro cifras no se interpreta")
+    void parse_shouldReturnEmpty_whenYearHasSignOrMoreThanFourDigits() {
         // CA-1.1.8 exige dd/mm/aaaa: un año con signo es un error de formato, no una fecha que
         // luego rechace la política de edad con otro código.
         assertThat(BirthDateFormatValidator.parse("01/01/-2000")).isEmpty();

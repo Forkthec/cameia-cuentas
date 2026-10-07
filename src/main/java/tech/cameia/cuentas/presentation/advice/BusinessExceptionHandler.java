@@ -147,7 +147,7 @@ class BusinessExceptionHandler {
      * @return {@code 422 Unprocessable Entity} con un elemento para ese campo
      */
     @ExceptionHandler(InvalidFieldException.class)
-    ProblemDetail campoDeDominioInvalido(InvalidFieldException error) {
+    ProblemDetail invalidDomainField(InvalidFieldException error) {
         return validacion(List.of(campo(error.getField(), error.getErrorCode(), error.getMessage())));
     }
 
@@ -276,7 +276,7 @@ class BusinessExceptionHandler {
         ProblemDetail problema = problema(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno", DETALLE_INTERNO,
                 ErrorCode.INTERNAL_ERROR);
         logger.error("Violación de restricción de la base [constraint={}, sqlState={}, code={}, requestId={}, causa={}]",
-                restriccionDe(error), estadoSqlDe(error), ErrorCode.INTERNAL_ERROR,
+                restriccionDe(error), sqlStateOf(error), ErrorCode.INTERNAL_ERROR,
                 problema.getProperties().get("requestId"), claseMasEspecifica(error));
         return problema;
     }
@@ -334,7 +334,7 @@ class BusinessExceptionHandler {
      * @return {@code 406 Not Acceptable} con el código {@code MEDIA_TYPE_NOT_ACCEPTABLE}
      */
     @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
-    ProblemDetail tipoDeRespuestaNoAdmitido(HttpMediaTypeNotAcceptableException error) {
+    ProblemDetail responseTypeNotAcceptable(HttpMediaTypeNotAcceptableException error) {
         return rechazo(HttpStatus.NOT_ACCEPTABLE, "Tipo de respuesta no admitido", "Tipo de respuesta no admitido.",
                 ErrorCode.MEDIA_TYPE_NOT_ACCEPTABLE);
     }
@@ -465,10 +465,10 @@ class BusinessExceptionHandler {
     }
 
     /** SQLState de la primera excepción de JDBC en la cadena de causas; nunca su mensaje. */
-    private static String estadoSqlDe(Throwable error) {
-        Throwable actual = error;
-        for (int nivel = 0; actual != null && nivel < MAX_CAUSAS; nivel++, actual = actual.getCause()) {
-            if (actual instanceof SQLException jdbc && jdbc.getSQLState() != null) {
+    private static String sqlStateOf(Throwable error) {
+        Throwable current = error;
+        for (int depth = 0; current != null && depth < MAX_CAUSAS; depth++, current = current.getCause()) {
+            if (current instanceof SQLException jdbc && jdbc.getSQLState() != null) {
                 return jdbc.getSQLState();
             }
         }

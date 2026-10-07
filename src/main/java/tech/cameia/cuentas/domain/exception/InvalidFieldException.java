@@ -16,10 +16,10 @@ public abstract class InvalidFieldException extends BusinessException {
      *
      * @param field nombre del campo en el contrato JSON
      * @param errorCode código estable de la causa
-     * @param mensaje texto del criterio de aceptación, sin el valor recibido
+     * @param message texto del criterio de aceptación, sin el valor recibido
      */
-    protected InvalidFieldException(String field, ErrorCode errorCode, String mensaje) {
-        super(errorCode, mensaje);
+    protected InvalidFieldException(String field, ErrorCode errorCode, String message) {
+        super(errorCode, message);
         this.field = field;
     }
 
