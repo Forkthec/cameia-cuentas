@@ -319,7 +319,7 @@ Cobertura: ≥ 90 % de líneas y ramas de lo nuevo o modificado, medida con JaCo
 
 ## 14. Verificaciones previas de Backend
 
-- **V-01 (correo de 254 caracteres).** Comprobar con el emulador de Firebase Auth que `createUser` acepta un correo de 254 caracteres con parte local de hasta 64; si lo rechaza, se informa a Vela y no se recorta. Se hace en el bloque 6.
+- **V-01 (correo de 254 caracteres).** Comprobar con el emulador de Firebase Auth que `createUser` acepta un correo de 254 caracteres con parte local de hasta 64; si lo rechaza, se informa a Vela y no se recorta. Se hace en el bloque 6. **Resultado (7-oct):** el emulador acepta y guarda completo un correo de 254 caracteres. **Pendiente: verificar en staging con Firebase real** (proyecto de desarrollo, nunca producción) el correo de 254 y los dudosos `ana..perez@correo.co`, `.ana@correo.co`, `"ana"@correo.co`, `ñandú@correo.co` y uno con dominio `ñandú.co`; anotar qué responde Firebase y qué devuelve Cuentas, y borrar los usuarios de prueba. El emulador los acepta todos, así que no prueba lo que hará el Firebase real (D14).
 - **V-03 (lista de contraseñas).** Fuente y licencia de la lista de 3000 antes del bloque 4 (pregunta 3).
 - **V-05 (celular igual en cliente y servidor).** Comparar el resultado de `libphonenumber` Java con `libphonenumber-js` sobre los valores de los CA (`+573000000000`, `+34612345678`, `12345`) en el bloque 5; si difieren, se informa a Frontend.
 - **V-06.** Confirmar que la propiedad de Jackson que rechaza números como enumerado existe con su nombre en la versión del proyecto (bloque 6).

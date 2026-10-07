@@ -94,10 +94,10 @@ Justificación del caso manual: comprobar el JSON de OpenAPI exige levantar el c
 ## 7. Orden y dependencias de toda la tarea
 
 1. **1A → 1B** (1B emite códigos nuevos y usa la tabla).
-2. **Bloques 2 y 3 en un solo PR** (decidido por Paula el 6-oct-2026: tocan los mismos archivos y suman ≈ 650 líneas), después de 1B. Dentro del PR, primero el recorte y NFC (secciones 9) y después `PersonName` (sección 10), porque el nombre recortado y en NFC entra a `PersonName`. Pregunta 8 decidida: toda letra `\p{L}` y los espacios internos repetidos se unen en uno (`SingleLineText.normalizeName`).
+2. **Bloques 2 y 3 en un solo PR** (decidido por Paula el 6-oct-2026: tocan los mismos archivos y suman ≈ 650 líneas), después de 1B. **Al ejecutarlos (7-oct) midieron 706 y 388 líneas, 1094 juntos, por encima del tope de 1000: van como dos PR apilados, primero el 2 y después el 3.** Dentro del PR, primero el recorte y NFC (secciones 9) y después `PersonName` (sección 10), porque el nombre recortado y en NFC entra a `PersonName`. Pregunta 8 decidida: toda letra `\p{L}` y los espacios internos repetidos se unen en uno (`SingleLineText.normalizeName`).
 3. Bloque 4 en paralelo con 2 y 3 (fuente decidida: SecLists filtrada, pregunta 3).
 4. Bloque 5 cuando se quiera (dependencia aprobada, pregunta 11; tipos de número decididos, pregunta 9).
-5. Bloque 6 al final: usa las tablas de todos los bloques, exige que CM-251 esté fusionada (su prueba de CA-1.1.42 espera 200).
+5. Bloque 6 al final: usa las tablas de todos los bloques. **Ya no exige CM-251** (T-6.5, 7-oct): la prueba del correo repetido de CA-1.1.42 espera 409 y la tarea del registro repetido la cambia a 200 al fusionarse.
 Paralelo posible: bloque 4 con 2 y 3; el resto es secuencial porque comparten `RegisterUserRequest` y el manejador.
 
 **Fuera de esta tarea, pero dependen de ella:** CM-251 y el bloque 1 de CM-179 empiezan en cuanto se fusione **1A** (no esperan a 1B, 2 ni 3: decidido por Paula el 6-oct-2026). Lo que se fusione después hace un rebase pequeño.
