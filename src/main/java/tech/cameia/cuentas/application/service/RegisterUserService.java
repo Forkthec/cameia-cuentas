@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import tech.cameia.cuentas.application.command.RegisterUserCommand;
 import tech.cameia.cuentas.domain.model.Account;
+import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.model.BirthDate;
 import tech.cameia.cuentas.domain.model.DirectoryUser;
@@ -149,8 +150,12 @@ public class RegisterUserService {
      * <p>El identificador lo genera esta petición para reconocer su credencial. Si el conflicto
      * viene de otra petición que creó el mismo correo, se evalúa de nuevo, una sola vez. Si la
      * credencial que aparece tiene el identificador propio, el SDK de Firebase reintentó una
-     * creación que sí se había completado (la respuesta se perdió por el tiempo de espera): la
-     * credencial es de esta petición y el registro continúa, en lugar de dejarla sin cuenta local.</p>
+     * creación que sí se había completado: la credencial es de esta petición y el registro
+     * continúa, en lugar de dejarla sin cuenta local.</p>
+     *
+     * <p>Si la creación no obtiene respuesta (por ejemplo, vence el tiempo de lectura), Firebase
+     * pudo haberla completado igual. Como el identificador es propio, se intenta borrar esa
+     * credencial antes de responder 503: así el reintento de la persona no choca con ella.</p>
      */
     private RegisterUserResult registrarNueva(ValidRegistration registro) {
         String firebaseUid = UUID.randomUUID().toString().replace("-", "");
@@ -164,8 +169,27 @@ public class RegisterUserService {
             }
             logger.warn("La creación de la credencial se completó tras un reintento del directorio; "
                     + "se continúa con el usuario {}", firebaseUid);
+        } catch (DependencyUnavailableException sinRespuesta) {
+            borrarSiQuedoCreada(firebaseUid);
+            throw sinRespuesta;
         }
         return completarRegistro(firebaseUid, registro);
+    }
+
+    /**
+     * Borra la credencial propia después de una creación sin respuesta.
+     *
+     * <p>Lo normal es que no exista y el borrado no haga nada. Si el borrado tampoco responde, no se
+     * sabe si la credencial existe: se deja un aviso con el identificador y, si quedó, la concilia la
+     * purga de cuentas sin verificar. No es un error de conciliación porque puede no haber nada que conciliar.</p>
+     */
+    private void borrarSiQuedoCreada(String firebaseUid) {
+        try {
+            directorio.deleteUser(firebaseUid);
+        } catch (RuntimeException fallo) {
+            logger.warn("No se pudo confirmar el borrado de la credencial tras una creación sin respuesta, "
+                    + "uid {}; si quedó creada, la concilia la purga", firebaseUid);
+        }
     }
 
     /** Escribe el plan y guarda la cuenta; si algo falla, borra la credencial recién creada. */

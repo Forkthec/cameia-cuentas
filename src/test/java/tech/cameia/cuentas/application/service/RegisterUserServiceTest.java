@@ -165,6 +165,42 @@ class RegisterUserServiceTest {
     }
 
     @Test
+    void siLaCreacionNoRespondePeroSeCompletoLaCredencialPropiaSeBorra() {
+        directorio.perderLaRespuestaDeLaCreacion();
+
+        assertThatThrownBy(() -> servicio.register(comando())).isInstanceOf(DependencyUnavailableException.class);
+
+        assertThat(directorio.creaciones()).isEqualTo(1);
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
+        assertThat(directorio.borrados()).isEqualTo(1);
+        assertThat(repositorio.guardadas).isEmpty();
+    }
+
+    @Test
+    void despuesDeUnaCreacionSinRespuestaElReintentoDeLaPersonaSeRegistra() {
+        directorio.perderLaRespuestaDeLaCreacion();
+        assertThatThrownBy(() -> servicio.register(comando())).isInstanceOf(DependencyUnavailableException.class);
+        directorio.dejarDeFallar();
+
+        RegisterUserResult reintento = servicio.register(comando());
+
+        assertThat(reintento.created()).isTrue();
+        assertThat(directorio.cantidadDeUsuarios()).isEqualTo(1);
+        assertThat(repositorio.guardadas).hasSize(1);
+    }
+
+    @Test
+    void siElBorradoTrasUnaCreacionSinRespuestaFallaSigueLaIndisponibilidadYSoloHayUnAviso(CapturedOutput salida) {
+        directorio.perderLaRespuestaDeLaCreacion();
+        directorio.fallarAlBorrar();
+
+        assertThatThrownBy(() -> servicio.register(comando())).isInstanceOf(DependencyUnavailableException.class);
+
+        assertThat(salida.getOut()).contains("No se pudo confirmar el borrado").doesNotContain(CORREO)
+                .doesNotContain("requiere conciliación manual");
+    }
+
+    @Test
     void siElSdkReintentaYLuegoFallaElPlanLaCredencialPropiaSeBorra() {
         directorio.simularReintentoDelSdk();
         directorio.fallarAlEscribirElPlan();
