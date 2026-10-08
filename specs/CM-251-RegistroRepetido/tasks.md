@@ -74,7 +74,7 @@ Estado: sin ejecutar; spec y plan pendientes de aprobación de Paula. Dos PR: **
    */
   public record RegisterUserResult(Account account, boolean created) { }
   ```
-- **Servicio.** Agregar `Clock clock` por un segundo constructor (el primero, el que usa Spring, pasa `Clock.systemUTC()`; mismo patrón que `AgePolicy`), y la constante `private static final Duration REGISTRO_EN_CURSO = Duration.ofSeconds(60);` con su Javadoc (cubre el peor caso del registro: cuatro llamadas de hasta 8 s). Estructura final, con las validaciones existentes sin cambios al inicio del método:
+- **Servicio.** Agregar `Clock clock` por un segundo constructor (el primero, el que usa Spring, pasa `Clock.systemUTC()`; mismo patrón que `AgePolicy`), y la constante `private static final Duration REGISTRO_EN_CURSO = Duration.ofSeconds(300);` con su Javadoc (cubre el peor caso del registro: cuatro llamadas de hasta 8 s). Estructura final, con las validaciones existentes sin cambios al inicio del método:
   ```java
   public RegisterUserResult register(RegisterUserCommand command) {
       // ... validaciones existentes (correo, contraseña, fecha, celular, políticas, nombres), que arman el record privado ValidRegistration ...
@@ -121,7 +121,7 @@ Estado: sin ejecutar; spec y plan pendientes de aprobación de Paula. Dos PR: **
       return Duration.between(credencial.createdAt(), clock.instant());
   }
   ```
-  `trasConflicto` es un `enum Origen { CONSULTA_PREVIA, TRAS_CONFLICTO }` privado si el revisor prefiere evitar el booleano. Un límite de exactamente 60 s cuenta como huérfana. El servicio **no** registra nada de S4: lo hace el manejador (T-4), una sola línea con `code`, `requestId` y `uid`. Actualizar el Javadoc de la clase y de `register` (devuelve el resultado; `@throws` para S3, S4, S8 y la carrera) y no describir ya el método como «crea la cuenta» a secas. Comentario de bloque sobre `atenderCorreoExistente`: explica que la contraseña no se verifica y los datos del cuerpo se ignoran.
+  `trasConflicto` es un `enum Origen { CONSULTA_PREVIA, TRAS_CONFLICTO }` privado si el revisor prefiere evitar el booleano. Un límite de exactamente 300 s cuenta como huérfana. El servicio **no** registra nada de S4: lo hace el manejador (T-4), una sola línea con `code`, `requestId` y `uid`. Actualizar el Javadoc de la clase y de `register` (devuelve el resultado; `@throws` para S3, S4, S8 y la carrera) y no describir ya el método como «crea la cuenta» a secas. Comentario de bloque sobre `atenderCorreoExistente`: explica que la contraseña no se verifica y los datos del cuerpo se ignoran.
 - **Pruebas existentes a actualizar:** `RegisterUserServiceTest` usa `register(...).account()`; el caso de correo repetido cambia a S2.
 - **Trampa:** `atenderCorreoExistente` **no** llama a `save`, `createUser`, `assignFreePlanClaim` ni `deleteUser`, y no recibe la contraseña (REQ-RR-08). `registrarNueva` conserva `compensar` exactamente como está.
 - **Verificación:** `./mvnw.cmd -B -Dtest=RegisterUserServiceTest test` en verde tras ajustar las llamadas.
@@ -148,7 +148,7 @@ Estado: sin ejecutar; spec y plan pendientes de aprobación de Paula. Dos PR: **
   3. `unCorreoConOtraGrafiaEsElMismoCorreo`: `ana@cameia.tech` y luego `  ANA@Cameia.Tech ` → S2.
   4. `unaCuentaActivaBloqueadaOAnonimizadaDaElMismoConflicto` (`@EnumSource(names = {"ACTIVE", "DISABLED", "ANONYMIZED"})`, fila con `Account.rebuild(...)`): `EmailAlreadyRegisteredException` con el **mismo mensaje** en los tres.
   5. `unUsuarioDeshabilitadoEnFirebaseConFilaPendienteDaConflicto`: `directorio.deshabilitar(uid)` → `EmailAlreadyRegisteredException`; la fila no cambia.
-  6. `unaCredencialSinCuentaLocalAntigua` (`@ParameterizedTest` con 59 s, 60 s y 61 s de antigüedad): `EmailAlreadyRegisteredException` con `getFirebaseUid()` igual al `uid`; `requiresReconciliation()` es `false` con 59 s y `true` con 60 s y 61 s; el servicio no escribe ninguna línea de log sobre el caso.
+  6. `unaCredencialSinCuentaLocalAntigua` (`@ParameterizedTest` con 299 s, 300 s y 301 s de antigüedad): `EmailAlreadyRegisteredException` con `getFirebaseUid()` igual al `uid`; `requiresReconciliation()` es `false` con 299 s y `true` con 300 s y 301 s; el servicio no escribe ninguna línea de log sobre el caso.
   7. `siFirebaseNoRespondeAlConsultarNoSeCreaNada`: `fallarAlConsultar()` → `DependencyUnavailableException`; cero usuarios y cero filas.
   8. `laCarreraSeResuelveConUnaSolaConsultaMas`: doble que en la primera consulta devuelve vacío y falla `createUser` con `EmailAlreadyRegisteredException`, y en la segunda devuelve una credencial con fila pendiente → `created()` `false`. Variante sin fila → `EmailAlreadyRegisteredException` con `requiresReconciliation()` `false`, aunque la credencial tenga 10 min. Variante con segunda consulta vacía → `EmailAlreadyRegisteredException` y `creaciones()` igual a 1.
   9. `unCuerpoInvalidoNoLlegaAFirebase`: contraseña `123` con correo ya registrado → `WeakPasswordException`; `consultas()` es 0.

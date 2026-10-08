@@ -63,7 +63,7 @@ Spec, sección 13 (D1 a D13). El plan agrega: el resultado es un `record` de `ap
 | S2 con datos distintos en el cuerpo → misma cuenta, fila intacta | servicio, punta a punta | REQ-RR-13 |
 | S3: `ACTIVE`, `DISABLED`, `ANONYMIZED` → `EmailAlreadyRegisteredException`, mismo mensaje en los tres | servicio | REQ-RR-03 |
 | S8: usuario deshabilitado con fila pendiente → `EmailAlreadyRegisteredException` | servicio | REQ-RR-03 |
-| S4: credencial sin fila de 59 s → excepción sin conciliación; de 60 s y 61 s → con conciliación | servicio | REQ-RR-04 |
+| S4: credencial sin fila de 299 s → excepción sin conciliación; de 300 s y 301 s → con conciliación | servicio | REQ-RR-04 |
 | S4: una sola línea de log del manejador con `code`, `requestId` y `uid` (`WARN` o `ERROR`), sin correo | manejador | REQ-RR-04, 12 |
 | S5: la consulta falla por indisponibilidad → `DependencyUnavailableException`, nada creado | servicio, adaptador | REQ-RR-05 |
 | `INVALID_EMAIL` al consultar → `InvalidEmailException`; cuota agotada → `DependencyUnavailableException`; otro rechazo → `IllegalStateException` sin el correo | adaptador | REQ-RR-05 |
