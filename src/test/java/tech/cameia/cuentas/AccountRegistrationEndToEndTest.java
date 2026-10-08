@@ -2,6 +2,9 @@ package tech.cameia.cuentas;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Instant;
+import java.util.Map;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -85,20 +88,117 @@ class AccountRegistrationEndToEndTest {
     }
 
     @Test
-    void elSegundoRegistroConElMismoCorreoRespondeConflicto() {
-        registrar(cuerpoValido());
+    void elSegundoRegistroConElMismoCorreoDevuelveLaCuentaPendiente() {
+        ResponseEntity<String> creado = registrar(cuerpoValido());
 
         ResponseEntity<String> repetido = registrar(cuerpoValido());
 
-        assertThat(repetido.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-        assertThat(repetido.getBody()).contains("Ese correo ya tiene una cuenta.")
-                .contains("\"code\":\"EMAIL_ALREADY_REGISTERED\"");
-        assertThat(repetido.getHeaders().getContentType()).isNotNull();
-        assertThat(repetido.getHeaders().getContentType().toString())
-                .startsWith("application/problem+json")
-                .containsIgnoringCase("charset=UTF-8");
-        assertThat(repetido.getHeaders().getFirst("X-Request-Id")).isNotBlank();
+        assertThat(repetido.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(repetido.getBody()).isEqualTo(creado.getBody());
+        assertThat(repetido.getHeaders().getContentType().toString()).containsIgnoringCase("charset=UTF-8");
         assertThat(cuentasGuardadas()).isEqualTo(1);
+        assertThat(directorio.cantidadDeUsuarios()).isEqualTo(1);
+    }
+
+    @Test
+    void elReintentoNoCambiaLasFechasNiLaVersion() {
+        registrar(cuerpoValido());
+        Map<String, Object> antes = filaGuardada();
+
+        registrar(cuerpoValido());
+
+        assertThat(filaGuardada()).isEqualTo(antes);
+    }
+
+    @Test
+    void veinteRepeticionesDelMismoRegistroNoProducenEfectosAdicionales() {
+        ResponseEntity<String> creado = registrar(cuerpoValido());
+        Map<String, Object> antes = filaGuardada();
+
+        for (int repeticion = 0; repeticion < 20; repeticion++) {
+            ResponseEntity<String> repetido = registrar(cuerpoValido());
+            assertThat(repetido.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(repetido.getBody()).isEqualTo(creado.getBody());
+        }
+
+        assertThat(cuentasGuardadas()).isEqualTo(1);
+        assertThat(directorio.cantidadDeUsuarios()).isEqualTo(1);
+        assertThat(filaGuardada()).isEqualTo(antes);
+    }
+
+    @Test
+    void unCorreoConCuentaActivaDaConflictoSinRevelarElEstado() {
+        registrar(cuerpoValido());
+        HttpHeaders encabezados = new HttpHeaders();
+        encabezados.add("X-User-Id", uidGuardado());
+        encabezados.add("X-User-Email-Verified", "true");
+        cliente.exchange("/api/v1/users/me/verification", HttpMethod.POST, new HttpEntity<>(encabezados),
+                String.class);
+        assertThat(estadoGuardado()).isEqualTo("ACTIVE");
+
+        ResponseEntity<String> conCuentaActiva = registrar(cuerpoValido());
+        jdbcTemplate.update("UPDATE microcuentas.cuenta SET estado = 'DISABLED'");
+        ResponseEntity<String> conCuentaBloqueada = registrar(cuerpoValido());
+
+        assertThat(conCuentaActiva.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(conCuentaActiva.getBody()).contains("Ese correo ya tiene una cuenta.")
+                .contains("\"code\":\"EMAIL_ALREADY_REGISTERED\"")
+                .contains("\"field\":\"email\"");
+        assertThat(conCuentaActiva.getHeaders().getContentType().toString())
+                .startsWith("application/problem+json").containsIgnoringCase("charset=UTF-8");
+        assertThat(conCuentaActiva.getHeaders().getFirst("X-Request-Id")).isNotBlank();
+        assertThat(conCuentaBloqueada.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(sinRequestId(conCuentaBloqueada.getBody())).isEqualTo(sinRequestId(conCuentaActiva.getBody()));
+    }
+
+    @Test
+    void unaCredencialSinCuentaLocalDaConflicto() {
+        directorio.crearSinCuentaLocal("ana@cameia.tech", Instant.now().minusSeconds(600));
+
+        ResponseEntity<String> respuesta = registrar(cuerpoValido());
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(respuesta.getBody()).contains("\"code\":\"EMAIL_ALREADY_REGISTERED\"");
+        assertThat(cuentasGuardadas()).isZero();
+    }
+
+    @Test
+    void unUsuarioDeshabilitadoDaConflicto() {
+        registrar(cuerpoValido());
+        directorio.deshabilitar(uidGuardado());
+
+        ResponseEntity<String> respuesta = registrar(cuerpoValido());
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(estadoGuardado()).isEqualTo("PENDING_VERIFICATION");
+    }
+
+    @Test
+    void siFirebaseNoRespondeAlConsultarRespondeServicioNoDisponible() {
+        directorio.fallarAlConsultar();
+
+        ResponseEntity<String> respuesta = registrar(cuerpoValido());
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(respuesta.getBody()).contains("\"code\":\"DEPENDENCY_UNAVAILABLE\"")
+                .contains("Ocurrió un error. Inténtalo de nuevo.")
+                .doesNotContain("Firebase no respondió");
+        assertThat(cuentasGuardadas()).isZero();
+    }
+
+    @Test
+    void elSegundoRegistroConOtrosDatosNoCambiaLaFila() {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+        Map<String, Object> antes = filaGuardada();
+        String otrosDatos = cuerpoValido().replace("Ana", "Luz").replace("12/04/1995", "01/01/1990")
+                .replace("frase secreta larga", "otra frase muy distinta");
+
+        ResponseEntity<String> respuesta = registrar(otrosDatos);
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(filaGuardada()).isEqualTo(antes);
+        assertThat(directorio.contrasenaDe(uid)).isEqualTo("frase secreta larga");
     }
 
     @Test
@@ -208,13 +308,13 @@ class AccountRegistrationEndToEndTest {
     }
 
     @Test
-    void unCorreoConEspaciosYMayusculasSeGuardaNormalizadoYBloqueaElSiguiente() {
+    void unCorreoConEspaciosYMayusculasSeGuardaNormalizadoYElSiguienteDevuelveLaMismaCuenta() {
         ResponseEntity<String> primero = registrar(cuerpoValido().replace("ana@cameia.tech", "  Ana@Correo.CO "));
         ResponseEntity<String> segundo = registrar(cuerpoValido().replace("ana@cameia.tech", "ana@correo.co"));
 
         assertThat(primero.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(segundo.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-        assertThat(segundo.getBody()).contains("\"code\":\"EMAIL_ALREADY_REGISTERED\"");
+        assertThat(segundo.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(segundo.getBody()).isEqualTo(primero.getBody());
         assertThat(directorio.cantidadDeUsuarios()).isEqualTo(1);
         assertThat(cuentasGuardadas()).isEqualTo(1);
     }
@@ -323,6 +423,14 @@ class AccountRegistrationEndToEndTest {
         HttpHeaders encabezados = new HttpHeaders();
         encabezados.setContentType(MediaType.APPLICATION_JSON);
         return cliente.postForEntity("/api/v1/users", new HttpEntity<>(cuerpo, encabezados), String.class);
+    }
+
+    private Map<String, Object> filaGuardada() {
+        return jdbcTemplate.queryForMap("SELECT * FROM microcuentas.cuenta");
+    }
+
+    private static String sinRequestId(String cuerpo) {
+        return cuerpo.replaceAll("\"requestId\":\"[^\"]*\"", "");
     }
 
     private String uidGuardado() {
