@@ -1,6 +1,6 @@
 # Plan — CM-251-RegistroRepetido
 
-Base: `develop` (`e5e17e4`, CM-36 completo fusionado). Rutas y líneas se revalidan al empezar. Estado: pendiente de aprobación de Paula. Dos PR: **A** (código, ≈ 750 líneas, ≈ 6 h) y **B** (Postman y V-02, ≈ 450 líneas, ≈ 2 h), B sobre A. Subir ramas o abrir PR se pregunta a Paula cada vez.
+Base: `develop` (`e5e17e4`, CM-36 completo fusionado). Rutas y líneas se revalidan al empezar. Estado: aprobado por Paula el 8-oct-2026. Dos PR: **A** (código, ≈ 750 líneas, ≈ 6 h) y **B** (Postman y V-02, ≈ 450 líneas, ≈ 2 h), B sobre A. Subir ramas o abrir PR se pregunta a Paula cada vez.
 
 ## 1. Cómo se aborda
 

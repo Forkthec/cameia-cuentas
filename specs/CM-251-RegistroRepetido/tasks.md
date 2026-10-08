@@ -1,6 +1,6 @@
 # Tareas — CM-251-RegistroRepetido
 
-Estado: sin ejecutar; spec y plan pendientes de aprobación de Paula. Dos PR: **A** (T-1 a T-9) y **B** (T-10 a T-12). Se marca `[x]` solo con la salida real de las pruebas pegada en el informe.
+Estado: spec y plan aprobados por Paula el 8-oct-2026. Dos PR: **A** (T-1 a T-9) y **B** (T-10 a T-12). Se marca `[x]` solo con la salida real de las pruebas pegada en el informe.
 
 ## Reglas para todas las tarjetas (el modelo que ejecuta no lee la spec ni el plan)
 

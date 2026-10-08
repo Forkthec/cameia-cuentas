@@ -3,7 +3,7 @@
 - **Tarea:** CM-251 · Subtarea «CM-241 – Backend: corrección del defecto» · padre CM-241 (Error DF-001, «Registro muestra "No hay conexión" pero la cuenta sí se crea», HU-1.1, staging, 24-sep-2026) · hermana de Frontend CM-250 · Sprint 2 · responsable: Paula Andrea Muñoz Delgado
 - **Repositorio:** `cameia-cuentas`, rama `CM-251-registro-repetido-pendiente`, sobre `develop` (`e5e17e4`, con CM-36 completo fusionado)
 - **Backlog vigente:** `05102026_01_Backlog.xlsx`, hoja `HE-01`: CA-1.1.30 (principal), CA-1.2.12 (remite a CA-1.1.30), CA-1.1.2, CA-1.2.8 y las reglas transversales RT-05 y RT-06; decisiones P-02 A y C-12 de «Cambios v4»
-- **Estado:** spec, plan y tarjetas escritos; **pendiente de aprobación de Paula**
+- **Estado:** spec, plan y tarjetas escritos; **aprobados por Paula el 8-oct-2026**
 - **Atributos de calidad que toca:** los del anexo de restricciones y atributos de calidad de CAMEIA que la épica HE-01 declara (AC-0003 seguridad, AC-0004 fiabilidad, AC-0006 capacidad de interacción, FIA-02, IOP-04) más AC-0002 (desempeño) y los controles MAN-02, IOP-01 e IOP-02; la sección 8 bis dice cómo se mide cada uno.
 
 ## 1. Contexto y objetivo
