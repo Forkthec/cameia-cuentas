@@ -47,6 +47,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     private volatile boolean fallarAlBorrar;
     private volatile boolean fallarAlConsultar;
     private volatile boolean reintentoDelSdk;
+    private volatile boolean respuestaPerdida;
 
     @Override
     public synchronized void createUser(String firebaseUid, EmailAddress email, RawPassword password) {
@@ -54,6 +55,10 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
             throw new EmailAlreadyRegisteredException();
         }
         crear(firebaseUid, email.value(), password.value(), reloj.instant());
+        if (respuestaPerdida) {
+            // Firebase creó la credencial pero la respuesta no llegó: el cliente solo ve que no respondió
+            throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
+        }
         if (reintentoDelSdk) {
             // El SDK reintentó una creación que sí se completó: la credencial existe y llega el conflicto
             throw new EmailAlreadyRegisteredException();
@@ -228,6 +233,11 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         this.reintentoDelSdk = true;
     }
 
+    /** Hace que la creación quede hecha pero no responda, como cuando vence el tiempo de lectura. */
+    public void perderLaRespuestaDeLaCreacion() {
+        this.respuestaPerdida = true;
+    }
+
     /** Hace que la escritura del plan falle en la siguiente llamada. */
     public void fallarAlEscribirElPlan() {
         this.fallarAlEscribirElPlan = true;
@@ -250,6 +260,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         this.fallarAlBorrar = false;
         this.fallarAlConsultar = false;
         this.reintentoDelSdk = false;
+        this.respuestaPerdida = false;
     }
 
     /** Vacía el directorio y desactiva los fallos provocados. */
@@ -269,5 +280,6 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         indisponibleAlEscribirElPlan = false;
         fallarAlBorrar = false;
         reintentoDelSdk = false;
+        respuestaPerdida = false;
     }
 }

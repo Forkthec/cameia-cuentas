@@ -1,6 +1,7 @@
 package tech.cameia.cuentas.infrastructure.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -116,6 +117,13 @@ class FirebaseUserDirectoryAdapterTest {
     }
 
     @Test
+    void borrarUnaCredencialQueNoExisteNoEsUnError() throws Exception {
+        doThrow(errorDeFirebase(AuthErrorCode.USER_NOT_FOUND)).when(firebaseAuth).deleteUser(UID);
+
+        assertThatCode(() -> adaptador.deleteUser(UID)).doesNotThrowAnyException();
+    }
+
+    @Test
     void eliminaLaCredencialDelUsuario() throws Exception {
         adaptador.deleteUser(UID);
 
@@ -192,8 +200,8 @@ class FirebaseUserDirectoryAdapterTest {
 
     @Test
     void unRechazoAlEscribirElPlanOAlBorrarSigueSiendoUnFalloImprevisto() throws Exception {
-        FirebaseAuthException rechazo = new FirebaseAuthException(ErrorCode.NOT_FOUND, "sin usuario", null, null,
-                AuthErrorCode.USER_NOT_FOUND);
+        FirebaseAuthException rechazo = new FirebaseAuthException(ErrorCode.PERMISSION_DENIED, "sin permisos", null, null,
+                null);
         doThrow(rechazo).when(firebaseAuth).setCustomUserClaims(eq(UID), any());
         doThrow(rechazo).when(firebaseAuth).deleteUser(UID);
 

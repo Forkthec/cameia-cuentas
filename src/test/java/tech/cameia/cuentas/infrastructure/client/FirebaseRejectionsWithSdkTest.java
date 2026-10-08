@@ -1,6 +1,7 @@
 package tech.cameia.cuentas.infrastructure.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Date;
@@ -117,10 +118,18 @@ class FirebaseRejectionsWithSdkTest {
     }
 
     @Test
+    @DisplayName("Borrar una credencial que no existe no es un error")
+    void deleteUser_shouldNotThrow_whenTheUserDoesNotExist() {
+        FirebaseUserDirectoryAdapter adapter = adapterRespondingWith(400, "USER_NOT_FOUND");
+
+        assertThatCode(() -> adapter.deleteUser("uid-inexistente")).doesNotThrowAnyException();
+    }
+
+    @Test
     @DisplayName("Un rechazo al borrar con respuesta HTTP no es indisponibilidad")
     void deleteUser_shouldNotThrowDependencyUnavailable_whenFirebaseAnswersWithHttpRejection() {
         // El SDK adjunta la respuesta HTTP como causa de E/S; no es una conexión fallida.
-        FirebaseUserDirectoryAdapter adapter = adapterRespondingWith(400, "USER_NOT_FOUND");
+        FirebaseUserDirectoryAdapter adapter = adapterRespondingWith(403, "PERMISSION_DENIED");
 
         assertThatThrownBy(() -> adapter.deleteUser("uid-inexistente"))
                 .isInstanceOf(IllegalStateException.class)

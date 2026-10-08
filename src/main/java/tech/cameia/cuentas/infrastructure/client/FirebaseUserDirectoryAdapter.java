@@ -203,6 +203,9 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
     /**
      * Elimina la credencial del usuario.
      *
+     * <p>Una credencial que ya no existe se da por borrada: el registro compensa también cuando la
+     * creación no devolvió respuesta, y entonces la credencial puede no haberse creado nunca.</p>
+     *
      * @param firebaseUid identificador del usuario
      * @throws DependencyUnavailableException si Firebase no respondió o falló de su lado
      * @throws IllegalStateException si Firebase rechaza el borrado por cualquier otro motivo;
@@ -214,6 +217,10 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
             firebaseAuth.deleteUser(firebaseUid);
             logger.info("Credencial eliminada en Firebase para el usuario {}", firebaseUid);
         } catch (FirebaseAuthException error) {
+            if (AuthErrorCode.USER_NOT_FOUND.equals(error.getAuthErrorCode())) {
+                logger.info("La credencial del usuario {} no existe en Firebase; no hay nada que borrar", firebaseUid);
+                return;
+            }
             throw unavailableOrRejection(error, "Firebase rechazó la eliminación del usuario");
         }
     }
