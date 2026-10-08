@@ -90,13 +90,16 @@ Estado: sin ejecutar; spec y plan pendientes de aprobación de Paula. Dos PR: **
           PhoneNumber phoneNumber, PersonName firstName, PersonName lastName, Pronoun pronoun) { }
 
   private RegisterUserResult registrarNueva(ValidRegistration registro) {
-      String firebaseUid;
+      String firebaseUid = UUID.randomUUID().toString().replace("-", "");
       try {
-          firebaseUid = directorio.createUser(email, password);
-      } catch (EmailAlreadyRegisteredException carrera) {
-          // Otra petición creó la credencial entre la consulta y la creación: se evalúa de nuevo, una sola vez
-          DirectoryUser creada = directorio.findByEmail(email).orElseThrow(EmailAlreadyRegisteredException::new);
-          return atenderCorreoExistente(creada, true);
+          directorio.createUser(firebaseUid, email, password);
+      } catch (EmailAlreadyRegisteredException conflicto) {
+          DirectoryUser existente = directorio.findByEmail(email).orElseThrow(EmailAlreadyRegisteredException::new);
+          if (!firebaseUid.equals(existente.uid())) {
+              // Otra petición creó la credencial entre la consulta y la creación: se evalúa de nuevo, una sola vez
+              return atenderCorreoExistente(existente, true);
+          }
+          // El SDK reintentó una creación que sí se completó: la credencial es de esta petición (D17)
       }
       ... (el bloque try/catch con assignFreePlanClaim, Account.register, save y compensar, sin cambios) ...
       return new RegisterUserResult(guardada, true);
