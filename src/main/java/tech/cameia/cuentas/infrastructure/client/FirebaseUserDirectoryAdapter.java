@@ -78,25 +78,29 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
      * <p>La credencial nace con el correo sin verificar: el enlace de verificación lo pide
      * el frontend a Firebase después de iniciar sesión.</p>
      *
+     * @param firebaseUid identificador que tendrá el usuario
      * @param email correo con el que iniciará sesión
      * @param password contraseña ya validada por la política del dominio
-     * @return identificador del usuario creado
-     * @throws EmailAlreadyRegisteredException si ese correo ya tiene credencial
+     * @throws EmailAlreadyRegisteredException si ese correo o ese identificador ya tienen credencial
      * @throws InvalidEmailException si Firebase rechaza el correo ({@code INVALID_EMAIL})
      * @throws DependencyUnavailableException si Firebase no respondió o falló de su lado
      * @throws IllegalStateException si Firebase rechaza la creación por cualquier otro motivo
      */
     @Override
-    public String createUser(EmailAddress email, RawPassword password) {
+    public void createUser(String firebaseUid, EmailAddress email, RawPassword password) {
         UserRecord.CreateRequest solicitud = new UserRecord.CreateRequest()
+                .setUid(firebaseUid)
                 .setEmail(email.value())
                 .setPassword(password.value())
                 .setEmailVerified(false);
 
         try {
-            return firebaseAuth.createUser(solicitud).getUid();
+            firebaseAuth.createUser(solicitud);
         } catch (FirebaseAuthException error) {
-            if (AuthErrorCode.EMAIL_ALREADY_EXISTS.equals(error.getAuthErrorCode())) {
+            // Si el SDK reintenta una creación que sí se completó, Firebase puede responder con
+            // cualquiera de los dos conflictos; el servicio distingue de quién es la credencial
+            if (AuthErrorCode.EMAIL_ALREADY_EXISTS.equals(error.getAuthErrorCode())
+                    || AuthErrorCode.UID_ALREADY_EXISTS.equals(error.getAuthErrorCode())) {
                 throw new EmailAlreadyRegisteredException();
             }
             throw translateRejection(error, "Firebase rechazó la creación del usuario");

@@ -1,5 +1,7 @@
 package tech.cameia.cuentas.application.service;
 
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -87,7 +89,9 @@ public class RegisterUserService {
         politicaDeEdad.verify(birthDate);
         politicaDeContrasenia.verify(password);
 
-        String firebaseUid = directorio.createUser(email, password);
+        // El identificador lo elige esta petición para poder reconocer su propia credencial
+        String firebaseUid = UUID.randomUUID().toString().replace("-", "");
+        directorio.createUser(firebaseUid, email, password);
 
         try {
             directorio.assignFreePlanClaim(firebaseUid);
