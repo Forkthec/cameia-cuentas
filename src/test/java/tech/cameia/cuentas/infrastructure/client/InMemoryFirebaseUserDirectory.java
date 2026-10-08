@@ -1,13 +1,17 @@
 package tech.cameia.cuentas.infrastructure.client;
 
-import java.util.HashMap;
-import java.util.HashSet;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
+import tech.cameia.cuentas.domain.model.DirectoryUser;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.RawPassword;
 import tech.cameia.cuentas.domain.port.FirebaseUserDirectory;
@@ -21,28 +25,52 @@ import tech.cameia.cuentas.domain.port.FirebaseUserDirectory;
  *
  * <p>Permite provocar los fallos que el registro tiene que saber manejar: un correo ya
  * registrado, un error al escribir el plan y un error al borrar la credencial durante la
- * compensación.</p>
+ * compensación, un error al consultar por correo y una credencial deshabilitada o sin cuenta local.</p>
+ *
+ * <p>Es seguro entre hilos: las pruebas de concurrencia lo comparten entre dos peticiones.</p>
  */
 public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
 
-    private final Map<String, String> correosPorUid = new HashMap<>();
-    private final Map<String, String> planesPorUid = new HashMap<>();
-    private final Map<String, String> contrasenasPorUid = new HashMap<>();
-    private final Set<String> correosVerificados = new HashSet<>();
+    private final Map<String, String> correosPorUid = new ConcurrentHashMap<>();
+    private final Map<String, String> planesPorUid = new ConcurrentHashMap<>();
+    private final Map<String, String> contrasenasPorUid = new ConcurrentHashMap<>();
+    private final Map<String, Instant> creacionesPorUid = new ConcurrentHashMap<>();
+    private final Set<String> correosVerificados = ConcurrentHashMap.newKeySet();
+    private final Set<String> deshabilitados = ConcurrentHashMap.newKeySet();
+    private final AtomicInteger consultas = new AtomicInteger();
+    private final AtomicInteger creaciones = new AtomicInteger();
+    private final AtomicInteger borrados = new AtomicInteger();
 
-    private boolean fallarAlEscribirElPlan;
-    private boolean indisponibleAlEscribirElPlan;
-    private boolean fallarAlBorrar;
+    private volatile Clock reloj = Clock.systemUTC();
+    private volatile boolean fallarAlEscribirElPlan;
+    private volatile boolean indisponibleAlEscribirElPlan;
+    private volatile boolean fallarAlBorrar;
+    private volatile boolean fallarAlConsultar;
 
     @Override
-    public String createUser(EmailAddress email, RawPassword password) {
+    public synchronized String createUser(EmailAddress email, RawPassword password) {
         if (correosPorUid.containsValue(email.value())) {
             throw new EmailAlreadyRegisteredException();
         }
         String uid = UUID.randomUUID().toString();
         correosPorUid.put(uid, email.value());
         contrasenasPorUid.put(uid, password.value());
+        creacionesPorUid.put(uid, reloj.instant());
+        creaciones.incrementAndGet();
         return uid;
+    }
+
+    @Override
+    public Optional<DirectoryUser> findByEmail(EmailAddress email) {
+        consultas.incrementAndGet();
+        if (fallarAlConsultar) {
+            throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
+        }
+        return correosPorUid.entrySet().stream()
+                .filter(entrada -> entrada.getValue().equals(email.value()))
+                .findFirst()
+                .map(entrada -> new DirectoryUser(entrada.getKey(), creacionesPorUid.get(entrada.getKey()),
+                        deshabilitados.contains(entrada.getKey())));
     }
 
     @Override
@@ -61,10 +89,13 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         if (fallarAlBorrar) {
             throw new IllegalStateException("Firebase rechazó la eliminación del usuario");
         }
+        borrados.incrementAndGet();
         correosPorUid.remove(firebaseUid);
         planesPorUid.remove(firebaseUid);
         contrasenasPorUid.remove(firebaseUid);
+        creacionesPorUid.remove(firebaseUid);
         correosVerificados.remove(firebaseUid);
+        deshabilitados.remove(firebaseUid);
     }
 
     @Override
@@ -121,6 +152,72 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         correosVerificados.add(firebaseUid);
     }
 
+    /**
+     * Cambia el reloj con el que se fecha cada credencial nueva.
+     *
+     * @param nuevoReloj reloj que usarán las credenciales creadas a partir de ahora
+     */
+    public void reloj(Clock nuevoReloj) {
+        this.reloj = nuevoReloj;
+    }
+
+    /**
+     * Crea una credencial que no tiene cuenta local, con la fecha de creación indicada.
+     *
+     * @param correo correo ya normalizado
+     * @param creada instante de creación de la credencial
+     * @return identificador de la credencial creada
+     */
+    public String crearSinCuentaLocal(String correo, Instant creada) {
+        String uid = UUID.randomUUID().toString();
+        correosPorUid.put(uid, correo);
+        contrasenasPorUid.put(uid, "sin-contrasena");
+        creacionesPorUid.put(uid, creada);
+        creaciones.incrementAndGet();
+        return uid;
+    }
+
+    /**
+     * Deshabilita una credencial.
+     *
+     * @param firebaseUid identificador del usuario
+     */
+    public void deshabilitar(String firebaseUid) {
+        deshabilitados.add(firebaseUid);
+    }
+
+    /**
+     * Cuenta las consultas por correo recibidas.
+     *
+     * @return número de llamadas a {@code findByEmail}
+     */
+    public int consultas() {
+        return consultas.get();
+    }
+
+    /**
+     * Cuenta las credenciales creadas con éxito.
+     *
+     * @return número de creaciones, incluidas las borradas después
+     */
+    public int creaciones() {
+        return creaciones.get();
+    }
+
+    /**
+     * Cuenta los borrados de credenciales pedidos.
+     *
+     * @return número de llamadas a {@code deleteUser} que no fallaron
+     */
+    public int borrados() {
+        return borrados.get();
+    }
+
+    /** Hace que la consulta por correo falle como si Firebase no estuviera disponible. */
+    public void fallarAlConsultar() {
+        this.fallarAlConsultar = true;
+    }
+
     /** Hace que la escritura del plan falle en la siguiente llamada. */
     public void fallarAlEscribirElPlan() {
         this.fallarAlEscribirElPlan = true;
@@ -141,6 +238,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         this.fallarAlEscribirElPlan = false;
         this.indisponibleAlEscribirElPlan = false;
         this.fallarAlBorrar = false;
+        this.fallarAlConsultar = false;
     }
 
     /** Vacía el directorio y desactiva los fallos provocados. */
@@ -149,6 +247,13 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         planesPorUid.clear();
         contrasenasPorUid.clear();
         correosVerificados.clear();
+        creacionesPorUid.clear();
+        deshabilitados.clear();
+        consultas.set(0);
+        creaciones.set(0);
+        borrados.set(0);
+        reloj = Clock.systemUTC();
+        fallarAlConsultar = false;
         fallarAlEscribirElPlan = false;
         indisponibleAlEscribirElPlan = false;
         fallarAlBorrar = false;

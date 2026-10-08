@@ -67,14 +67,17 @@ public class FirebaseConfiguration {
     /**
      * Máximo para abrir la conexión con Firebase, en milisegundos. El SDK no trae límite: sin
      * él, una red caída dejaría el hilo de la petición esperando hasta que el cliente se rinda.
+     * Los tiempos valen por intento: el SDK reintenta cada llamada hasta cuatro veces ante un 503
+     * o un error de conexión y no permite configurarlo, así que con Firebase degradado una llamada
+     * puede superar los 30 s del Gateway. Sin fallos, el registro tarda unos segundos.
      */
-    static final int CONNECT_TIMEOUT_MS = 5_000;
+    static final int CONNECT_TIMEOUT_MS = 3_000;
 
     /**
      * Máximo de espera de cada respuesta de Firebase, en milisegundos. Vencido, el registro
      * responde que el servicio no está disponible y la persona puede reintentar.
      */
-    static final int READ_TIMEOUT_MS = 10_000;
+    static final int READ_TIMEOUT_MS = 5_000;
 
     private final String projectId;
     private final String keyPath;

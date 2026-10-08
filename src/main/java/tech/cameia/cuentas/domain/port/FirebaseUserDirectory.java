@@ -1,6 +1,11 @@
 package tech.cameia.cuentas.domain.port;
 
+import java.util.Optional;
+
+import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
+import tech.cameia.cuentas.domain.exception.InvalidEmailException;
+import tech.cameia.cuentas.domain.model.DirectoryUser;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.RawPassword;
 
@@ -25,6 +30,16 @@ public interface FirebaseUserDirectory {
      * @throws EmailAlreadyRegisteredException si ese correo ya tiene una credencial
      */
     String createUser(EmailAddress email, RawPassword password);
+
+    /**
+     * Busca la credencial que tiene un correo.
+     *
+     * @param email correo ya normalizado
+     * @return la credencial, o vacío si ese correo no tiene ninguna
+     * @throws DependencyUnavailableException si el directorio no respondió o falló de su lado
+     * @throws InvalidEmailException si el directorio rechaza el correo como inválido
+     */
+    Optional<DirectoryUser> findByEmail(EmailAddress email);
 
     /**
      * Marca al usuario con el plan gratuito.

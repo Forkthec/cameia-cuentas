@@ -1,7 +1,9 @@
 package tech.cameia.cuentas.infrastructure.client;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -19,6 +21,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.InvalidEmailException;
+import tech.cameia.cuentas.domain.model.DirectoryUser;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.RawPassword;
 import tech.cameia.cuentas.domain.port.FirebaseUserDirectory;
@@ -96,21 +99,56 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
             if (AuthErrorCode.EMAIL_ALREADY_EXISTS.equals(error.getAuthErrorCode())) {
                 throw new EmailAlreadyRegisteredException();
             }
-            String serviceCode = serviceErrorCode(error);
-            if (INVALID_EMAIL_CODE.equals(serviceCode)) {
-                // EmailAddress es permisiva a propósito y Firebase podría ser más estricta. No se
-                // conoce un correo que pase la regla propia y Firebase rechace (el emulador los
-                // acepta todos), así que es una defensa. Para la persona es un correo inválido
-                // (CA-1.1.20); el aviso deja ver en el log que las dos reglas difieren.
-                logger.warn("Firebase rechazó como inválido un correo que pasó la validación propia");
-                throw InvalidEmailException.createInvalidFormat();
-            }
-            // Cualquier otro rechazo (una política de contraseñas o un proveedor deshabilitado en
-            // Firebase) es un defecto de configuración que la persona no puede corregir: el código
-            // del servicio va al log para diagnosticarlo.
-            throw unavailableOrRejection(error,
-                    "Firebase rechazó la creación del usuario [serviceCode=" + serviceCode + "]");
+            throw translateRejection(error, "Firebase rechazó la creación del usuario");
         }
+    }
+
+    /**
+     * Busca la credencial que tiene un correo.
+     *
+     * @param email correo ya normalizado
+     * @return la credencial, o vacío si ese correo no tiene ninguna
+     * @throws InvalidEmailException si Firebase rechaza el correo ({@code INVALID_EMAIL})
+     * @throws DependencyUnavailableException si Firebase no respondió, falló de su lado o agotó la cuota
+     * @throws IllegalStateException si Firebase rechaza la consulta por cualquier otro motivo
+     */
+    @Override
+    public Optional<DirectoryUser> findByEmail(EmailAddress email) {
+        try {
+            UserRecord usuario = firebaseAuth.getUserByEmail(email.value());
+            Instant creada = Instant.ofEpochMilli(usuario.getUserMetadata().getCreationTimestamp());
+            return Optional.of(new DirectoryUser(usuario.getUid(), creada, usuario.isDisabled()));
+        } catch (FirebaseAuthException error) {
+            if (AuthErrorCode.USER_NOT_FOUND.equals(error.getAuthErrorCode())) {
+                return Optional.empty();
+            }
+            // El mensaje no incluye el correo: es un dato personal
+            throw translateRejection(error, "Firebase rechazó la consulta de la credencial");
+        }
+    }
+
+    /**
+     * Traduce un rechazo de Firebase a la excepción que corresponde.
+     *
+     * <p>Un correo que Firebase considera inválido es un error de la persona (CA-1.1.20). Lo demás
+     * es indisponibilidad o un defecto de configuración que la persona no puede corregir: el código
+     * del servicio va al log para diagnosticarlo.</p>
+     *
+     * @param error excepción del SDK
+     * @param rejectionMessage texto técnico para el log si el rechazo no es indisponibilidad
+     * @return la excepción que se debe lanzar
+     */
+    private static RuntimeException translateRejection(FirebaseAuthException error, String rejectionMessage) {
+        String serviceCode = serviceErrorCode(error);
+        if (INVALID_EMAIL_CODE.equals(serviceCode)) {
+            // EmailAddress es permisiva a propósito y Firebase podría ser más estricta. No se
+            // conoce un correo que pase la regla propia y Firebase rechace (el emulador los
+            // acepta todos), así que es una defensa. Para la persona es un correo inválido
+            // (CA-1.1.20); el aviso deja ver en el log que las dos reglas difieren.
+            logger.warn("Firebase rechazó como inválido un correo que pasó la validación propia");
+            return InvalidEmailException.createInvalidFormat();
+        }
+        return unavailableOrRejection(error, rejectionMessage + " [serviceCode=" + serviceCode + "]");
     }
 
     /**
@@ -180,7 +218,8 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
      * Separa la indisponibilidad de Firebase de un rechazo.
      *
      * <p>Cuenta como indisponibilidad lo que la persona resuelve reintentando: el servicio no
-     * respondió a tiempo, respondió que no está disponible, falló de su lado, o la conexión
+     * respondió a tiempo, respondió que no está disponible, falló de su lado, agotó su cuota o
+     * límite de uso (se resuelve esperando, no es un defecto), o la conexión
      * misma falló (el SDK lo informa con una causa de E/S y el código {@code UNKNOWN} cuando
      * la conexión es rechazada, o {@code DEADLINE_EXCEEDED} cuando se agota el tiempo).
      * Cualquier otro error es un rechazo de un dato que pasó la validación propia: un
@@ -200,6 +239,7 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
         boolean unavailable = code == ErrorCode.UNAVAILABLE
                 || code == ErrorCode.DEADLINE_EXCEEDED
                 || code == ErrorCode.INTERNAL
+                || code == ErrorCode.RESOURCE_EXHAUSTED
                 || (error.getHttpResponse() == null && error.getCause() instanceof IOException);
         return unavailable ? new DependencyUnavailableException(error) : new IllegalStateException(rejectionMessage, error);
     }

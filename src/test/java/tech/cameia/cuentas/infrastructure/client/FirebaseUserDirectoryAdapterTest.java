@@ -11,12 +11,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 
 import com.google.firebase.ErrorCode;
 import com.google.firebase.auth.AuthErrorCode;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
+import com.google.firebase.auth.UserMetadata;
 import com.google.firebase.auth.UserRecord;
 
 import org.junit.jupiter.api.Test;
@@ -25,6 +28,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
+import tech.cameia.cuentas.domain.model.DirectoryUser;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.RawPassword;
 
@@ -190,6 +194,78 @@ class FirebaseUserDirectoryAdapterTest {
                 .isInstanceOf(IllegalStateException.class).hasMessage("Firebase rechazó la escritura del plan del usuario");
         assertThatThrownBy(() -> adaptador.deleteUser(UID))
                 .isInstanceOf(IllegalStateException.class).hasMessage("Firebase rechazó la eliminación del usuario");
+    }
+
+    @Test
+    void devuelveLaCredencialDelCorreoExistente() throws Exception {
+        UserRecord usuario = mock(UserRecord.class);
+        UserMetadata metadatos = mock(UserMetadata.class);
+        when(usuario.getUid()).thenReturn(UID);
+        when(usuario.getUserMetadata()).thenReturn(metadatos);
+        when(metadatos.getCreationTimestamp()).thenReturn(1_000L);
+        when(usuario.isDisabled()).thenReturn(true);
+        when(firebaseAuth.getUserByEmail("ana@cameia.tech")).thenReturn(usuario);
+
+        Optional<DirectoryUser> encontrada = adaptador.findByEmail(new EmailAddress("ana@cameia.tech"));
+
+        assertThat(encontrada).contains(new DirectoryUser(UID, Instant.ofEpochMilli(1_000L), true));
+    }
+
+    @Test
+    void unCorreoSinCredencialDevuelveVacio() throws Exception {
+        when(firebaseAuth.getUserByEmail(anyString()))
+                .thenThrow(new FirebaseAuthException(ErrorCode.NOT_FOUND, "sin usuario", null, null,
+                        AuthErrorCode.USER_NOT_FOUND));
+
+        assertThat(adaptador.findByEmail(new EmailAddress("ana@cameia.tech"))).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ErrorCode.class, names = {"UNAVAILABLE", "DEADLINE_EXCEEDED", "INTERNAL"})
+    void laIndisponibilidadAlConsultarEsUnFalloDeDependencia(ErrorCode codigo) throws Exception {
+        when(firebaseAuth.getUserByEmail(anyString()))
+                .thenThrow(new FirebaseAuthException(codigo, "fallo del servidor", null, null, null));
+
+        assertThatThrownBy(() -> adaptador.findByEmail(new EmailAddress("ana@cameia.tech")))
+                .isInstanceOf(DependencyUnavailableException.class);
+    }
+
+    @Test
+    void unErrorDeEntradaYSalidaSinRespuestaAlConsultarEsUnFalloDeDependencia() throws Exception {
+        when(firebaseAuth.getUserByEmail(anyString()))
+                .thenThrow(new FirebaseAuthException(ErrorCode.UNKNOWN, "conexión rechazada",
+                        new IOException("Connection refused"), null, null));
+
+        assertThatThrownBy(() -> adaptador.findByEmail(new EmailAddress("ana@cameia.tech")))
+                .isInstanceOf(DependencyUnavailableException.class);
+    }
+
+    @Test
+    void laCuotaAgotadaEsUnFalloDeDependencia() throws Exception {
+        FirebaseAuthException cuota = new FirebaseAuthException(ErrorCode.RESOURCE_EXHAUSTED, "cuota agotada",
+                null, null, null);
+        when(firebaseAuth.getUserByEmail(anyString())).thenThrow(cuota);
+        when(firebaseAuth.createUser(any(UserRecord.CreateRequest.class))).thenThrow(cuota);
+        doThrow(cuota).when(firebaseAuth).setCustomUserClaims(eq(UID), any());
+
+        assertThatThrownBy(() -> adaptador.findByEmail(new EmailAddress("ana@cameia.tech")))
+                .isInstanceOf(DependencyUnavailableException.class);
+        assertThatThrownBy(() -> adaptador.createUser(new EmailAddress("ana@cameia.tech"),
+                new RawPassword("frase secreta larga")))
+                .isInstanceOf(DependencyUnavailableException.class);
+        assertThatThrownBy(() -> adaptador.assignFreePlanClaim(UID))
+                .isInstanceOf(DependencyUnavailableException.class);
+    }
+
+    @Test
+    void cualquierOtroRechazoAlConsultarEsUnFalloTecnicoSinElCorreo() throws Exception {
+        when(firebaseAuth.getUserByEmail(anyString()))
+                .thenThrow(new FirebaseAuthException(ErrorCode.PERMISSION_DENIED, "sin permiso", null, null, null));
+
+        assertThatThrownBy(() -> adaptador.findByEmail(new EmailAddress("ana@cameia.tech")))
+                .isInstanceOf(IllegalStateException.class)
+                .isNotInstanceOf(DependencyUnavailableException.class)
+                .hasMessageNotContaining("ana@cameia.tech");
     }
 
     /**
