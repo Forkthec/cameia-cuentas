@@ -59,6 +59,16 @@ class FirebaseRejectionsWithSdkTest {
                 .hasMessage("Ingresa un correo electrónico válido.");
     }
 
+    @Test
+    @DisplayName("Un correo que Firebase rechaza al consultar es un correo inválido en su campo")
+    void findByEmail_shouldThrowInvalidEmail_whenFirebaseRejectsTheEmail() {
+        FirebaseUserDirectoryAdapter adapter = adapterRespondingWith(400, "INVALID_EMAIL");
+
+        assertThatThrownBy(() -> adapter.findByEmail(new EmailAddress("ana..perez@correo.co")))
+                .isInstanceOfSatisfying(InvalidEmailException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.EMAIL_INVALID_FORMAT));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"WEAK_PASSWORD : Password should be at least 6 characters",
         "PASSWORD_DOES_NOT_MEET_REQUIREMENTS : Missing password requirements: [Password must contain a numeric character]",
