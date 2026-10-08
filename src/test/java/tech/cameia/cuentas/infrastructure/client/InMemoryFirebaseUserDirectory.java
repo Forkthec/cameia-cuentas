@@ -46,22 +46,35 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     private volatile boolean indisponibleAlEscribirElPlan;
     private volatile boolean fallarAlBorrar;
     private volatile boolean fallarAlConsultar;
+    private volatile boolean reintentoDelSdk;
+    private volatile boolean respuestaPerdida;
 
     @Override
-    public synchronized String createUser(EmailAddress email, RawPassword password) {
-        if (correosPorUid.containsValue(email.value())) {
+    public synchronized void createUser(String firebaseUid, EmailAddress email, RawPassword password) {
+        if (correosPorUid.containsValue(email.value()) || correosPorUid.containsKey(firebaseUid)) {
             throw new EmailAlreadyRegisteredException();
         }
-        String uid = UUID.randomUUID().toString();
-        correosPorUid.put(uid, email.value());
-        contrasenasPorUid.put(uid, password.value());
-        creacionesPorUid.put(uid, reloj.instant());
+        crear(firebaseUid, email.value(), password.value(), reloj.instant());
+        if (respuestaPerdida) {
+            // Firebase creó la credencial pero la respuesta no llegó: el cliente solo ve que no respondió
+            throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
+        }
+        if (reintentoDelSdk) {
+            // El SDK reintentó una creación que sí se completó: la credencial existe y llega el conflicto
+            throw new EmailAlreadyRegisteredException();
+        }
+    }
+
+    private void crear(String uid, String correo, String contrasena, Instant creada) {
+        // La fecha se guarda antes que el correo: findByEmail no debe ver una credencial a medias
+        creacionesPorUid.put(uid, creada);
+        contrasenasPorUid.put(uid, contrasena);
+        correosPorUid.put(uid, correo);
         creaciones.incrementAndGet();
-        return uid;
     }
 
     @Override
-    public Optional<DirectoryUser> findByEmail(EmailAddress email) {
+    public synchronized Optional<DirectoryUser> findByEmail(EmailAddress email) {
         consultas.incrementAndGet();
         if (fallarAlConsultar) {
             throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
@@ -170,10 +183,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
      */
     public String crearSinCuentaLocal(String correo, Instant creada) {
         String uid = UUID.randomUUID().toString();
-        correosPorUid.put(uid, correo);
-        contrasenasPorUid.put(uid, "sin-contrasena");
-        creacionesPorUid.put(uid, creada);
-        creaciones.incrementAndGet();
+        crear(uid, correo, "sin-contrasena", creada);
         return uid;
     }
 
@@ -218,6 +228,16 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         this.fallarAlConsultar = true;
     }
 
+    /** Hace que la creación quede hecha pero responda conflicto, como un reintento del SDK tras perder la respuesta. */
+    public void simularReintentoDelSdk() {
+        this.reintentoDelSdk = true;
+    }
+
+    /** Hace que la creación quede hecha pero no responda, como cuando vence el tiempo de lectura. */
+    public void perderLaRespuestaDeLaCreacion() {
+        this.respuestaPerdida = true;
+    }
+
     /** Hace que la escritura del plan falle en la siguiente llamada. */
     public void fallarAlEscribirElPlan() {
         this.fallarAlEscribirElPlan = true;
@@ -239,6 +259,8 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         this.indisponibleAlEscribirElPlan = false;
         this.fallarAlBorrar = false;
         this.fallarAlConsultar = false;
+        this.reintentoDelSdk = false;
+        this.respuestaPerdida = false;
     }
 
     /** Vacía el directorio y desactiva los fallos provocados. */
@@ -257,5 +279,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         fallarAlEscribirElPlan = false;
         indisponibleAlEscribirElPlan = false;
         fallarAlBorrar = false;
+        reintentoDelSdk = false;
+        respuestaPerdida = false;
     }
 }

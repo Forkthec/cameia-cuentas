@@ -22,14 +22,18 @@ import tech.cameia.cuentas.domain.model.RawPassword;
 public interface FirebaseUserDirectory {
 
     /**
-     * Crea la credencial de un usuario nuevo.
+     * Crea la credencial de un usuario nuevo con el identificador que elige el llamador.
      *
+     * <p>El llamador genera el identificador para poder reconocer su propia credencial: si el
+     * directorio reintenta por su cuenta una creación que sí se completó y responde que el correo ya
+     * existe, la credencial que tiene ese identificador es suya y no de otra petición.</p>
+     *
+     * @param firebaseUid identificador que tendrá el usuario
      * @param email correo con el que iniciará sesión
      * @param password contraseña ya validada por la política del dominio
-     * @return identificador del usuario creado
-     * @throws EmailAlreadyRegisteredException si ese correo ya tiene una credencial
+     * @throws EmailAlreadyRegisteredException si ese correo o ese identificador ya tienen credencial
      */
-    String createUser(EmailAddress email, RawPassword password);
+    void createUser(String firebaseUid, EmailAddress email, RawPassword password);
 
     /**
      * Busca la credencial que tiene un correo.

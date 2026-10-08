@@ -1,6 +1,7 @@
 package tech.cameia.cuentas.infrastructure.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -48,15 +49,22 @@ class FirebaseUserDirectoryAdapterTest {
     private final FirebaseUserDirectoryAdapter adaptador = new FirebaseUserDirectoryAdapter(firebaseAuth);
 
     @Test
-    void devuelveElIdentificadorDelUsuarioCreado() throws Exception {
-        UserRecord creado = mock(UserRecord.class);
-        when(creado.getUid()).thenReturn(UID);
-        when(firebaseAuth.createUser(any(UserRecord.CreateRequest.class))).thenReturn(creado);
+    void creaLaCredencialEnFirebase() throws Exception {
+        when(firebaseAuth.createUser(any(UserRecord.CreateRequest.class))).thenReturn(mock(UserRecord.class));
 
-        String uid = adaptador.createUser(new EmailAddress("ana@cameia.tech"),
-                new RawPassword("frase secreta larga"));
+        adaptador.createUser(UID, new EmailAddress("ana@cameia.tech"), new RawPassword("frase secreta larga"));
 
-        assertThat(uid).isEqualTo(UID);
+        verify(firebaseAuth).createUser(any(UserRecord.CreateRequest.class));
+    }
+
+    @Test
+    void traduceElIdentificadorRepetidoALaMismaExcepcionQueElCorreoRepetido() throws Exception {
+        when(firebaseAuth.createUser(any(UserRecord.CreateRequest.class)))
+                .thenThrow(errorDeFirebase(AuthErrorCode.UID_ALREADY_EXISTS));
+
+        assertThatThrownBy(() -> adaptador.createUser(UID, new EmailAddress("ana@cameia.tech"),
+                new RawPassword("frase secreta larga")))
+                .isInstanceOf(EmailAlreadyRegisteredException.class);
     }
 
     @Test
@@ -64,7 +72,7 @@ class FirebaseUserDirectoryAdapterTest {
         when(firebaseAuth.createUser(any(UserRecord.CreateRequest.class)))
                 .thenThrow(errorDeFirebase(AuthErrorCode.EMAIL_ALREADY_EXISTS));
 
-        assertThatThrownBy(() -> adaptador.createUser(new EmailAddress("ana@cameia.tech"),
+        assertThatThrownBy(() -> adaptador.createUser(UID, new EmailAddress("ana@cameia.tech"),
                 new RawPassword("frase secreta larga")))
                 .isInstanceOf(EmailAlreadyRegisteredException.class)
                 .hasMessage("Ese correo ya tiene una cuenta.");
@@ -75,7 +83,7 @@ class FirebaseUserDirectoryAdapterTest {
         when(firebaseAuth.createUser(any(UserRecord.CreateRequest.class)))
                 .thenThrow(errorDeFirebase(AuthErrorCode.INVALID_ID_TOKEN));
 
-        assertThatThrownBy(() -> adaptador.createUser(new EmailAddress("ana@cameia.tech"),
+        assertThatThrownBy(() -> adaptador.createUser(UID, new EmailAddress("ana@cameia.tech"),
                 new RawPassword("frase secreta larga")))
                 .isInstanceOf(IllegalStateException.class)
                 .isNotInstanceOf(EmailAlreadyRegisteredException.class);
@@ -102,10 +110,17 @@ class FirebaseUserDirectoryAdapterTest {
         when(firebaseAuth.createUser(any(UserRecord.CreateRequest.class)))
                 .thenThrow(errorDeFirebase(AuthErrorCode.UNAUTHORIZED_CONTINUE_URL));
 
-        assertThatThrownBy(() -> adaptador.createUser(new EmailAddress("ana@cameia.tech"),
+        assertThatThrownBy(() -> adaptador.createUser(UID, new EmailAddress("ana@cameia.tech"),
                 new RawPassword("frase secreta larga")))
                 .hasMessageNotContaining("frase secreta larga")
                 .hasMessageNotContaining("ana@cameia.tech");
+    }
+
+    @Test
+    void borrarUnaCredencialQueNoExisteNoEsUnError() throws Exception {
+        doThrow(errorDeFirebase(AuthErrorCode.USER_NOT_FOUND)).when(firebaseAuth).deleteUser(UID);
+
+        assertThatCode(() -> adaptador.deleteUser(UID)).doesNotThrowAnyException();
     }
 
     @Test
@@ -132,7 +147,7 @@ class FirebaseUserDirectoryAdapterTest {
         when(firebaseAuth.createUser(any(UserRecord.CreateRequest.class)))
                 .thenThrow(new FirebaseAuthException(codigo, "fallo del servidor", null, null, null));
 
-        assertThatThrownBy(() -> adaptador.createUser(new EmailAddress("ana@cameia.tech"),
+        assertThatThrownBy(() -> adaptador.createUser(UID, new EmailAddress("ana@cameia.tech"),
                 new RawPassword("frase secreta larga")))
                 .isInstanceOf(DependencyUnavailableException.class)
                 .hasMessage("Ocurrió un error. Inténtalo de nuevo.")
@@ -146,7 +161,7 @@ class FirebaseUserDirectoryAdapterTest {
                 .thenThrow(new FirebaseAuthException(ErrorCode.UNKNOWN, "conexión rechazada",
                         new IOException("Connection refused"), null, null));
 
-        assertThatThrownBy(() -> adaptador.createUser(new EmailAddress("ana@cameia.tech"),
+        assertThatThrownBy(() -> adaptador.createUser(UID, new EmailAddress("ana@cameia.tech"),
                 new RawPassword("frase secreta larga")))
                 .isInstanceOf(DependencyUnavailableException.class);
     }
@@ -156,7 +171,7 @@ class FirebaseUserDirectoryAdapterTest {
         when(firebaseAuth.createUser(any(UserRecord.CreateRequest.class)))
                 .thenThrow(new FirebaseAuthException(ErrorCode.UNKNOWN, "respuesta inesperada", null, null, null));
 
-        assertThatThrownBy(() -> adaptador.createUser(new EmailAddress("ana@cameia.tech"),
+        assertThatThrownBy(() -> adaptador.createUser(UID, new EmailAddress("ana@cameia.tech"),
                 new RawPassword("frase secreta larga")))
                 .isInstanceOf(IllegalStateException.class);
     }
@@ -167,7 +182,7 @@ class FirebaseUserDirectoryAdapterTest {
                 .thenThrow(new FirebaseAuthException(ErrorCode.INVALID_ARGUMENT, "correo inválido", null, null,
                         AuthErrorCode.INVALID_ID_TOKEN));
 
-        assertThatThrownBy(() -> adaptador.createUser(new EmailAddress("ana@cameia.tech"),
+        assertThatThrownBy(() -> adaptador.createUser(UID, new EmailAddress("ana@cameia.tech"),
                 new RawPassword("frase secreta larga")))
                 .isInstanceOf(IllegalStateException.class)
                 .isNotInstanceOf(DependencyUnavailableException.class);
@@ -185,8 +200,8 @@ class FirebaseUserDirectoryAdapterTest {
 
     @Test
     void unRechazoAlEscribirElPlanOAlBorrarSigueSiendoUnFalloImprevisto() throws Exception {
-        FirebaseAuthException rechazo = new FirebaseAuthException(ErrorCode.NOT_FOUND, "sin usuario", null, null,
-                AuthErrorCode.USER_NOT_FOUND);
+        FirebaseAuthException rechazo = new FirebaseAuthException(ErrorCode.PERMISSION_DENIED, "sin permisos", null, null,
+                null);
         doThrow(rechazo).when(firebaseAuth).setCustomUserClaims(eq(UID), any());
         doThrow(rechazo).when(firebaseAuth).deleteUser(UID);
 
@@ -250,7 +265,7 @@ class FirebaseUserDirectoryAdapterTest {
 
         assertThatThrownBy(() -> adaptador.findByEmail(new EmailAddress("ana@cameia.tech")))
                 .isInstanceOf(DependencyUnavailableException.class);
-        assertThatThrownBy(() -> adaptador.createUser(new EmailAddress("ana@cameia.tech"),
+        assertThatThrownBy(() -> adaptador.createUser(UID, new EmailAddress("ana@cameia.tech"),
                 new RawPassword("frase secreta larga")))
                 .isInstanceOf(DependencyUnavailableException.class);
         assertThatThrownBy(() -> adaptador.assignFreePlanClaim(UID))

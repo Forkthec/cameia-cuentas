@@ -78,25 +78,29 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
      * <p>La credencial nace con el correo sin verificar: el enlace de verificación lo pide
      * el frontend a Firebase después de iniciar sesión.</p>
      *
+     * @param firebaseUid identificador que tendrá el usuario
      * @param email correo con el que iniciará sesión
      * @param password contraseña ya validada por la política del dominio
-     * @return identificador del usuario creado
-     * @throws EmailAlreadyRegisteredException si ese correo ya tiene credencial
+     * @throws EmailAlreadyRegisteredException si ese correo o ese identificador ya tienen credencial
      * @throws InvalidEmailException si Firebase rechaza el correo ({@code INVALID_EMAIL})
      * @throws DependencyUnavailableException si Firebase no respondió o falló de su lado
      * @throws IllegalStateException si Firebase rechaza la creación por cualquier otro motivo
      */
     @Override
-    public String createUser(EmailAddress email, RawPassword password) {
+    public void createUser(String firebaseUid, EmailAddress email, RawPassword password) {
         UserRecord.CreateRequest solicitud = new UserRecord.CreateRequest()
+                .setUid(firebaseUid)
                 .setEmail(email.value())
                 .setPassword(password.value())
                 .setEmailVerified(false);
 
         try {
-            return firebaseAuth.createUser(solicitud).getUid();
+            firebaseAuth.createUser(solicitud);
         } catch (FirebaseAuthException error) {
-            if (AuthErrorCode.EMAIL_ALREADY_EXISTS.equals(error.getAuthErrorCode())) {
+            // Si el SDK reintenta una creación que sí se completó, Firebase puede responder con
+            // cualquiera de los dos conflictos; el servicio distingue de quién es la credencial
+            if (AuthErrorCode.EMAIL_ALREADY_EXISTS.equals(error.getAuthErrorCode())
+                    || AuthErrorCode.UID_ALREADY_EXISTS.equals(error.getAuthErrorCode())) {
                 throw new EmailAlreadyRegisteredException();
             }
             throw translateRejection(error, "Firebase rechazó la creación del usuario");
@@ -199,6 +203,9 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
     /**
      * Elimina la credencial del usuario.
      *
+     * <p>Una credencial que ya no existe se da por borrada: el registro compensa también cuando la
+     * creación no devolvió respuesta, y entonces la credencial puede no haberse creado nunca.</p>
+     *
      * @param firebaseUid identificador del usuario
      * @throws DependencyUnavailableException si Firebase no respondió o falló de su lado
      * @throws IllegalStateException si Firebase rechaza el borrado por cualquier otro motivo;
@@ -210,6 +217,10 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
             firebaseAuth.deleteUser(firebaseUid);
             logger.info("Credencial eliminada en Firebase para el usuario {}", firebaseUid);
         } catch (FirebaseAuthException error) {
+            if (AuthErrorCode.USER_NOT_FOUND.equals(error.getAuthErrorCode())) {
+                logger.info("La credencial del usuario {} no existe en Firebase; no hay nada que borrar", firebaseUid);
+                return;
+            }
             throw unavailableOrRejection(error, "Firebase rechazó la eliminación del usuario");
         }
     }

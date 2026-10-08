@@ -1,12 +1,14 @@
 package tech.cameia.cuentas.infrastructure.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Date;
 import java.util.UUID;
 
 import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.api.client.testing.http.MockLowLevelHttpRequest;
 import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
@@ -21,6 +23,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
+import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.InvalidEmailException;
 import tech.cameia.cuentas.domain.model.EmailAddress;
@@ -36,7 +39,10 @@ import tech.cameia.cuentas.domain.model.RawPassword;
  */
 class FirebaseRejectionsWithSdkTest {
 
+    private static final String UID = "uid-firebase";
+
     private FirebaseApp app;
+    private MockLowLevelHttpRequest request;
 
     @AfterEach
     void closeApp() {
@@ -50,13 +56,26 @@ class FirebaseRejectionsWithSdkTest {
     void createUser_shouldThrowInvalidEmail_whenFirebaseRejectsTheEmail() {
         FirebaseUserDirectoryAdapter adapter = adapterRespondingWith(400, "INVALID_EMAIL");
 
-        assertThatThrownBy(() -> adapter.createUser(new EmailAddress("ana..perez@correo.co"),
+        assertThatThrownBy(() -> adapter.createUser(UID, new EmailAddress("ana..perez@correo.co"),
                 new RawPassword("frase secreta larga")))
                 .isInstanceOfSatisfying(InvalidEmailException.class, error -> {
                     assertThat(error.getErrorCode()).isEqualTo(ErrorCode.EMAIL_INVALID_FORMAT);
                     assertThat(error.getField()).isEqualTo("email");
                 })
                 .hasMessage("Ingresa un correo electrónico válido.");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"EMAIL_EXISTS", "DUPLICATE_LOCAL_ID"})
+    @DisplayName("Tanto el correo como el identificador repetidos son un conflicto, y el identificador viaja en la petición")
+    void createUser_shouldThrowEmailAlreadyRegistered_whenFirebaseReportsEitherConflict(String serviceCode)
+            throws Exception {
+        FirebaseUserDirectoryAdapter adapter = adapterRespondingWith(400, serviceCode);
+
+        assertThatThrownBy(() -> adapter.createUser(UID, new EmailAddress("ana@correo.co"),
+                new RawPassword("frase secreta larga")))
+                .isInstanceOf(EmailAlreadyRegisteredException.class);
+        assertThat(request.getContentAsString()).contains("\"localId\":\"" + UID + "\"");
     }
 
     @Test
@@ -79,7 +98,7 @@ class FirebaseRejectionsWithSdkTest {
         FirebaseUserDirectoryAdapter adapter = adapterRespondingWith(400, serviceMessage);
         String code = serviceMessage.split(" ")[0];
 
-        assertThatThrownBy(() -> adapter.createUser(new EmailAddress("ana@correo.co"),
+        assertThatThrownBy(() -> adapter.createUser(UID, new EmailAddress("ana@correo.co"),
                 new RawPassword("frase secreta larga")))
                 .isInstanceOf(IllegalStateException.class)
                 .isNotInstanceOf(InvalidEmailException.class)
@@ -92,17 +111,25 @@ class FirebaseRejectionsWithSdkTest {
     void createUser_shouldReportUnknownCode_whenResponseBodyHasNoReadableCode() {
         FirebaseUserDirectoryAdapter adapter = adapterRespondingWithBody(400, "no es json");
 
-        assertThatThrownBy(() -> adapter.createUser(new EmailAddress("ana@correo.co"),
+        assertThatThrownBy(() -> adapter.createUser(UID, new EmailAddress("ana@correo.co"),
                 new RawPassword("frase secreta larga")))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Firebase rechazó la creación del usuario [serviceCode=desconocido]");
     }
 
     @Test
+    @DisplayName("Borrar una credencial que no existe no es un error")
+    void deleteUser_shouldNotThrow_whenTheUserDoesNotExist() {
+        FirebaseUserDirectoryAdapter adapter = adapterRespondingWith(400, "USER_NOT_FOUND");
+
+        assertThatCode(() -> adapter.deleteUser("uid-inexistente")).doesNotThrowAnyException();
+    }
+
+    @Test
     @DisplayName("Un rechazo al borrar con respuesta HTTP no es indisponibilidad")
     void deleteUser_shouldNotThrowDependencyUnavailable_whenFirebaseAnswersWithHttpRejection() {
         // El SDK adjunta la respuesta HTTP como causa de E/S; no es una conexión fallida.
-        FirebaseUserDirectoryAdapter adapter = adapterRespondingWith(400, "USER_NOT_FOUND");
+        FirebaseUserDirectoryAdapter adapter = adapterRespondingWith(403, "PERMISSION_DENIED");
 
         assertThatThrownBy(() -> adapter.deleteUser("uid-inexistente"))
                 .isInstanceOf(IllegalStateException.class)
@@ -115,7 +142,7 @@ class FirebaseRejectionsWithSdkTest {
     void createUser_shouldThrowDependencyUnavailable_whenFirebaseAnswersWithServerError(int status) {
         FirebaseUserDirectoryAdapter adapter = adapterRespondingWith(status, "BACKEND_ERROR");
 
-        assertThatThrownBy(() -> adapter.createUser(new EmailAddress("ana@correo.co"),
+        assertThatThrownBy(() -> adapter.createUser(UID, new EmailAddress("ana@correo.co"),
                 new RawPassword("frase secreta larga")))
                 .isInstanceOf(DependencyUnavailableException.class);
     }
@@ -127,12 +154,11 @@ class FirebaseRejectionsWithSdkTest {
     }
 
     private FirebaseUserDirectoryAdapter adapterRespondingWithBody(int status, String body) {
-        MockHttpTransport transport = new MockHttpTransport.Builder()
-                .setLowLevelHttpResponse(new MockLowLevelHttpResponse()
-                        .setStatusCode(status)
-                        .setContentType("application/json; charset=UTF-8")
-                        .setContent(body))
-                .build();
+        request = new MockLowLevelHttpRequest().setResponse(new MockLowLevelHttpResponse()
+                .setStatusCode(status)
+                .setContentType("application/json; charset=UTF-8")
+                .setContent(body));
+        MockHttpTransport transport = new MockHttpTransport.Builder().setLowLevelHttpRequest(request).build();
         FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(GoogleCredentials.create(new AccessToken("token-de-prueba",
                         new Date(System.currentTimeMillis() + 3_600_000))))
