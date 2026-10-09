@@ -85,6 +85,7 @@ class BusinessExceptionHandler {
 
     /** Título común de los errores de validación. */
     private static final String TITULO_VALIDACION = "Datos no válidos";
+    private static final String TITULO_CORREO_REPETIDO = "Correo ya registrado";
 
     /** {@code detail} fijo de todo 422 con lista de campos: el mensaje de cada uno va en {@code errors}. */
     private static final String DETALLE_VALIDACION = "Revisa los campos marcados.";
@@ -132,12 +133,31 @@ class BusinessExceptionHandler {
     /**
      * Correo ya registrado.
      *
+     * <p>El nivel del registro depende del origen. Un conflicto común es un {@code WARN}. Una
+     * credencial sin cuenta local reciente es un registro en curso (otro {@code WARN}, con el
+     * identificador). Una credencial sin cuenta local que ya es antigua es un residuo que alguien
+     * debe conciliar a mano: un solo {@code ERROR}, sin el {@code WARN} de siempre. El correo
+     * nunca se registra.</p>
+     *
      * @param error excepción de negocio
-     * @return {@code 409 Conflict} con el mensaje del criterio de aceptación
+     * @return {@code 409 Conflict} con el mensaje del criterio de aceptación y el campo {@code email}
      */
     @ExceptionHandler(EmailAlreadyRegisteredException.class)
     ProblemDetail correoRepetido(EmailAlreadyRegisteredException error) {
-        return rechazo(HttpStatus.CONFLICT, "Correo ya registrado", error.getMessage(), error.getErrorCode());
+        ProblemDetail problema;
+        if (error.requiresReconciliation()) {
+            problema = problema(HttpStatus.CONFLICT, TITULO_CORREO_REPETIDO, error.getMessage(), error.getErrorCode());
+            logger.error("Credencial sin cuenta local; requiere conciliación manual [code={}, requestId={}, uid={}]",
+                    error.getErrorCode(), problema.getProperties().get("requestId"), error.getFirebaseUid());
+        } else {
+            String contexto = error.getFirebaseUid() == null
+                    ? ""
+                    : "uid=" + error.getFirebaseUid() + " registro en curso";
+            problema = rechazo(HttpStatus.CONFLICT, TITULO_CORREO_REPETIDO, error.getMessage(),
+                    error.getErrorCode(), contexto);
+        }
+        problema.setProperty(ERRORS, List.of(campo("email", error.getErrorCode(), error.getMessage())));
+        return problema;
     }
 
     /**

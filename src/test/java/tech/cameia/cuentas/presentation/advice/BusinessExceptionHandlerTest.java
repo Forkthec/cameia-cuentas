@@ -10,6 +10,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.RecordComponent;
 import java.sql.SQLException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import com.jayway.jsonpath.JsonPath;
@@ -44,6 +45,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import tech.cameia.cuentas.domain.exception.ErrorCode;
+import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.Pronoun;
 import tech.cameia.cuentas.presentation.dto.DomainRule;
@@ -379,6 +381,46 @@ class BusinessExceptionHandlerTest {
                 MismatchedInputException.from(null, Pronoun.class, "x"), new MockHttpInputMessage(new byte[0]));
 
         assertThat(manejador.cuerpoIlegible(error).getProperties()).containsEntry("code", "REQUEST_BODY_INVALID_FORMAT");
+    }
+
+    @Test
+    void elConflictoDeCorreoLlevaSuCampoYRegistraUnSoloWarnSinElUid(CapturedOutput salida) {
+        ProblemDetail problema = manejador.correoRepetido(new EmailAlreadyRegisteredException());
+
+        assertThat(problema.getStatus()).isEqualTo(409);
+        assertThat(problema.getTitle()).isEqualTo("Correo ya registrado");
+        assertThat(problema.getProperties()).containsEntry("code", "EMAIL_ALREADY_REGISTERED");
+        assertThat(problema.getProperties().get("errors")).isEqualTo(List.of(new BusinessExceptionHandler.CampoRechazado(
+                "email", "EMAIL_ALREADY_REGISTERED", "Ese correo ya tiene una cuenta.")));
+        assertThat(lineasConLaPalabra(salida, "WARN")).hasSize(1);
+        assertThat(salida.getOut()).doesNotContain("ERROR").doesNotContain("uid=");
+    }
+
+    @Test
+    void unaCredencialSinCuentaRecienteSeRegistraEnWarnConElUid(CapturedOutput salida) {
+        manejador.correoRepetido(new EmailAlreadyRegisteredException("uid-reciente", false));
+
+        assertThat(lineasConLaPalabra(salida, "WARN")).hasSize(1);
+        assertThat(salida.getOut()).contains("uid=uid-reciente").contains("registro en curso").doesNotContain("ERROR");
+    }
+
+    @Test
+    void unaCredencialSinCuentaAntiguaSeRegistraEnUnSoloErrorConTodoLoNecesario(CapturedOutput salida) {
+        ProblemDetail problema = manejador.correoRepetido(new EmailAlreadyRegisteredException("uid-antiguo", true));
+
+        assertThat(problema.getStatus()).isEqualTo(409);
+        assertThat(lineasConLaPalabra(salida, "ERROR")).hasSize(1);
+        assertThat(salida.getOut()).doesNotContain("WARN");
+        assertThat(salida.getOut())
+                .contains("conciliación manual")
+                .contains("code=EMAIL_ALREADY_REGISTERED")
+                .contains("requestId=" + problema.getProperties().get("requestId"))
+                .contains("uid=uid-antiguo")
+                .doesNotContain("ana@");
+    }
+
+    private static List<String> lineasConLaPalabra(CapturedOutput salida, String nivel) {
+        return salida.getOut().lines().filter(linea -> linea.contains(" " + nivel + " ")).toList();
     }
 
     /** Controlador de la prueba que provoca cada tipo de fallo. */

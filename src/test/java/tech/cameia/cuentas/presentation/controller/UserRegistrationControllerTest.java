@@ -33,6 +33,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import tech.cameia.cuentas.application.command.RegisterUserCommand;
+import tech.cameia.cuentas.application.service.RegisterUserResult;
 import tech.cameia.cuentas.application.service.RegisterUserService;
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
@@ -82,7 +83,7 @@ class UserRegistrationControllerTest {
 
     @Test
     void elRegistroExitosoDevuelveCreadoConElEstadoYElPlan() throws Exception {
-        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(new RegisterUserResult(cuentaCreada(), true));
 
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoValido()))
                 .andExpect(status().isCreated())
@@ -93,7 +94,7 @@ class UserRegistrationControllerTest {
 
     @Test
     void laRespuestaNoDevuelveElCorreoNiLaContrasenia() throws Exception {
-        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(new RegisterUserResult(cuentaCreada(), true));
 
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoValido()))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
@@ -112,7 +113,27 @@ class UserRegistrationControllerTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.detail").value("Ese correo ya tiene una cuenta."))
                 .andExpect(jsonPath("$.code").value("EMAIL_ALREADY_REGISTERED"))
-                .andExpect(jsonPath("$.errors").doesNotExist());
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value("email"))
+                .andExpect(jsonPath("$.errors[0].code").value("EMAIL_ALREADY_REGISTERED"))
+                .andExpect(jsonPath("$.errors[0].message").value("Ese correo ya tiene una cuenta."));
+    }
+
+    @Test
+    void elRegistroRepetidoDevuelve200ConElMismoCuerpoQueElCreado() throws Exception {
+        Account cuenta = cuentaCreada();
+        when(servicio.register(any(RegisterUserCommand.class)))
+                .thenReturn(new RegisterUserResult(cuenta, true))
+                .thenReturn(new RegisterUserResult(cuenta, false));
+
+        String creado = mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoValido()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String repetido = mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoValido()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(repetido).isEqualTo(creado);
     }
 
     @Test
@@ -287,7 +308,7 @@ class UserRegistrationControllerTest {
 
     @Test
     void losTextosLleganRecortadosYEnNfcAlCasoDeUso() throws Exception {
-        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(new RegisterUserResult(cuentaCreada(), true));
         ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
         String cuerpo = cuerpoValido()
                 .replace("\"Ana\"", "\"  Jose\u0301  \"")
@@ -334,7 +355,7 @@ class UserRegistrationControllerTest {
     @MethodSource("limitesDeNombreYApellido")
     void elNombreYElApellidoAdmitenExactamente120CaracteresYRechazan121(String campo, int cantidad, int estado,
             String texto) throws Exception {
-        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(new RegisterUserResult(cuentaCreada(), true));
 
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON)
                         .content(cuerpoConCampo(campo, "\"" + texto + "\"")))
@@ -366,7 +387,7 @@ class UserRegistrationControllerTest {
     @ParameterizedTest(name = "[{index}] correo de {0} caracteres -> {1}")
     @CsvSource({"253, 201", "254, 201", "255, 422"})
     void elCorreoAdmiteExactamente254PuntosDeCodigo(int cantidad, int estado) throws Exception {
-        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(new RegisterUserResult(cuentaCreada(), true));
         String correo = "a".repeat(cantidad - 6) + "@b.com";
 
         var resultado = mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON)
@@ -382,7 +403,7 @@ class UserRegistrationControllerTest {
 
     @Test
     void laContraseniaNoSeRecortaNiSeNormalizaAlLlegarAlCasoDeUso() throws Exception {
-        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(new RegisterUserResult(cuentaCreada(), true));
         ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
 
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON)
@@ -505,7 +526,7 @@ class UserRegistrationControllerTest {
     @ParameterizedTest
     @ValueSource(strings = {"29/02/2000", "12/04/1995", "01/01/2000", "29/02/1996"})
     void unaFechaValidaLlegaAlCasoDeUsoComoFecha(String fecha) throws Exception {
-        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(new RegisterUserResult(cuentaCreada(), true));
         ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
 
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoConFecha(fecha)))
@@ -535,7 +556,7 @@ class UserRegistrationControllerTest {
     @ParameterizedTest
     @EnumSource(Pronoun.class)
     void cadaPronombreValidoLlegaAlCasoDeUso(Pronoun pronombre) throws Exception {
-        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(new RegisterUserResult(cuentaCreada(), true));
         ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
 
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON)
@@ -564,7 +585,7 @@ class UserRegistrationControllerTest {
     @ValueSource(strings = {"\"sinCelular\":1", "\"phoneNumber\":null", "\"phoneNumber\":\"\"", "\"phoneNumber\":\"   \"",
         "\"phoneNumber\":\"\u00A0\""})
     void sinCelularElComandoLlevaNulo(String fragmento) throws Exception {
-        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(new RegisterUserResult(cuentaCreada(), true));
         ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
 
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON)
@@ -577,7 +598,7 @@ class UserRegistrationControllerTest {
 
     @Test
     void elCelularLlegaRecortadoAlCasoDeUso() throws Exception {
-        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(new RegisterUserResult(cuentaCreada(), true));
         ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
 
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON)
@@ -677,7 +698,7 @@ class UserRegistrationControllerTest {
 
     @Test
     void unaContrasenaConEspaciosYEmojiLlegaSinRecortarAlCasoDeUso() throws Exception {
-        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(cuentaCreada());
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(new RegisterUserResult(cuentaCreada(), true));
         ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
         String contrasena = "mi clave larga 🙂";
 
