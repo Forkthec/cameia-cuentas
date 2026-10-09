@@ -1,0 +1,534 @@
+{
+  "info": {
+    "name": "cameia-cuentas",
+    "description": "Pruebas de API del microservicio de Cuentas. Cada petición verifica su estado y el cuerpo; el script de la colección verifica en todas el Content-Type con charset y, en los errores, application/problem+json, requestId igual al encabezado X-Request-Id y ausencia de detalle interno.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const tipo = (pm.response.headers.get('Content-Type') || '').toLowerCase();",
+          "pm.test('Content-Type con charset utf-8', () => pm.expect(tipo).to.include('charset=utf-8'));",
+          "if (pm.response.code >= 400) {",
+          "    pm.test('Error: application/problem+json', () => pm.expect(tipo).to.include('application/problem+json'));",
+          "    pm.test('Error: requestId igual a X-Request-Id', () =>",
+          "        pm.expect(pm.response.json().requestId).to.eql(pm.response.headers.get('X-Request-Id')));",
+          "    pm.test('Error: sin detalle interno', () => {",
+          "        const texto = pm.response.text();",
+          "        ['Exception', 'SQL', 'org.', 'tech.cameia'].forEach((marca) => pm.expect(texto).to.not.include(marca));",
+          "    });",
+          "} else {",
+          "    pm.test('Éxito: JSON', () => pm.expect(tipo).to.include('application/json'));",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "email",
+      "value": ""
+    },
+    {
+      "key": "emailMayusculas",
+      "value": ""
+    },
+    {
+      "key": "accountId",
+      "value": ""
+    },
+    {
+      "key": "firebaseUid",
+      "value": ""
+    },
+    {
+      "key": "emailActiva",
+      "value": ""
+    },
+    {
+      "key": "uidActiva",
+      "value": ""
+    },
+    {
+      "key": "emailCaido",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Registro",
+      "description": "POST /api/v1/users: registro nuevo, repetido con cuenta pendiente y errores previsibles.",
+      "item": [
+        {
+          "name": "1 · 201 registro nuevo",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Una marca de tiempo en milisegundos y el número de iteración evitan colisiones entre vueltas rápidas.",
+                  "pm.collectionVariables.set('email', 'prueba+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('Trae id y firebaseUid de 32 caracteres', () => {",
+                  "    pm.expect(cuerpo.id).to.be.a('string').and.not.empty;",
+                  "    pm.expect(cuerpo.firebaseUid).to.match(/^[0-9a-f]{32}$/);",
+                  "});",
+                  "pm.test('Cuenta pendiente de verificación y plan FREE', () => {",
+                  "    pm.expect(cuerpo.status).to.eql('PENDING_VERIFICATION');",
+                  "    pm.expect(cuerpo.plan).to.eql('FREE');",
+                  "});",
+                  "pm.collectionVariables.set('accountId', cuerpo.id);",
+                  "pm.collectionVariables.set('firebaseUid', cuerpo.firebaseUid);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{email}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2 · 200 el mismo registro otra vez",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve la misma cuenta', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.id).to.eql(pm.collectionVariables.get('accountId'));",
+                  "    pm.expect(cuerpo.firebaseUid).to.eql(pm.collectionVariables.get('firebaseUid'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{email}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "3 · 200 el mismo correo con mayúsculas y espacios",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('emailMayusculas', '  ' + pm.collectionVariables.get('email').toUpperCase() + ' ');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve la misma cuenta', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('accountId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{emailMayusculas}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "4 · 200 con otros datos y otra contraseña",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve la misma cuenta; el reintento ignora los datos nuevos', () =>",
+                  "    pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('accountId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Luz\",\n  \"lastName\": \"Gómez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{email}}\",\n  \"password\": \"otra frase muy distinta\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"HE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "5 · 422 cuerpo inválido con el correo existente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 422', () => pm.response.to.have.status(422));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('VALIDATION_FAILED con el campo password', () => {",
+                  "    pm.expect(cuerpo.code).to.eql('VALIDATION_FAILED');",
+                  "    pm.expect(cuerpo.errors.map((e) => e.field)).to.include('password');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{email}}\",\n  \"password\": \"123\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "6a · 201 registro de la cuenta que se activará",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Una marca de tiempo en milisegundos y el número de iteración evitan colisiones entre vueltas rápidas.",
+                  "pm.collectionVariables.set('emailActiva', 'activa+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('uidActiva', pm.response.json().firebaseUid);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{emailActiva}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "6b · 200 activación de la cuenta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{uidActiva}}"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "6c · 409 correo de una cuenta ya activa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 409', () => pm.response.to.have.status(409));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('EMAIL_ALREADY_REGISTERED con el mensaje en errors[email]', () => {",
+                  "    pm.expect(cuerpo.code).to.eql('EMAIL_ALREADY_REGISTERED');",
+                  "    pm.expect(cuerpo.errors[0].field).to.eql('email');",
+                  "    pm.expect(cuerpo.errors[0].message).to.eql('Ese correo ya tiene una cuenta.');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{emailActiva}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Firebase no disponible (manual)",
+      "description": "Se corre aparte, con el emulador de Firebase Auth detenido. No forma parte de la corrida automática.",
+      "item": [
+        {
+          "name": "7 · 503 Firebase no disponible",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Una marca de tiempo en milisegundos y el número de iteración evitan colisiones entre vueltas rápidas.",
+                  "pm.collectionVariables.set('emailCaido', 'caido+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 503', () => pm.response.to.have.status(503));",
+                  "pm.test('DEPENDENCY_UNAVAILABLE', () => pm.expect(pm.response.json().code).to.eql('DEPENDENCY_UNAVAILABLE'));",
+                  "pm.test('Responde en menos de 9 s', () => pm.expect(pm.response.responseTime).to.be.below(9000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{emailCaido}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
