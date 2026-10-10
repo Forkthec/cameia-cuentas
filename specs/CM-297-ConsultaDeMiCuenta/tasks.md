@@ -202,7 +202,7 @@ Commit: `CM-297 | docs(cuentas): catálogo de errores con la consulta de mi cuen
 **Resultado (10-oct-2026):** `ErrorCodeDocumentationTest` 34 pruebas, 0 fallos. Las filas de `ACCOUNT_NOT_FOUND` e `IDENTITY_REQUIRED` suman el endpoint, el origen y las
 pruebas (`GetCurrentAccountServiceTest`, `CurrentAccountControllerTest`, `CurrentAccountEndToEndTest`).
 
-## [ ] T-36.6 · Postman — ≤ 25 min, ≈ 260 líneas
+## [x] T-36.6 · Postman — ≤ 25 min, ≈ 260 líneas
 
 - En `postman/cameia-cuentas.postman_collection.json` (editar con `Edit`), carpeta nueva al final **«Mi cuenta»** (variables `meEmail`, `meUid`,
   `uidOtra`). El script de la colección ya comprueba `charset`, `problem+json` y `requestId`. Cada petición agrega `responseTime < 2000`.
@@ -220,6 +220,14 @@ pruebas (`GetCurrentAccountServiceTest`, `CurrentAccountControllerTest`, `Curren
   contra el jar (`docker compose up -d --build`). Si la app no arranca sin el `.env` o el emulador, anotar PENDIENTE de Paula (P36-2) con la salida y
   seguir.
 - **Commit:** `CM-297 | test(cuentas): peticiones de Postman de la consulta de mi cuenta`.
+- **Resultado (10-oct-2026):** carpeta «Mi cuenta» con 12 peticiones (M-00, M-00b, M-01 a M-06, M-06b, M-06c, M-08 y M-09; M-07 se omite y se cita la
+  prueba de punta a punta en `postman/README.md`) agregada con un script que reescribe el JSON conservando el formato. **Newman real contra el jar**
+  (PostgreSQL 16, emulador de Firebase Auth y RabbitMQ 3.13 desechables en contenedores, credenciales sintéticas, `API_DOCUMENTATION_ENABLED=true`):
+  `--folder "Mi cuenta"` → 12 peticiones, 72 aserciones, 0 fallos, ninguna respuesta 5xx (`ejecucion/newman-CM-36.log`, `.xml`); `--folder Registro`
+  (regresión del registro) → 8 peticiones, 35 aserciones, 0 fallos. Prueba adversarial con el jar (V8): fila sin fecha de nacimiento insertada con SQL →
+  `GET /api/v1/users/me` 200 con `"birthDate":null` y `Content-Type: application/json;charset=UTF-8`; `POST …/verification` 200 y estado `ACTIVE`;
+  `POST` y `DELETE` sobre `/me` 405; cuerpo en el `GET` ignorado. P36-2 queda cerrado con credenciales sintéticas: solo falta la prueba con el `.env` real,
+  que es de Paula. La colección crece 555 líneas por el formato de Postman, de ahí que sea una capa propia.
 
 ## [ ] T-36.7 · Autoverificación y cierre — ≤ 30 min
 
