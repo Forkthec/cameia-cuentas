@@ -51,7 +51,12 @@ class UntypedExceptionClassificationTest {
     private static final String CONFIGURATION_PACKAGE = "tech.cameia.cuentas.infrastructure.config.";
     private static final String CLIENT_PACKAGE = "tech.cameia.cuentas.infrastructure.client.";
 
+    private static final String EVENT_PACKAGE = "tech.cameia.cuentas.domain.event.";
+
     private static final Map<String, String> CLASSIFICATION = Map.ofEntries(
+            Map.entry(EVENT_PACKAGE + "AccountCreated#<init>", DEFENSIVE_INVARIANT),
+            Map.entry(EVENT_PACKAGE + "CorrelationId#<init>", DEFENSIVE_INVARIANT),
+            Map.entry(EVENT_PACKAGE + "OutboundEvent#<init>", DEFENSIVE_INVARIANT),
             Map.entry(MODEL_PACKAGE + "Account#activate", PENDING_CM_179),
             Map.entry(MODEL_PACKAGE + "Account#exigirTexto", DEFENSIVE_INVARIANT),
             Map.entry(MODEL_PACKAGE + "BirthDate#<init>", DEFENSIVE_INVARIANT),
