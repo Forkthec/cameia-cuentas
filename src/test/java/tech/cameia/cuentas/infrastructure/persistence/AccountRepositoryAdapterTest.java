@@ -58,7 +58,7 @@ class AccountRepositoryAdapterTest {
         assertThat(recuperada.get().getId()).isEqualTo(guardada.getId());
         assertThat(recuperada.get().getFirstName()).isEqualTo("Ana");
         assertThat(recuperada.get().getLastName()).isEqualTo("Pérez");
-        assertThat(recuperada.get().getBirthDate()).isEqualTo(new BirthDate(LocalDate.of(1995, 4, 12)));
+        assertThat(recuperada.get().getBirthDate()).contains(new BirthDate(LocalDate.of(1995, 4, 12)));
         assertThat(recuperada.get().getPhoneNumber()).contains(new PhoneNumber("+573001234567"));
         assertThat(recuperada.get().getPronoun()).contains(Pronoun.SHE);
         assertThat(recuperada.get().getStatus()).isEqualTo(AccountStatus.PENDING_VERIFICATION);
@@ -116,7 +116,7 @@ class AccountRepositoryAdapterTest {
         assertThatThrownBy(() -> {
             repositorioJpa.saveAndFlush(new tech.cameia.cuentas.infrastructure.persistence.entity.AccountEntity(
                     otra.getId(), otra.getFirebaseUid(), otra.getFirstName(), otra.getLastName(),
-                    otra.getBirthDate().value(), null, null, otra.getStatus()));
+                    otra.getBirthDate().orElseThrow().value(), null, null, otra.getStatus()));
         }).isInstanceOf(DataIntegrityViolationException.class);
     }
 

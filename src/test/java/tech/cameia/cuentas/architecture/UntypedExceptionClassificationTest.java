@@ -60,6 +60,7 @@ class UntypedExceptionClassificationTest {
             Map.entry(EVENT_PACKAGE + "OutboundEvent#<init>", DEFENSIVE_INVARIANT),
             Map.entry(MODEL_PACKAGE + "Account#activate", PENDING_CM_179),
             Map.entry(MODEL_PACKAGE + "Account#exigirTexto", DEFENSIVE_INVARIANT),
+            Map.entry(MODEL_PACKAGE + "Account#register", DEFENSIVE_INVARIANT),
             Map.entry(MODEL_PACKAGE + "BirthDate#<init>", DEFENSIVE_INVARIANT),
             Map.entry(MODEL_PACKAGE + "DirectoryUser#<init>", DEFENSIVE_INVARIANT),
             Map.entry(MODEL_PACKAGE + "EmailAddress#<init>", DEFENSIVE_INVARIANT),

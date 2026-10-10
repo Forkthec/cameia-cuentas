@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import tech.cameia.cuentas.application.command.ActivateAccountCommand;
@@ -84,6 +85,18 @@ class ActivateAccountServiceTest {
 
         assertThat(segunda.getStatus()).isEqualTo(AccountStatus.ACTIVE);
         assertThat(repositorio.guardados).isEqualTo(guardadosTrasLaPrimera);
+    }
+
+    @Test
+    @DisplayName("Una cuenta sin fecha de nacimiento se activa sin error")
+    void activate_shouldActivate_whenBirthDateIsUnknown() {
+        repositorio.con(Account.rebuild(UUID.randomUUID(), UID, "Ana", "Pérez", null, null, null,
+                AccountStatus.PENDING_VERIFICATION));
+
+        Account activada = servicio.activate(new ActivateAccountCommand(UID, true));
+
+        assertThat(activada.getStatus()).isEqualTo(AccountStatus.ACTIVE);
+        assertThat(activada.getBirthDate()).isEmpty();
     }
 
     @Test

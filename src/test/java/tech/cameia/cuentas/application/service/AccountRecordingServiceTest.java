@@ -7,12 +7,14 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import tech.cameia.cuentas.domain.event.AccountCreated;
 import tech.cameia.cuentas.domain.model.Account;
+import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.Pronoun;
@@ -68,5 +70,17 @@ class AccountRecordingServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("La cuenta ya tiene su evento de cuenta creada");
         assertThat(outbox.appended()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Falla sin agregar evento cuando la cuenta guardada no trae fecha de nacimiento")
+    void recordNewAccount_shouldThrow_whenSavedAccountHasNoBirthDate() {
+        Account withoutBirthDate = Account.rebuild(UUID.randomUUID(), "uid-sin-fecha", "Ana", "Pérez", null, null,
+                null, AccountStatus.PENDING_VERIFICATION);
+
+        assertThatThrownBy(() -> service.recordNewAccount(withoutBirthDate, EMAIL, "req-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Una cuenta recién registrada siempre tiene fecha de nacimiento");
+        assertThat(outbox.appended()).isEmpty();
     }
 }

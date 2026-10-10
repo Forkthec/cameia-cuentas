@@ -38,7 +38,7 @@ T-36.0 es el PR 0 (solo documentos, ≈ 455 líneas); T-36.1 a T-36.7, el PR 1.
   `[ERROR] Tests run: 1, Failures: 0, Errors: 1 … java.lang.IllegalArgumentException: La fecha de nacimiento es obligatoria`.
   La prueba definitiva de `AccountMapperTest` no se confirma en el PR 0 (rompería el build); se escribe en T-36.1.
 
-## [ ] T-36.1 · Fecha de nacimiento desconocida sin 500 — ≤ 25 min, ≈ 90 líneas
+## [x] T-36.1 · Fecha de nacimiento desconocida sin 500 — ≤ 25 min, ≈ 90 líneas
 
 - `git grep -n "getBirthDate()" -- src` y anotar los llamadores (en la base de la cadena: `AccountMapper.toEntity`, `AccountRecordingService` y
   pruebas).
@@ -60,6 +60,12 @@ T-36.0 es el PR 0 (solo documentos, ≈ 455 líneas); T-36.1 a T-36.7, el PR 1.
   llaman `getBirthDate()` (`.orElseThrow()` o `.get()`).
 - **Comandos:** `./mvnw.cmd -q -B "-Dtest=AccountMapperTest,ActivateAccountServiceTest,AccountRecordingServiceTest,UntypedExceptionClassificationTest" test`.
 - **Commit:** `CM-297 | fix(cuentas): una cuenta sin fecha de nacimiento se lee y se guarda sin error`.
+- **Resultado (10-oct-2026):** rojo: `IllegalArgumentException: La fecha de nacimiento es obligatoria` (T-36.0). Verde con
+  `clean test -Dtest=AccountMapperTest,AccountTest,ActivateAccountServiceTest,AccountRecordingServiceTest,AccountRepositoryAdapterTest,UntypedExceptionClassificationTest`:
+  30 pruebas, 0 fallos. `Account.register` rechaza la fecha nula (`register_shouldReject_whenBirthDateIsMissing`) y entra en la lista de
+  `UntypedExceptionClassificationTest` como invariante defensivo. Llamadores ajustados: `AccountMapper`, `AccountRecordingService`
+  (`orElseThrow`, ya clasificado), `AccountTest`, `AccountRepositoryAdapterTest`. Entorno: el IDE deja clases compiladas con nombres de lambda propios
+  en `target/` y `UntypedExceptionClassificationTest` falla con `StringIndexOutOfBounds`; se resuelve con `clean`.
 
 ## [ ] T-36.2 · Caso de uso — ≤ 25 min, ≈ 120 líneas
 
