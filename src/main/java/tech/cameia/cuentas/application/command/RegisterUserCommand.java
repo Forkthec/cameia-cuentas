@@ -21,6 +21,8 @@ import tech.cameia.cuentas.domain.model.Pronoun;
  * @param password contraseña elegida
  * @param phoneNumber celular en formato E.164, o {@code null} si no lo declaró
  * @param pronoun pronombres, o {@code null} si no los declaró
+ * @param requestId {@code X-Request-Id} que propaga el Gateway, puede ser {@code null}; solo sirve para correlacionar
+ *        el evento de cuenta creada
  */
 public record RegisterUserCommand(
         String firstName,
@@ -29,5 +31,6 @@ public record RegisterUserCommand(
         String email,
         String password,
         String phoneNumber,
-        Pronoun pronoun) {
+        Pronoun pronoun,
+        String requestId) {
 }

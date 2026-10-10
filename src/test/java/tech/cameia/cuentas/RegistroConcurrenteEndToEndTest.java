@@ -11,6 +11,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -59,6 +60,7 @@ class RegistroConcurrenteEndToEndTest {
     void limpiarEstado() {
         directorio.limpiar();
         jdbcTemplate.update("DELETE FROM microcuentas.cuenta");
+        jdbcTemplate.update("DELETE FROM microcuentas.evento_saliente");
     }
 
     @Test
@@ -81,6 +83,21 @@ class RegistroConcurrenteEndToEndTest {
         } finally {
             hilos.shutdownNow();
         }
+    }
+
+    @Test
+    @DisplayName("Dos registros simultáneos del mismo correo dejan un solo evento cuenta.creada")
+    void twoConcurrentRegistrations_shouldRecordOneEvent_whenSameEmail() throws Exception {
+        ExecutorService hilos = Executors.newFixedThreadPool(2);
+        try {
+            dosRegistrosALaVez(hilos, cuerpoConCorreo("evento.unico@cameia.tech"));
+        } finally {
+            hilos.shutdownNow();
+        }
+
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM microcuentas.evento_saliente", Integer.class))
+                .isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM microcuentas.cuenta", Integer.class)).isEqualTo(1);
     }
 
     /** Lanza dos registros idénticos soltando a la vez a los dos hilos y devuelve sus estados HTTP. */
