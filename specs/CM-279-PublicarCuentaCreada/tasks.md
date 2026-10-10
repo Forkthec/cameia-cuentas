@@ -346,6 +346,7 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
     microcuentas.cuenta WHERE firebase_uid = 'uid-rollback'` = 0.
 - **Clasificar** `application.service.AccountRecordingService#recordNewAccount` → `DEFENSIVE_INVARIANT`.
 - **Verificar:** `.\mvnw.cmd -q test -Dtest="AccountRecordingServiceTest,AccountRecordingTransactionTest,UntypedExceptionClassificationTest"`.
+- **Resultado (9-oct-2026):** hecha. Falló primero: `testCompile` con `AccountRecordingService cannot be resolved` (diagnóstico del compilador). Después: `AccountRecordingServiceTest` 3, `AccountRecordingTransactionTest` 2 (reversión real contra PostgreSQL y camino feliz), `UntypedExceptionClassificationTest` 1, `LayeredArchitectureTest` 3: 0 fallos. Nota de ejecución: los dobles `InMemoryAccountRepository` e `InMemoryOutboxRepository` quedan en `src/test/.../infrastructure/persistence/`; `RegisterUserServiceTest` conserva su repositorio privado (tiene fallo simulado propio).
 
 ### T-C1.5 · El registro usa `AccountRecordingService` y propaga `X-Request-Id`
 
@@ -393,6 +394,7 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
   `RegistroConcurrenteEndToEndTest`. En esta última agrega `twoConcurrentRegistrations_shouldRecordOneEvent_whenSameEmail`
   (`SELECT count(*) FROM microcuentas.evento_saliente` = 1 tras la carrera ya existente).
 - **Verificar:** `.\mvnw.cmd test`.
+- **Resultado (9-oct-2026):** hecha. Falló primero: `test-compile` con `no suitable constructor found for RegisterUserService(...)` y `RegisterUserCommand cannot be applied`. Después: suite completa `mvnw clean test` 730 pruebas, 0 fallos, 0 errores (incluye `twoConcurrentRegistrations_shouldRecordOneEvent_whenSameEmail`). Nota: `RegistroConcurrenteEndToEndTest` ahora también limpia `evento_saliente` en `@BeforeEach`.
 
 ### T-C1.6 · Cierre del bloque C1
 

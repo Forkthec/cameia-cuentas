@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -39,6 +40,7 @@ import tech.cameia.cuentas.domain.policy.AgePolicy;
 import tech.cameia.cuentas.domain.policy.PasswordPolicy;
 import tech.cameia.cuentas.domain.port.AccountRepository;
 import tech.cameia.cuentas.infrastructure.client.InMemoryFirebaseUserDirectory;
+import tech.cameia.cuentas.infrastructure.persistence.InMemoryOutboxRepository;
 
 /**
  * Prueba del caso de uso de registro descrito en
@@ -56,6 +58,7 @@ class RegisterUserServiceTest {
 
     private final InMemoryFirebaseUserDirectory directorio = new InMemoryFirebaseUserDirectory();
     private final RepositorioEnMemoria repositorio = new RepositorioEnMemoria();
+    private final InMemoryOutboxRepository outbox = new InMemoryOutboxRepository();
 
     private RegisterUserService servicio;
 
@@ -65,9 +68,10 @@ class RegisterUserServiceTest {
     }
 
     private RegisterUserService servicioCon(InMemoryFirebaseUserDirectory directorioDePrueba) {
-        return new RegisterUserService(directorioDePrueba, repositorio, new AgePolicy(),
-                new PasswordPolicy(Set.of("123456789012", "password1234", "qwertyuiop123")),
-                Clock.fixed(AHORA, ZoneOffset.UTC));
+        Clock reloj = Clock.fixed(AHORA, ZoneOffset.UTC);
+        return new RegisterUserService(directorioDePrueba, repositorio,
+                new AccountRecordingService(repositorio, outbox, reloj), new AgePolicy(),
+                new PasswordPolicy(Set.of("123456789012", "password1234", "qwertyuiop123")), reloj);
     }
 
     @Test
@@ -77,6 +81,61 @@ class RegisterUserServiceTest {
         assertThat(resultado.created()).isTrue();
         assertThat(directorio.cantidadDeUsuarios()).isEqualTo(1);
         assertThat(repositorio.guardadas).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Un registro nuevo agrega el evento cuenta.creada con la cuenta, el correo y la correlación")
+    void register_shouldRecordAccountCreated_whenAccountIsNew() {
+        RegisterUserResult resultado = servicio.register(comando());
+
+        assertThat(outbox.appended()).hasSize(1);
+        assertThat(outbox.appended().get(0).firebaseUid()).isEqualTo(resultado.account().getFirebaseUid());
+        assertThat(outbox.appended().get(0).email().value()).isEqualTo("ana@cameia.tech");
+        assertThat(outbox.appended().get(0).correlationId().value()).isEqualTo("req-1");
+    }
+
+    @Test
+    @DisplayName("Repetir el registro de una cuenta pendiente no agrega otro evento")
+    void register_shouldNotRecordEvent_whenPendingAccountIsReturned() {
+        servicio.register(comando());
+
+        servicio.register(comando());
+
+        assertThat(outbox.appended()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Un correo de una cuenta activa responde conflicto y no agrega evento")
+    void register_shouldNotRecordEvent_whenEmailBelongsToActiveAccount() {
+        String uid = directorio.crearSinCuentaLocal(CORREO, AHORA.minusSeconds(5));
+        repositorio.guardadas.put(uid, Account.rebuild(UUID.randomUUID(), uid, "Ana", "Pérez",
+                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, AccountStatus.ACTIVE));
+
+        assertThatThrownBy(() -> servicio.register(comando())).isInstanceOf(EmailAlreadyRegisteredException.class);
+
+        assertThat(outbox.appended()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Si Firebase no está disponible no se agrega ningún evento")
+    void register_shouldNotRecordEvent_whenFirebaseIsUnavailable() {
+        directorio.quedarIndisponibleAlEscribirElPlan();
+
+        assertThatThrownBy(() -> servicio.register(comando())).isInstanceOf(DependencyUnavailableException.class);
+
+        assertThat(outbox.appended()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Si el evento no se puede guardar se borra la credencial y se propaga el fallo")
+    void register_shouldCompensateCredential_whenEventCannotBeStored() {
+        outbox.failNextAppend();
+
+        assertThatThrownBy(() -> servicio.register(comando())).isInstanceOf(IllegalStateException.class)
+                .hasMessage("fallo simulado");
+
+        assertThat(directorio.borrados()).isEqualTo(1);
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
     }
 
     @Test
@@ -275,7 +334,7 @@ class RegisterUserServiceTest {
     void elRegistroRepetidoIgnoraLosOtrosDatosYNoUsaLaContrasenia(CapturedOutput salida) {
         RegisterUserResult primero = servicio.register(comando());
         RegisterUserCommand otrosDatos = new RegisterUserCommand("Luz", "Gómez", LocalDate.of(1990, 1, 1), CORREO,
-                "otra frase muy distinta", "+573009876543", Pronoun.HE);
+                "otra frase muy distinta", "+573009876543", Pronoun.HE, null);
 
         RegisterUserResult segundo = servicio.register(otrosDatos);
 
@@ -330,7 +389,7 @@ class RegisterUserServiceTest {
     void noTocaFirebaseCuandoLaFechaDeNacimientoNoPermiteRegistrarse() {
         RegisterUserCommand menorDeEdad = new RegisterUserCommand("Ana", "Pérez",
                 LocalDate.now().minusYears(15), "ana@cameia.tech", "frase secreta larga",
-                null, null);
+                null, null, null);
 
         assertThatThrownBy(() -> servicio.register(menorDeEdad))
                 .isInstanceOf(InvalidBirthDateException.class);
@@ -340,7 +399,7 @@ class RegisterUserServiceTest {
     @Test
     void noTocaFirebaseCuandoLaContraseniaEsDebil() {
         RegisterUserCommand contraseniaCorta = new RegisterUserCommand("Ana", "Pérez",
-                LocalDate.of(1995, 4, 12), "ana@cameia.tech", "corta", null, null);
+                LocalDate.of(1995, 4, 12), "ana@cameia.tech", "corta", null, null, null);
 
         assertThatThrownBy(() -> servicio.register(contraseniaCorta))
                 .isInstanceOf(WeakPasswordException.class);
@@ -350,7 +409,7 @@ class RegisterUserServiceTest {
     @Test
     void unNombreConNumerosNoCreaCredencialNiCuenta() {
         RegisterUserCommand nombreInvalido = new RegisterUserCommand("Ana3", "Pérez", LocalDate.of(1995, 4, 12),
-                "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE);
+                "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE, null);
 
         assertThatThrownBy(() -> servicio.register(nombreInvalido))
                 .isInstanceOf(InvalidPersonNameException.class)
@@ -363,7 +422,7 @@ class RegisterUserServiceTest {
     @Test
     void unApellidoConGuionBajoNoCreaCredencialNiCuenta() {
         RegisterUserCommand apellidoInvalido = new RegisterUserCommand("Ana", "Pérez_", LocalDate.of(1995, 4, 12),
-                "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE);
+                "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE, null);
 
         assertThatThrownBy(() -> servicio.register(apellidoInvalido))
                 .isInstanceOf(InvalidPersonNameException.class)
@@ -376,7 +435,7 @@ class RegisterUserServiceTest {
     @Test
     void unNombreConTildesYGuionSeGuardaNormalizado() {
         RegisterUserCommand conTildes = new RegisterUserCommand("María  José", "Gómez-Ruiz",
-                LocalDate.of(1995, 4, 12), "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE);
+                LocalDate.of(1995, 4, 12), "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE, null);
 
         Account cuenta = servicio.register(conTildes).account();
 
@@ -449,7 +508,7 @@ class RegisterUserServiceTest {
     @Test
     void unaContraseniaDebilNoQuedaEnElLog(CapturedOutput salida) {
         RegisterUserCommand comun = new RegisterUserCommand("Ana", "Pérez", LocalDate.of(1995, 4, 12),
-                "ana@cameia.tech", "password1234", null, Pronoun.SHE);
+                "ana@cameia.tech", "password1234", null, Pronoun.SHE, null);
 
         assertThatThrownBy(() -> servicio.register(comun)).isInstanceOf(WeakPasswordException.class);
 
@@ -462,7 +521,7 @@ class RegisterUserServiceTest {
 
     private RegisterUserCommand comando(String correo, String contrasenia) {
         return new RegisterUserCommand("Ana", "Pérez", LocalDate.of(1995, 4, 12),
-                correo, contrasenia, "+573001234567", Pronoun.SHE);
+                correo, contrasenia, "+573001234567", Pronoun.SHE, "req-1");
     }
 
     /** Repositorio en memoria que puede simular un fallo de la base de datos. */

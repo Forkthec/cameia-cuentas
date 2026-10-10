@@ -93,6 +93,32 @@ class UserRegistrationControllerTest {
     }
 
     @Test
+    @DisplayName("Pasa el X-Request-Id al caso de uso cuando el encabezado viene")
+    void register_shouldPassRequestIdToService_whenHeaderPresent() throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(new RegisterUserResult(cuentaCreada(), true));
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).header("X-Request-Id", "req-1")
+                .content(cuerpoValido())).andExpect(status().isCreated());
+
+        ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
+        verify(servicio).register(comando.capture());
+        assertThat(comando.getValue().requestId()).isEqualTo("req-1");
+    }
+
+    @Test
+    @DisplayName("Pasa nulo al caso de uso cuando falta el X-Request-Id")
+    void register_shouldPassNull_whenHeaderMissing() throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(new RegisterUserResult(cuentaCreada(), true));
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoValido()))
+                .andExpect(status().isCreated());
+
+        ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
+        verify(servicio).register(comando.capture());
+        assertThat(comando.getValue().requestId()).isNull();
+    }
+
+    @Test
     void laRespuestaNoDevuelveElCorreoNiLaContrasenia() throws Exception {
         when(servicio.register(any(RegisterUserCommand.class))).thenReturn(new RegisterUserResult(cuentaCreada(), true));
 

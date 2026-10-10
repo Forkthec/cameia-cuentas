@@ -1,6 +1,7 @@
 package tech.cameia.cuentas.presentation.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -14,6 +15,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import tech.cameia.cuentas.application.service.RegisterUserResult;
@@ -111,8 +113,12 @@ class UserRegistrationController {
                         examples = @ExampleObject(name = "firebaseNoDisponible", value = EJEMPLO_503)))
     })
     @PostMapping("/api/v1/users")
-    ResponseEntity<RegisteredUserResponse> register(@Valid @RequestBody RegisterUserRequest request) {
-        RegisterUserResult resultado = servicio.register(request.toCommand());
+    ResponseEntity<RegisteredUserResponse> register(@Valid @RequestBody RegisterUserRequest request,
+            @Parameter(description = "Identificador de la petición que pone el Gateway; si cumple ^[A-Za-z0-9._-]{1,64}$ "
+                    + "se usa para correlacionar el evento cuenta.creada.",
+                    example = "3f1c9a52-7d0e-4b57-9a38-52c1e4d8a601")
+            @RequestHeader(name = "X-Request-Id", required = false) String requestId) {
+        RegisterUserResult resultado = servicio.register(request.toCommand(requestId));
         HttpStatus estado = resultado.created() ? HttpStatus.CREATED : HttpStatus.OK;
 
         return ResponseEntity.status(estado).body(RegisteredUserResponse.de(resultado.account()));
