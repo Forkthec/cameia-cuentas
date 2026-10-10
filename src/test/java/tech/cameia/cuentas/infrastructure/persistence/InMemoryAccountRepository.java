@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import tech.cameia.cuentas.domain.model.Account;
+import tech.cameia.cuentas.domain.model.UnannouncedAccount;
 import tech.cameia.cuentas.domain.port.AccountRepository;
 
 /**
@@ -15,6 +16,7 @@ import tech.cameia.cuentas.domain.port.AccountRepository;
 public class InMemoryAccountRepository implements AccountRepository {
 
     private final Map<String, Account> accounts = new LinkedHashMap<>();
+    private final List<UnannouncedAccount> unannounced = new ArrayList<>();
 
     /**
      * Guarda la cuenta en memoria.
@@ -46,5 +48,25 @@ public class InMemoryAccountRepository implements AccountRepository {
      */
     public List<Account> saved() {
         return new ArrayList<>(accounts.values());
+    }
+
+    /**
+     * Prepara las cuentas que {@link #findUnannounced} devolverá.
+     *
+     * @param account cuenta sin evento
+     */
+    public void seedUnannounced(UnannouncedAccount account) {
+        unannounced.add(account);
+    }
+
+    /**
+     * Devuelve las cuentas sin evento preparadas con {@link #seedUnannounced}, como máximo {@code limit}.
+     *
+     * @param limit cantidad máxima de cuentas
+     * @return copia de las cuentas preparadas
+     */
+    @Override
+    public List<UnannouncedAccount> findUnannounced(int limit) {
+        return unannounced.stream().limit(limit).toList();
     }
 }

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,6 +18,7 @@ import tech.cameia.cuentas.domain.exception.EmailNotVerifiedException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
+import tech.cameia.cuentas.domain.model.UnannouncedAccount;
 import tech.cameia.cuentas.domain.port.AccountRepository;
 import tech.cameia.cuentas.infrastructure.client.InMemoryFirebaseUserDirectory;
 
@@ -105,6 +107,11 @@ class ActivateAccountServiceTest {
 
     /** Repositorio en memoria que cuenta cuántas veces se guardó. */
     private static class RepositorioEnMemoria implements AccountRepository {
+
+        @Override
+        public List<UnannouncedAccount> findUnannounced(int limit) {
+            return List.of();
+        }
 
         private final Map<String, Account> cuentas = new HashMap<>();
         private int guardados;

@@ -735,6 +735,8 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
   `..._shouldExcludeMissingBirthDate`; `..._shouldReturnOldestFirstAndRespectLimit` (límite 1); `..._shouldIgnorePublishedEventsToo`
   (una cuenta con evento publicado, `carga` NULL, no sale). Agrega la comparación `UnannouncedAccount.FIREBASE_UID_MAX_LENGTH` = 128 en
   `EventoSalienteSchemaMigrationTest.columnLengths_shouldMatchDomainLimits`.
+- **Resultado (9-oct-2026):** hecha. Primero no compilaban las pruebas (`UnannouncedAccount` y `findUnannounced` no existían). Después `UnannouncedAccountsQueryTest` 6 y `EventoSalienteSchemaMigrationTest` 15 en verde contra PostgreSQL real.
+  - *Nota de ejecución:* las seis pruebas de la consulta están en la clase nueva `UnannouncedAccountsQueryTest`, no en `AccountRepositoryAdapterTest`: necesitan vaciar `cuenta` y `evento_saliente` antes de cada prueba y esa clase comparte filas entre sus pruebas. Los dobles de `AccountRepository` de las pruebas devuelven lista vacía (el doble compartido permite preparar cuentas con `seedUnannounced`).
 
 ### T-C3.2 · Correo por `firebaseUid` en Firebase
 
