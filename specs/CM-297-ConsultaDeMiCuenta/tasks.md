@@ -126,7 +126,7 @@ T-36.0 es el PR 0 (solo documentos, ≈ 455 líneas); T-36.1 a T-36.7, el PR 1.
   Se agregó `find_shouldRejectIdentity_whenNull` (identidad nula, rama que la tarjeta no listaba) y el caso `"\n"` a la parametrizada; el límite
   de 129 caracteres vive en `find_shouldLookUp_whenIdentityHas128Characters` (n y n+1 juntos).
 
-## [ ] T-36.3 · Controlador, DTO, manejador y OpenAPI — ≤ 30 min, ≈ 170 líneas
+## [x] T-36.3 · Controlador, DTO, manejador y OpenAPI — ≤ 30 min, ≈ 170 líneas
 
 - **Crear** `presentation/dto/CurrentAccountResponse.java`:
   `public record CurrentAccountResponse(UUID id, String firstName, String lastName, LocalDate birthDate, String phoneNumber, String pronoun, String status, String plan)`
@@ -160,6 +160,13 @@ T-36.0 es el PR 0 (solo documentos, ≈ 455 líneas); T-36.1 a T-36.7, el PR 1.
   - `getMe_shouldReturn404_whenAccountDoesNotExist`: 404, `$.code` `ACCOUNT_NOT_FOUND`.
 - **Comandos:** `./mvnw.cmd -q -B "-Dtest=CurrentAccountControllerTest,BusinessExceptionHandlerTest,LayeredArchitectureTest,UntypedExceptionClassificationTest" test`.
 - **Commit:** `CM-297 | feat(cuentas): GET /api/v1/users/me con los datos de la cuenta y su OpenAPI`.
+- **Resultado (10-oct-2026):** rojo: `CurrentAccountController cannot find symbol` (no compila). Verde: `CurrentAccountControllerTest` 7 pruebas,
+  `BusinessExceptionHandlerTest` 35, `LayeredArchitectureTest` 3, `UntypedExceptionClassificationTest` 1; 0 fallos.
+  **Desvío:** la aserción de `charset=UTF-8` del 200 no va en `CurrentAccountControllerTest`: `standaloneSetup` no ejecuta el filtro de codificación
+  de Spring Boot (`spring.servlet.encoding.force-response=true`) y el `Content-Type` sale `application/json`. Se afirma en
+  `CurrentAccountEndToEndTest` (T-36.4), como hace `AccountRegistrationEndToEndTest` con el 201. Regla: §6 (4) del protocolo, atributo ASVS 4.1.1.
+  Se quitó la aserción por `$.keys()` (función de JsonPath no estándar): el conjunto exacto lo fijan `hasSize(8)` y las ocho claves del primer test.
+  El ejemplo 406 de OpenAPI usa el texto real del manejador («Tipo de respuesta no admitido.»).
 
 ## [ ] T-36.4 · Prueba de punta a punta — ≤ 30 min, ≈ 180 líneas
 

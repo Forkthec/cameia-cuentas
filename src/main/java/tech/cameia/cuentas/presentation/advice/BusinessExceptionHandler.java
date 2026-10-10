@@ -36,6 +36,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import tech.cameia.cuentas.domain.exception.AccountNotFoundException;
+import tech.cameia.cuentas.domain.exception.IdentityRequiredException;
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.EmailNotVerifiedException;
@@ -261,6 +262,21 @@ class BusinessExceptionHandler {
                 : "causa=" + error.getClass().getSimpleName();
         return rechazo(HttpStatus.BAD_REQUEST, "Petición incompleta",
                 "La petición no incluye los datos que exige esta ruta", ErrorCode.IDENTITY_REQUIRED, faltante);
+    }
+
+    /**
+     * Identidad del Gateway que llegó en blanco o más larga que un identificador de Firebase.
+     *
+     * <p>Responde igual que el encabezado ausente: para quien llama es la misma falta. El valor del
+     * encabezado nunca se registra.</p>
+     *
+     * @param error excepción de negocio
+     * @return {@code 400 Bad Request} con el código {@code IDENTITY_REQUIRED}
+     */
+    @ExceptionHandler(IdentityRequiredException.class)
+    ProblemDetail invalidIdentity(IdentityRequiredException error) {
+        return rechazo(HttpStatus.BAD_REQUEST, "Petición incompleta", error.getMessage(), error.getErrorCode(),
+                "causa=identidad-invalida");
     }
 
     /**
