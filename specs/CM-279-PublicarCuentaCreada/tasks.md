@@ -107,6 +107,7 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
   la herramienta de escritura de archivos.
 - **Verificar:** `.\mvnw.cmd -q test -Dtest=EventoSalienteSchemaMigrationTest` y `.\mvnw.cmd -q test -Dtest=CuentasApplicationTests`
   (el arranque valida las entidades; todavía no hay entidad nueva).
+- **Resultado (9-oct-2026):** hecha. `EventoSalienteSchemaMigrationTest` 15 pruebas, 0 fallos (informe de Surefire); V5 libre en `origin/develop` (solo V1 a V4). Hallazgo: `-q` no imprime el resumen; se lee de `target/surefire-reports`.
 
 ### T-C1.2 · Dominio: `CorrelationId`, `AccountCreated`, `OutboundEvent`
 
