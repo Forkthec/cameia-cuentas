@@ -168,7 +168,7 @@ T-36.0 es el PR 0 (solo documentos, ≈ 455 líneas); T-36.1 a T-36.7, el PR 1.
   Se quitó la aserción por `$.keys()` (función de JsonPath no estándar): el conjunto exacto lo fijan `hasSize(8)` y las ocho claves del primer test.
   El ejemplo 406 de OpenAPI usa el texto real del manejador («Tipo de respuesta no admitido.»).
 
-## [ ] T-36.4 · Prueba de punta a punta — ≤ 30 min, ≈ 180 líneas
+## [x] T-36.4 · Prueba de punta a punta — ≤ 30 min, ≈ 180 líneas
 
 - **Crear** `CurrentAccountEndToEndTest.java` en la raíz de pruebas con la forma de `AccountRegistrationEndToEndTest` (`RANDOM_PORT`,
   `@AutoConfigureTestRestTemplate`, `@Testcontainers(disabledWithoutDocker = true)`, `JdbcTemplate`). Datos: registrar con `POST /api/v1/users`
@@ -186,6 +186,11 @@ T-36.0 es el PR 0 (solo documentos, ≈ 455 líneas); T-36.1 a T-36.7, el PR 1.
   - `getMe_shouldReturn400_whenIdentityIsTooLong`: 129 caracteres → 400 `IDENTITY_REQUIRED`.
 - **Comandos:** `./mvnw.cmd -q -B "-Dtest=CurrentAccountEndToEndTest" test` (Docker encendido).
 - **Commit:** `CM-297 | test(cuentas): consulta de mi cuenta de punta a punta con PostgreSQL real`.
+- **Resultado (10-oct-2026):** `CurrentAccountEndToEndTest`: 9 pruebas, 0 fallos (16,4 s, PostgreSQL 16 real). Verde al primer intento porque el endpoint
+  ya existía desde T-36.3; el caso de la cuenta sin fecha habría fallado antes de T-36.1 (500 por `IllegalArgumentException`, reproducido en T-36.0).
+  Se agregó `getMe_shouldReturn400_whenIdentityHeaderIsMissing` (400 con `Content-Type` problem+json y charset) a los siete de la tarjeta, y la
+  prueba de registro afirma el `charset=UTF-8` del 200 que el test del controlador no puede ver. Las filas anteriores al registro con fecha se
+  insertan con `JdbcTemplate`; los pronombres de esas filas son `THEY` porque `ck_cuenta_pronombres_valor` (V3) exige valor salvo en `ANONYMIZED`.
 
 ## [ ] T-36.5 · Catálogo de errores — ≤ 10 min
 
