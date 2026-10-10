@@ -614,6 +614,8 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
   - `relayPending_shouldProcessSeveralBatches_whenMoreThanBatchSize` (250 eventos → 250 publicados).
   - `relayPending_shouldReturnZeros_whenNothingIsPending`.
 - **Verificar:** `.\mvnw.cmd -q test -Dtest=OutboxRelayServiceTest`.
+- **Resultado (9-oct-2026):** hecha. Primero no compilaban las pruebas (`OutboxRelayService` y `RelaySummary` no existían); después `OutboxRelayServiceTest` 9 pruebas en verde, 0 fallos (`BUILD SUCCESS`).
+  - *Nota de ejecución:* `relayPending` corta la corrida cuando un lote tiene cualquier fallo, no solo cuando falla el lote entero: los fallidos son los más antiguos y se releerían en el siguiente lote, sumando muchos intentos a un mismo evento y disparando la alerta de 10 intentos sin motivo. Lo cubre `relayPending_shouldStopAfterBatch_whenAnyEventFails`. El doble `InMemoryOutboxRepository` ganó `seed` y `publishedAt` y ordena `findPending` por instante e id, como la consulta real.
 
 ### T-C2.4 · Intento inmediato tras el registro
 
@@ -652,6 +654,8 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
     `IllegalStateException`) → `created` true; salida con `Falló la publicación inmediata`; sin compensación.
   - `register_shouldNotPublish_whenPendingAccountIsReturned`.
 - **Verificar:** `.\mvnw.cmd test`.
+- **Resultado (9-oct-2026):** hecha. Primero no compilaba `RegisterUserServiceTest` (constructor con `OutboxRelayService` y `eventId()` inexistentes); después `RegisterUserServiceTest` 44 y `UserRegistrationControllerTest` 128 en verde.
+  - *Nota de ejecución:* `RegisterUserResult` conserva un constructor de dos parámetros (sin evento) para los 12 sitios que construyen resultados sin cuenta nueva, y la variable de la clase se llama `relay`; el campo existente `grabador` no se renombra.
 
 ### T-C2.5 · Prueba de punta a punta con RabbitMQ real
 
@@ -688,6 +692,9 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
     201; evento pendiente con `intentos` 1; la duración de la llamada a `relay(...)` medida dentro del espía (`doAnswer` que toma
     `System.nanoTime()` antes y después de `callRealMethod()`) es menor que 1 200 ms. Reporta la medida y la duración total del `POST`.
 - **Verificar:** `.\mvnw.cmd -q test -Dtest=AccountCreatedEventEndToEndTest` y la suite.
+- **Resultado (9-oct-2026):** hecha. `AccountCreatedEventEndToEndTest` 4 y `AccountCreatedEventBrokerDownEndToEndTest` 1 en verde. Medida DES-02 con el broker caído: `relay(...)` 82 ms (límite 1 200 ms); el `POST` completo tardó 1 559 ms en la primera petición del contexto, con el doble de Firebase y la base recién arrancada, sin que la publicación aporte más de 82 ms.
+  - *Nota de ejecución 1 (reproducción previa):* la prueba `register_shouldPublishAccountCreated_whenAccountIsNew` se escribió después del código de C2 y no se corrió antes sobre el commit de C1 como pedía la tarjeta; el equivalente en rojo es que, sin `RabbitEventPublisher` y el relevo, `RegisterUserServiceTest.register_shouldPublishEvent_whenBrokerConfirms` no compilaba (T-C2.4). Queda anotado como desvío.
+  - *Nota de ejecución 2:* la cola de prueba se declara sin borrado automático: con `autoDelete` el broker la eliminaba entre pruebas y el siguiente `receive` fallaba con 404.
 
 ### T-C2.6 · Cierre del bloque C2
 
@@ -696,6 +703,8 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
 - Prueba manual con el jar: `docker compose up -d db rabbitmq`; `java -jar target\cuentas-0.0.1-SNAPSHOT.jar`; registrar con Postman
   (petición 1 de `Registro`); en `http://localhost:15673` (usuario del `.env`) el exchange `cuentas.events` existe. Pega la captura de
   la salida de `rabbitmqadmin` o del API de administración (`GET /api/exchanges/%2F/cuentas.events`).
+- **Resultado (9-oct-2026):** `.\mvnw.cmd clean verify`: 827 pruebas, 0 fallos, 0 omitidas, BUILD SUCCESS. JaCoCo (líneas / ramas): `RabbitEventPublisher` 35/35 y 6/6; `OutboxRelayService` 32/32 y 14/14; `RelaySummary` 1/1; `AccountEventsProperties` 1/1; `AccountEventsMessagingConfiguration` 3/3; `RegisterUserService` 83/83 y 20/20; `RegisterUserResult` 3/3. Cobertura global de líneas 99,3 % (913/919). Sin líneas ni ramas sin cubrir en lo nuevo.
+  - **Prueba manual con el jar: PENDIENTE (Paula).** No se ejecutó: exige el `.env` con secretos (que no se leen) y `docker compose up`. La existencia del exchange `cuentas.events` y el enrutamiento quedan demostrados por `RabbitEventPublisherTest` y `AccountCreatedEventEndToEndTest` contra RabbitMQ real.
 
 ---
 

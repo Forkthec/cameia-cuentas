@@ -58,6 +58,7 @@ public class RegisterUserService {
     private final FirebaseUserDirectory directorio;
     private final AccountRepository repositorio;
     private final AccountRecordingService accountRecorder;
+    private final OutboxRelayService relay;
     private final AgePolicy politicaDeEdad;
     private final PasswordPolicy politicaDeContrasenia;
     private final Clock clock;
@@ -68,13 +69,15 @@ public class RegisterUserService {
      * @param directorio directorio de usuarios donde viven las credenciales
      * @param repositorio repositorio de cuentas locales
      * @param accountRecorder guarda la cuenta nueva junto con su evento de cuenta creada en una transacción
+     * @param relay publica el evento guardado, una vez confirmada la transacción
      * @param politicaDeEdad reglas de fecha de nacimiento
      * @param politicaDeContrasenia reglas de contraseña
      */
     @Autowired
     public RegisterUserService(FirebaseUserDirectory directorio, AccountRepository repositorio,
-            AccountRecordingService accountRecorder, AgePolicy politicaDeEdad, PasswordPolicy politicaDeContrasenia) {
-        this(directorio, repositorio, accountRecorder, politicaDeEdad, politicaDeContrasenia, Clock.systemUTC());
+            AccountRecordingService accountRecorder, OutboxRelayService relay, AgePolicy politicaDeEdad,
+            PasswordPolicy politicaDeContrasenia) {
+        this(directorio, repositorio, accountRecorder, relay, politicaDeEdad, politicaDeContrasenia, Clock.systemUTC());
     }
 
     /**
@@ -83,16 +86,18 @@ public class RegisterUserService {
      * @param directorio directorio de usuarios donde viven las credenciales
      * @param repositorio repositorio de cuentas locales
      * @param accountRecorder guarda la cuenta nueva junto con su evento de cuenta creada en una transacción
+     * @param relay publica el evento guardado, una vez confirmada la transacción
      * @param politicaDeEdad reglas de fecha de nacimiento
      * @param politicaDeContrasenia reglas de contraseña
      * @param clock reloj con el que se mide la antigüedad de una credencial
      */
     public RegisterUserService(FirebaseUserDirectory directorio, AccountRepository repositorio,
-            AccountRecordingService accountRecorder, AgePolicy politicaDeEdad, PasswordPolicy politicaDeContrasenia,
-            Clock clock) {
+            AccountRecordingService accountRecorder, OutboxRelayService relay, AgePolicy politicaDeEdad,
+            PasswordPolicy politicaDeContrasenia, Clock clock) {
         this.directorio = directorio;
         this.repositorio = repositorio;
         this.accountRecorder = accountRecorder;
+        this.relay = relay;
         this.politicaDeEdad = politicaDeEdad;
         this.politicaDeContrasenia = politicaDeContrasenia;
         this.clock = clock;
@@ -179,7 +184,9 @@ public class RegisterUserService {
             borrarSiQuedoCreada(firebaseUid);
             throw sinRespuesta;
         }
-        return completarRegistro(firebaseUid, registro);
+        RegisterUserResult resultado = completarRegistro(firebaseUid, registro);
+        publishAfterCommit(resultado.eventId());
+        return resultado;
     }
 
     /**
@@ -208,13 +215,31 @@ public class RegisterUserService {
                     registro.pronoun());
             // La fila de la cuenta y el evento cuenta.creada se guardan en una sola transacción; un fallo aquí sigue
             // compensando la credencial.
-            Account guardada = accountRecorder.recordNewAccount(cuenta, registro.email(), registro.requestId()).account();
+            RecordedAccount guardada = accountRecorder.recordNewAccount(cuenta, registro.email(), registro.requestId());
 
             logger.info("Cuenta registrada para el usuario {}", firebaseUid);
-            return new RegisterUserResult(guardada, true);
+            return new RegisterUserResult(guardada.account(), true, guardada.eventId());
         } catch (RuntimeException error) {
             compensar(firebaseUid);
             throw error;
+        }
+    }
+
+    /**
+     * Intenta publicar el evento de la cuenta recién creada.
+     *
+     * <p>La cuenta y su evento ya están confirmados en la base. Un fallo aquí no debe cambiar la respuesta 201 ni compensar
+     * la credencial: el evento queda pendiente y la tarea de relevo lo publica después.</p>
+     *
+     * @param eventId identificador del evento guardado con la cuenta
+     */
+    private void publishAfterCommit(UUID eventId) {
+        try {
+            relay.relay(eventId);
+        } catch (RuntimeException failure) {
+            // Excepción documentada a la regla de no capturar: aquí la recuperación es la tarea de relevo y el fallo queda registrado
+            logger.warn("Falló la publicación inmediata; la tarea de relevo la reintentará [eventId={}, causa={}]",
+                    eventId, failure.getClass().getSimpleName());
         }
     }
 

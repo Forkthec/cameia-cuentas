@@ -40,6 +40,7 @@ import tech.cameia.cuentas.domain.policy.AgePolicy;
 import tech.cameia.cuentas.domain.policy.PasswordPolicy;
 import tech.cameia.cuentas.domain.port.AccountRepository;
 import tech.cameia.cuentas.infrastructure.client.InMemoryFirebaseUserDirectory;
+import tech.cameia.cuentas.infrastructure.messaging.InMemoryEventPublisher;
 import tech.cameia.cuentas.infrastructure.persistence.InMemoryOutboxRepository;
 
 /**
@@ -59,6 +60,7 @@ class RegisterUserServiceTest {
     private final InMemoryFirebaseUserDirectory directorio = new InMemoryFirebaseUserDirectory();
     private final RepositorioEnMemoria repositorio = new RepositorioEnMemoria();
     private final InMemoryOutboxRepository outbox = new InMemoryOutboxRepository();
+    private final InMemoryEventPublisher publisher = new InMemoryEventPublisher();
 
     private RegisterUserService servicio;
 
@@ -69,8 +71,13 @@ class RegisterUserServiceTest {
 
     private RegisterUserService servicioCon(InMemoryFirebaseUserDirectory directorioDePrueba) {
         Clock reloj = Clock.fixed(AHORA, ZoneOffset.UTC);
+        return servicioCon(directorioDePrueba, new OutboxRelayService(outbox, publisher, reloj));
+    }
+
+    private RegisterUserService servicioCon(InMemoryFirebaseUserDirectory directorioDePrueba, OutboxRelayService relay) {
+        Clock reloj = Clock.fixed(AHORA, ZoneOffset.UTC);
         return new RegisterUserService(directorioDePrueba, repositorio,
-                new AccountRecordingService(repositorio, outbox, reloj), new AgePolicy(),
+                new AccountRecordingService(repositorio, outbox, reloj), relay, new AgePolicy(),
                 new PasswordPolicy(Set.of("123456789012", "password1234", "qwertyuiop123")), reloj);
     }
 
@@ -124,6 +131,58 @@ class RegisterUserServiceTest {
         assertThatThrownBy(() -> servicio.register(comando())).isInstanceOf(DependencyUnavailableException.class);
 
         assertThat(outbox.appended()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Un registro nuevo publica el evento de inmediato cuando el broker confirma")
+    void register_shouldPublishEvent_whenBrokerConfirms() {
+        RegisterUserResult resultado = servicio.register(comando());
+
+        assertThat(publisher.published()).hasSize(1);
+        assertThat(publisher.published().get(0).id()).isEqualTo(resultado.eventId());
+        assertThat(outbox.pending()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Si el broker no confirma, la cuenta se crea igual y el evento queda pendiente con un intento")
+    void register_shouldStillCreateAccount_whenPublicationIsNotConfirmed() {
+        publisher.failNext(1);
+
+        RegisterUserResult resultado = servicio.register(comando());
+
+        assertThat(resultado.created()).isTrue();
+        assertThat(directorio.borrados()).isZero();
+        assertThat(outbox.pending()).hasSize(1);
+        assertThat(outbox.pending().get(0).attempts()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Si el relevo lanza una excepción, la cuenta se crea igual, sin compensar, y queda el aviso")
+    void register_shouldStillCreateAccount_whenRelayThrows(CapturedOutput salida) {
+        OutboxRelayService relayRoto = new OutboxRelayService(new InMemoryOutboxRepository() {
+            @Override
+            public java.util.Optional<tech.cameia.cuentas.domain.event.OutboundEvent> findPendingById(UUID id) {
+                throw new IllegalStateException("fallo simulado");
+            }
+        }, publisher);
+        RegisterUserService servicioConRelayRoto = servicioCon(directorio, relayRoto);
+
+        RegisterUserResult resultado = servicioConRelayRoto.register(comando());
+
+        assertThat(resultado.created()).isTrue();
+        assertThat(directorio.borrados()).isZero();
+        assertThat(salida.getOut()).contains("Falló la publicación inmediata");
+    }
+
+    @Test
+    @DisplayName("Repetir el registro de una cuenta pendiente no vuelve a publicar")
+    void register_shouldNotPublish_whenPendingAccountIsReturned() {
+        servicio.register(comando());
+
+        RegisterUserResult repetido = servicio.register(comando());
+
+        assertThat(repetido.eventId()).isNull();
+        assertThat(publisher.published()).hasSize(1);
     }
 
     @Test
