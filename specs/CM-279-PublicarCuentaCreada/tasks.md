@@ -346,6 +346,7 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
     microcuentas.cuenta WHERE firebase_uid = 'uid-rollback'` = 0.
 - **Clasificar** `application.service.AccountRecordingService#recordNewAccount` → `DEFENSIVE_INVARIANT`.
 - **Verificar:** `.\mvnw.cmd -q test -Dtest="AccountRecordingServiceTest,AccountRecordingTransactionTest,UntypedExceptionClassificationTest"`.
+- **Resultado (9-oct-2026):** hecha. Falló primero: `testCompile` con `AccountRecordingService cannot be resolved` (diagnóstico del compilador). Después: `AccountRecordingServiceTest` 3, `AccountRecordingTransactionTest` 2 (reversión real contra PostgreSQL y camino feliz), `UntypedExceptionClassificationTest` 1, `LayeredArchitectureTest` 3: 0 fallos. Nota de ejecución: los dobles `InMemoryAccountRepository` e `InMemoryOutboxRepository` quedan en `src/test/.../infrastructure/persistence/`; `RegisterUserServiceTest` conserva su repositorio privado (tiene fallo simulado propio).
 
 ### T-C1.5 · El registro usa `AccountRecordingService` y propaga `X-Request-Id`
 
