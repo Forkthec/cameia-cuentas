@@ -802,6 +802,8 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
   - En `AccountRepositoryAdapterTest`, `findUnannounced_shouldReturnAccount_whenItsEventRowWasDeleted` (SQL: cuenta con evento publicado;
     `DELETE` de esa fila de `evento_saliente` → la cuenta vuelve a salir).
   - `enqueueMissing_shouldReportMoreRemain_whenLimitReached` (doble que devuelve exactamente `MAX_ACCOUNTS`).
+- **Resultado (9-oct-2026):** hecha. Primero no compilaban las pruebas (`AccountCreatedBackfillService` y `BackfillSummary` no existían). Después `AccountCreatedBackfillServiceTest` 8 en verde (las siete de la tarjeta, incluida `findUnannounced_shouldReturnAccount_whenItsEventRowWasDeleted` en `UnannouncedAccountsQueryTest` de T-C3.1, más la del aviso único con diez ejemplos y la de «nada por registrar»), `LayeredArchitectureTest` y `UntypedExceptionClassificationTest` en verde.
+  - *Nota de ejecución:* el doble `InMemoryOutboxRepository` gana `deleteEventRowOf(uid)` (simula el `DELETE` del procedimiento de republicación) y `InMemoryFirebaseUserDirectory` gana `fallarDespuesDeConsultas(n)`. La carga completa del evento republicado la comprueba `OutboxRepositoryAdapterTest`; el doble guarda una carga mínima.
 
 ### T-C3.4 · Tarea `account-events-relay` (Cloud Run Job)
 
