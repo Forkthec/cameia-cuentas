@@ -48,11 +48,15 @@ public class Account {
      * @param phoneNumber celular, o {@code null} si no lo declaró
      * @param pronoun pronombres, o {@code null} si no los declaró
      * @return cuenta nueva en estado {@code PENDING_VERIFICATION}
-     * @throws IllegalArgumentException si falta el identificador de Firebase, los nombres
-     *                                  o los apellidos
+     * @throws IllegalArgumentException si falta el identificador de Firebase, los nombres,
+     *                                  los apellidos o la fecha de nacimiento
      */
     public static Account register(String firebaseUid, String firstName, String lastName,
             BirthDate birthDate, PhoneNumber phoneNumber, Pronoun pronoun) {
+        // El registro siempre exige la fecha: solo las cuentas antiguas pueden carecer de ella al reconstruirse.
+        if (birthDate == null) {
+            throw new IllegalArgumentException("La fecha de nacimiento es obligatoria al registrarse");
+        }
         return new Account(
                 UUID.randomUUID(),
                 exigirTexto(firebaseUid, "El identificador de Firebase es obligatorio"),
@@ -74,7 +78,7 @@ public class Account {
      * @param firebaseUid identificador del usuario en Firebase Auth
      * @param firstName nombres
      * @param lastName apellidos
-     * @param birthDate fecha de nacimiento
+     * @param birthDate fecha de nacimiento, o {@code null} si la cuenta es anterior a que el registro la exigiera
      * @param phoneNumber celular, o {@code null}
      * @param pronoun pronombres, o {@code null}
      * @param status estado almacenado
@@ -134,9 +138,9 @@ public class Account {
         return lastName;
     }
 
-    /** @return fecha de nacimiento declarada */
-    public BirthDate getBirthDate() {
-        return birthDate;
+    /** @return fecha de nacimiento declarada; vacía en las cuentas anteriores a que el registro la exigiera */
+    public Optional<BirthDate> getBirthDate() {
+        return Optional.ofNullable(birthDate);
     }
 
     /** @return celular declarado, vacío si no lo dio */

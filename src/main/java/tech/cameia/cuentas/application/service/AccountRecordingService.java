@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tech.cameia.cuentas.domain.event.AccountCreated;
 import tech.cameia.cuentas.domain.event.CorrelationId;
 import tech.cameia.cuentas.domain.model.Account;
+import tech.cameia.cuentas.domain.model.BirthDate;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.port.AccountRepository;
 import tech.cameia.cuentas.domain.port.OutboxRepository;
@@ -59,14 +60,18 @@ public class AccountRecordingService {
      * @param email correo normalizado de la credencial
      * @param requestId {@code X-Request-Id} tal como llegó, puede ser nulo
      * @return la cuenta guardada y el identificador de su evento
-     * @throws IllegalStateException si la tabla de salida ya tiene un evento de cuenta creada para esta cuenta (imposible
-     *         con una identidad recién generada; la transacción se deshace)
+     * @throws IllegalStateException si la cuenta guardada no trae fecha de nacimiento (el registro siempre la exige)
+     *         o si la tabla de salida ya tiene un evento de cuenta creada para esta cuenta (imposible con una
+     *         identidad recién generada; la transacción se deshace)
      */
     @Transactional
     public RecordedAccount recordNewAccount(Account account, EmailAddress email, String requestId) {
         Account saved = accounts.save(account);
         UUID eventId = UUID.randomUUID();
-        AccountCreated event = new AccountCreated(eventId, saved.getFirebaseUid(), email, saved.getBirthDate(),
+        // El registro siempre trae fecha de nacimiento; que falte sería un defecto del sistema, no una entrada del cliente.
+        BirthDate birthDate = saved.getBirthDate().orElseThrow(() -> new IllegalStateException(
+                "Una cuenta recién registrada siempre tiene fecha de nacimiento"));
+        AccountCreated event = new AccountCreated(eventId, saved.getFirebaseUid(), email, birthDate,
                 clock.instant(), CorrelationId.fromRequestIdOrElse(requestId, eventId));
         // Si la tabla de salida rechaza el evento, la excepción deshace también la fila de la cuenta guardada arriba.
         if (!outbox.appendAccountCreated(event)) {

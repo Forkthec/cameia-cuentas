@@ -41,9 +41,16 @@ class AccountTest {
         assertThat(cuenta.getFirstName()).isEqualTo("Ana");
         assertThat(cuenta.getLastName()).isEqualTo("Pérez");
         assertThat(cuenta.getFirebaseUid()).isEqualTo("uid-firebase");
-        assertThat(cuenta.getBirthDate()).isEqualTo(MAYOR_DE_EDAD);
+        assertThat(cuenta.getBirthDate()).contains(MAYOR_DE_EDAD);
         assertThat(cuenta.getPhoneNumber()).contains(new PhoneNumber("+573001234567"));
         assertThat(cuenta.getPronoun()).contains(Pronoun.SHE);
+    }
+
+    @Test
+    void register_shouldReject_whenBirthDateIsMissing() {
+        assertThatThrownBy(() -> Account.register("uid", "Ana", "Pérez", null, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("La fecha de nacimiento es obligatoria al registrarse");
     }
 
     @Test

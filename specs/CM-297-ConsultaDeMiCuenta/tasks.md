@@ -38,7 +38,7 @@ T-36.0 es el PR 0 (solo documentos, ≈ 455 líneas); T-36.1 a T-36.7, el PR 1.
   `[ERROR] Tests run: 1, Failures: 0, Errors: 1 … java.lang.IllegalArgumentException: La fecha de nacimiento es obligatoria`.
   La prueba definitiva de `AccountMapperTest` no se confirma en el PR 0 (rompería el build); se escribe en T-36.1.
 
-## [ ] T-36.1 · Fecha de nacimiento desconocida sin 500 — ≤ 25 min, ≈ 90 líneas
+## [x] T-36.1 · Fecha de nacimiento desconocida sin 500 — ≤ 25 min, ≈ 90 líneas
 
 - `git grep -n "getBirthDate()" -- src` y anotar los llamadores (en la base de la cadena: `AccountMapper.toEntity`, `AccountRecordingService` y
   pruebas).
@@ -60,8 +60,14 @@ T-36.0 es el PR 0 (solo documentos, ≈ 455 líneas); T-36.1 a T-36.7, el PR 1.
   llaman `getBirthDate()` (`.orElseThrow()` o `.get()`).
 - **Comandos:** `./mvnw.cmd -q -B "-Dtest=AccountMapperTest,ActivateAccountServiceTest,AccountRecordingServiceTest,UntypedExceptionClassificationTest" test`.
 - **Commit:** `CM-297 | fix(cuentas): una cuenta sin fecha de nacimiento se lee y se guarda sin error`.
+- **Resultado (10-oct-2026):** rojo: `IllegalArgumentException: La fecha de nacimiento es obligatoria` (T-36.0). Verde con
+  `clean test -Dtest=AccountMapperTest,AccountTest,ActivateAccountServiceTest,AccountRecordingServiceTest,AccountRepositoryAdapterTest,UntypedExceptionClassificationTest`:
+  30 pruebas, 0 fallos. `Account.register` rechaza la fecha nula (`register_shouldReject_whenBirthDateIsMissing`) y entra en la lista de
+  `UntypedExceptionClassificationTest` como invariante defensivo. Llamadores ajustados: `AccountMapper`, `AccountRecordingService`
+  (`orElseThrow`, ya clasificado), `AccountTest`, `AccountRepositoryAdapterTest`. Entorno: el IDE deja clases compiladas con nombres de lambda propios
+  en `target/` y `UntypedExceptionClassificationTest` falla con `StringIndexOutOfBounds`; se resuelve con `clean`.
 
-## [ ] T-36.2 · Caso de uso — ≤ 25 min, ≈ 120 líneas
+## [x] T-36.2 · Caso de uso — ≤ 25 min, ≈ 120 líneas
 
 - **Crear** `domain/exception/IdentityRequiredException.java`:
   ```java
@@ -115,8 +121,12 @@ T-36.0 es el PR 0 (solo documentos, ≈ 455 líneas); T-36.1 a T-36.7, el PR 1.
   repositorio); `find_shouldLookUp_whenIdentityHas128Characters`; `find_shouldNeverWrite_whenReading` (`verify(repository, never()).save(any())`).
 - **Comandos:** `./mvnw.cmd -q -B "-Dtest=GetCurrentAccountServiceTest,LayeredArchitectureTest" test`.
 - **Commit:** `CM-297 | feat(cuentas): caso de uso que lee la cuenta de quien llama`.
+- **Resultado (10-oct-2026):** rojo: `cannot find symbol` para `GetCurrentAccountService` e `IdentityRequiredException` (la compilación de la
+  prueba falla). Verde: `GetCurrentAccountServiceTest` 13 pruebas, `LayeredArchitectureTest` 3 y `UntypedExceptionClassificationTest` 1, 0 fallos.
+  Se agregó `find_shouldRejectIdentity_whenNull` (identidad nula, rama que la tarjeta no listaba) y el caso `"\n"` a la parametrizada; el límite
+  de 129 caracteres vive en `find_shouldLookUp_whenIdentityHas128Characters` (n y n+1 juntos).
 
-## [ ] T-36.3 · Controlador, DTO, manejador y OpenAPI — ≤ 30 min, ≈ 170 líneas
+## [x] T-36.3 · Controlador, DTO, manejador y OpenAPI — ≤ 30 min, ≈ 170 líneas
 
 - **Crear** `presentation/dto/CurrentAccountResponse.java`:
   `public record CurrentAccountResponse(UUID id, String firstName, String lastName, LocalDate birthDate, String phoneNumber, String pronoun, String status, String plan)`
@@ -150,8 +160,15 @@ T-36.0 es el PR 0 (solo documentos, ≈ 455 líneas); T-36.1 a T-36.7, el PR 1.
   - `getMe_shouldReturn404_whenAccountDoesNotExist`: 404, `$.code` `ACCOUNT_NOT_FOUND`.
 - **Comandos:** `./mvnw.cmd -q -B "-Dtest=CurrentAccountControllerTest,BusinessExceptionHandlerTest,LayeredArchitectureTest,UntypedExceptionClassificationTest" test`.
 - **Commit:** `CM-297 | feat(cuentas): GET /api/v1/users/me con los datos de la cuenta y su OpenAPI`.
+- **Resultado (10-oct-2026):** rojo: `CurrentAccountController cannot find symbol` (no compila). Verde: `CurrentAccountControllerTest` 7 pruebas,
+  `BusinessExceptionHandlerTest` 35, `LayeredArchitectureTest` 3, `UntypedExceptionClassificationTest` 1; 0 fallos.
+  **Desvío:** la aserción de `charset=UTF-8` del 200 no va en `CurrentAccountControllerTest`: `standaloneSetup` no ejecuta el filtro de codificación
+  de Spring Boot (`spring.servlet.encoding.force-response=true`) y el `Content-Type` sale `application/json`. Se afirma en
+  `CurrentAccountEndToEndTest` (T-36.4), como hace `AccountRegistrationEndToEndTest` con el 201. Regla: §6 (4) del protocolo, atributo ASVS 4.1.1.
+  Se quitó la aserción por `$.keys()` (función de JsonPath no estándar): el conjunto exacto lo fijan `hasSize(8)` y las ocho claves del primer test.
+  El ejemplo 406 de OpenAPI usa el texto real del manejador («Tipo de respuesta no admitido.»).
 
-## [ ] T-36.4 · Prueba de punta a punta — ≤ 30 min, ≈ 180 líneas
+## [x] T-36.4 · Prueba de punta a punta — ≤ 30 min, ≈ 180 líneas
 
 - **Crear** `CurrentAccountEndToEndTest.java` en la raíz de pruebas con la forma de `AccountRegistrationEndToEndTest` (`RANDOM_PORT`,
   `@AutoConfigureTestRestTemplate`, `@Testcontainers(disabledWithoutDocker = true)`, `JdbcTemplate`). Datos: registrar con `POST /api/v1/users`
@@ -169,14 +186,21 @@ T-36.0 es el PR 0 (solo documentos, ≈ 455 líneas); T-36.1 a T-36.7, el PR 1.
   - `getMe_shouldReturn400_whenIdentityIsTooLong`: 129 caracteres → 400 `IDENTITY_REQUIRED`.
 - **Comandos:** `./mvnw.cmd -q -B "-Dtest=CurrentAccountEndToEndTest" test` (Docker encendido).
 - **Commit:** `CM-297 | test(cuentas): consulta de mi cuenta de punta a punta con PostgreSQL real`.
+- **Resultado (10-oct-2026):** `CurrentAccountEndToEndTest`: 9 pruebas, 0 fallos (16,4 s, PostgreSQL 16 real). Verde al primer intento porque el endpoint
+  ya existía desde T-36.3; el caso de la cuenta sin fecha habría fallado antes de T-36.1 (500 por `IllegalArgumentException`, reproducido en T-36.0).
+  Se agregó `getMe_shouldReturn400_whenIdentityHeaderIsMissing` (400 con `Content-Type` problem+json y charset) a los siete de la tarjeta, y la
+  prueba de registro afirma el `charset=UTF-8` del 200 que el test del controlador no puede ver. Las filas anteriores al registro con fecha se
+  insertan con `JdbcTemplate`; los pronombres de esas filas son `THEY` porque `ck_cuenta_pronombres_valor` (V3) exige valor salvo en `ANONYMIZED`.
 
-## [ ] T-36.5 · Catálogo de errores — ≤ 10 min
+## [x] T-36.5 · Catálogo de errores — ≤ 10 min
 
 `docs/errores.md`: fila de `ACCOUNT_NOT_FOUND` → endpoints «activación, `GET /api/v1/users/me`» y origen «`AccountNotFoundException` (sin cuenta, o
 cuenta anonimizada en la consulta)», pruebas `+ GetCurrentAccountServiceTest, CurrentAccountControllerTest`; fila de `IDENTITY_REQUIRED` → endpoints
 «activación, `GET /api/v1/users/me`», origen «Falta `X-User-Id` (`ServletRequestBindingException`) o llega en blanco o con más de 128 caracteres
 (`IdentityRequiredException`)», pruebas `+ CurrentAccountControllerTest`. `./mvnw.cmd -q -B "-Dtest=ErrorCodeDocumentationTest" test`.
 Commit: `CM-297 | docs(cuentas): catálogo de errores con la consulta de mi cuenta`.
+**Resultado (10-oct-2026):** `ErrorCodeDocumentationTest` 34 pruebas, 0 fallos. Las filas de `ACCOUNT_NOT_FOUND` e `IDENTITY_REQUIRED` suman el endpoint, el origen y las
+pruebas (`GetCurrentAccountServiceTest`, `CurrentAccountControllerTest`, `CurrentAccountEndToEndTest`).
 
 ## [ ] T-36.6 · Postman — ≤ 25 min, ≈ 260 líneas
 

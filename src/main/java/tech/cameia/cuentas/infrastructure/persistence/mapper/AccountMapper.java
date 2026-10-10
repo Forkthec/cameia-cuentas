@@ -28,7 +28,7 @@ public class AccountMapper {
                 account.getFirebaseUid(),
                 account.getFirstName(),
                 account.getLastName(),
-                account.getBirthDate().value(),
+                account.getBirthDate().map(BirthDate::value).orElse(null),
                 account.getPhoneNumber().map(PhoneNumber::value).orElse(null),
                 account.getPronoun().orElse(null),
                 account.getStatus());
@@ -46,7 +46,7 @@ public class AccountMapper {
                 entity.getFirebaseUid(),
                 entity.getNombre(),
                 entity.getApellido(),
-                new BirthDate(entity.getFechaNacimiento()),
+                entity.getFechaNacimiento() == null ? null : new BirthDate(entity.getFechaNacimiento()),
                 entity.getTelefono() == null ? null : new PhoneNumber(entity.getTelefono()),
                 entity.getPronombres(),
                 entity.getEstado());
