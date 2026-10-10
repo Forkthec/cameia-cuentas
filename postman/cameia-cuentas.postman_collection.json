@@ -1298,6 +1298,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Cache-Control no-store', () => pm.expect(pm.response.headers.get('Cache-Control')).to.eql('no-store'));",
                   "const cuerpo = pm.response.json();",
                   "pm.test('Exactamente los ocho campos de la historia', () =>",
                   "    pm.expect(Object.keys(cuerpo).sort()).to.eql([\"birthDate\",\"firstName\",\"id\",\"lastName\",\"phoneNumber\",\"plan\",\"pronoun\",\"status\"]));",

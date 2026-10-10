@@ -49,7 +49,7 @@ Carpeta `Mi cuenta` (`GET /api/v1/users/me`): registra dos cuentas sintéticas y
 |---|---|---|
 | M-00 | Registro de la cuenta que se consultará | 201; guarda `meUid` |
 | M-00b | Registro de una segunda cuenta | 201; guarda `uidOtra` e `idOtra` |
-| M-01 | `GET /api/v1/users/me` con `X-User-Id: {{meUid}}` | 200 con exactamente `id`, `firstName`, `lastName`, `birthDate` (`1995-04-12`), `phoneNumber`, `pronoun`, `status` (`PENDING_VERIFICATION`) y `plan` (`FREE`); sin correo ni identificadores internos |
+| M-01 | `GET /api/v1/users/me` con `X-User-Id: {{meUid}}` | 200 con exactamente `id`, `firstName`, `lastName`, `birthDate` (`1995-04-12`), `phoneNumber`, `pronoun`, `status` (`PENDING_VERIFICATION`) y `plan` (`FREE`); sin correo ni identificadores internos; encabezado `Cache-Control: no-store` |
 | M-02 | La misma consulta | 200 con `phoneNumber` presente y `null` (la cuenta se registró sin celular) |
 | M-03 | Consulta con `?firebase_uid={{uidOtra}}&id={{idOtra}}&uid={{uidOtra}}` | 200 con el `id` propio y nunca el de la otra cuenta |
 | M-04 | `X-User-Id` de una cuenta que no existe | 404 `ACCOUNT_NOT_FOUND` con «No encontramos una cuenta para este usuario» |
