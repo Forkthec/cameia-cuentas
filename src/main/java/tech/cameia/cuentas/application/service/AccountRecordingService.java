@@ -60,8 +60,9 @@ public class AccountRecordingService {
      * @param email correo normalizado de la credencial
      * @param requestId {@code X-Request-Id} tal como llegó, puede ser nulo
      * @return la cuenta guardada y el identificador de su evento
-     * @throws IllegalStateException si la cuenta guardada no trae fecha de nacimiento (el registro siempre la exige) o si la tabla de salida ya tiene un evento de cuenta creada para esta cuenta (imposible
-     *         con una identidad recién generada; la transacción se deshace)
+     * @throws IllegalStateException si la cuenta guardada no trae fecha de nacimiento (el registro siempre la exige)
+     *         o si la tabla de salida ya tiene un evento de cuenta creada para esta cuenta (imposible con una
+     *         identidad recién generada; la transacción se deshace)
      */
     @Transactional
     public RecordedAccount recordNewAccount(Account account, EmailAddress email, String requestId) {

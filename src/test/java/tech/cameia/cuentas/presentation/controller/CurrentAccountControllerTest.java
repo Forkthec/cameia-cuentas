@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -68,6 +69,16 @@ class CurrentAccountControllerTest {
                 .andExpect(jsonPath("$.pronoun").value("SHE"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.plan").value("FREE"));
+    }
+
+    @Test
+    @DisplayName("La respuesta con datos personales no se guarda en cachés")
+    void getMe_shouldSendNoStore_whenAccountExists() throws Exception {
+        when(service.find(UID)).thenReturn(fullAccount());
+
+        mockMvc.perform(get(ROUTE).header("X-User-Id", UID))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"));
     }
 
     @Test

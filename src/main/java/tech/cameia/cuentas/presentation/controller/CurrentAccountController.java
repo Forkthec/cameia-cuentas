@@ -3,6 +3,7 @@ package tech.cameia.cuentas.presentation.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -10,6 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
+import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -77,6 +79,8 @@ class CurrentAccountController {
                     + "y plan; nunca el correo ni la contraseña. Los campos sin valor van presentes con null.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Datos de la cuenta de quien llama",
+                headers = @Header(name = "Cache-Control", description = "Siempre no-store: la respuesta lleva datos "
+                        + "personales y no debe guardarse en cachés", schema = @Schema(type = "string", example = "no-store")),
                 content = @Content(mediaType = "application/json",
                         schema = @Schema(implementation = CurrentAccountResponse.class),
                         examples = @ExampleObject(name = "miCuenta", value = EJEMPLO_200))),
@@ -101,6 +105,8 @@ class CurrentAccountController {
     ResponseEntity<CurrentAccountResponse> me(
             @Parameter(name = "X-User-Id", in = ParameterIn.HEADER, hidden = true)
             @RequestHeader("X-User-Id") String firebaseUid) {
-        return ResponseEntity.ok(CurrentAccountResponse.from(service.find(firebaseUid)));
+        // Nombre, fecha de nacimiento y celular: ningún navegador ni proxy compartido debe conservar la respuesta.
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(CurrentAccountResponse.from(service.find(firebaseUid)));
     }
 }

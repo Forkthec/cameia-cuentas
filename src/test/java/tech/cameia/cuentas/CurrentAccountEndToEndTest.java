@@ -80,6 +80,7 @@ class CurrentAccountEndToEndTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getHeaders().getContentType().toString()).containsIgnoringCase("charset=UTF-8");
+        assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
         JsonNode body = mapper.readTree(response.getBody());
         assertThat(body.get("firstName").asString()).isEqualTo("María José");
         assertThat(body.get("lastName").asString()).isEqualTo("Gómez-Ruiz");
