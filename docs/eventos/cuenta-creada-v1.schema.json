@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:cameia:eventos:cuenta-creada:v1",
+  "title": "cuenta.creada versión 1",
+  "description": "Cuerpo del evento que publica cameia-cuentas en el exchange cuentas.events con la clave cuenta.creada.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["usuarioId", "email", "fechaNacimiento", "creadaEn"],
+  "properties": {
+    "usuarioId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9]+$" },
+    "email": { "type": "string", "format": "idn-email", "maxLength": 254 },
+    "fechaNacimiento": { "type": "string", "format": "date", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "creadaEn": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$" }
+  },
+  "examples": [
+    {
+      "usuarioId": "6f1d2c3b4a5e4f60718293a4b5c6d7e8",
+      "email": "ana.perez@ejemplo.test",
+      "fechaNacimiento": "2008-03-15",
+      "creadaEn": "2026-10-09T15:04:05.123Z"
+    }
+  ]
+}
