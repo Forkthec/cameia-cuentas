@@ -175,6 +175,7 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
   `CorrelationId.MAX_LENGTH`. Clasifica en `UntypedExceptionClassificationTest`: `domain.event.CorrelationId#<init>`,
   `domain.event.AccountCreated#<init>`, `domain.event.OutboundEvent#<init>` → `DEFENSIVE_INVARIANT`.
 - **Verificar:** `.\mvnw.cmd -q test -Dtest="CorrelationIdTest,AccountCreatedTest,LayeredArchitectureTest,UntypedExceptionClassificationTest"`.
+- **Resultado (9-oct-2026):** hecha. Falló primero: `testCompile` con `cannot find symbol: class CorrelationId` (y `AccountCreated`). Después: `CorrelationIdTest` 19, `AccountCreatedTest` 8, `OutboundEventTest` 7 (agregada para cubrir el constructor), `LayeredArchitectureTest` 3, `UntypedExceptionClassificationTest` 1 y `EventoSalienteSchemaMigrationTest` 15 (ahora compara `id_correlacion` con `CorrelationId.MAX_LENGTH`): 0 fallos, 0 errores. Se agregó `package-info.java` de `domain.event` (R8).
 
 ### T-C1.3 · Puerto `OutboxRepository`, entidad, repositorio y adaptador; carga JSON y su esquema
 
