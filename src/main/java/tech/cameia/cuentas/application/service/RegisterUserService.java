@@ -31,7 +31,8 @@ import tech.cameia.cuentas.domain.port.FirebaseUserDirectory;
  *
  * <p>Orquesta tres sistemas en este orden: valida con las políticas del dominio, consulta si el
  * correo ya tiene credencial, y si no la tiene crea la credencial en Firebase con su plan y guarda
- * la cuenta local. Validar primero evita crear credenciales que luego habría que borrar.</p>
+ * la cuenta local junto con su evento {@code cuenta.creada} en una sola transacción. Validar primero
+ * evita crear credenciales que luego habría que borrar.</p>
  *
  * <p>Repetir el registro de un correo cuya cuenta sigue pendiente de verificar es idempotente:
  * devuelve la misma cuenta sin escribir nada. Así, quien perdió la respuesta (red lenta, pestaña
@@ -56,6 +57,7 @@ public class RegisterUserService {
 
     private final FirebaseUserDirectory directorio;
     private final AccountRepository repositorio;
+    private final AccountRecordingService accountRecorder;
     private final AgePolicy politicaDeEdad;
     private final PasswordPolicy politicaDeContrasenia;
     private final Clock clock;
@@ -65,13 +67,14 @@ public class RegisterUserService {
      *
      * @param directorio directorio de usuarios donde viven las credenciales
      * @param repositorio repositorio de cuentas locales
+     * @param accountRecorder guarda la cuenta nueva junto con su evento de cuenta creada en una transacción
      * @param politicaDeEdad reglas de fecha de nacimiento
      * @param politicaDeContrasenia reglas de contraseña
      */
     @Autowired
     public RegisterUserService(FirebaseUserDirectory directorio, AccountRepository repositorio,
-            AgePolicy politicaDeEdad, PasswordPolicy politicaDeContrasenia) {
-        this(directorio, repositorio, politicaDeEdad, politicaDeContrasenia, Clock.systemUTC());
+            AccountRecordingService accountRecorder, AgePolicy politicaDeEdad, PasswordPolicy politicaDeContrasenia) {
+        this(directorio, repositorio, accountRecorder, politicaDeEdad, politicaDeContrasenia, Clock.systemUTC());
     }
 
     /**
@@ -79,14 +82,17 @@ public class RegisterUserService {
      *
      * @param directorio directorio de usuarios donde viven las credenciales
      * @param repositorio repositorio de cuentas locales
+     * @param accountRecorder guarda la cuenta nueva junto con su evento de cuenta creada en una transacción
      * @param politicaDeEdad reglas de fecha de nacimiento
      * @param politicaDeContrasenia reglas de contraseña
      * @param clock reloj con el que se mide la antigüedad de una credencial
      */
     public RegisterUserService(FirebaseUserDirectory directorio, AccountRepository repositorio,
-            AgePolicy politicaDeEdad, PasswordPolicy politicaDeContrasenia, Clock clock) {
+            AccountRecordingService accountRecorder, AgePolicy politicaDeEdad, PasswordPolicy politicaDeContrasenia,
+            Clock clock) {
         this.directorio = directorio;
         this.repositorio = repositorio;
+        this.accountRecorder = accountRecorder;
         this.politicaDeEdad = politicaDeEdad;
         this.politicaDeContrasenia = politicaDeContrasenia;
         this.clock = clock;
@@ -125,7 +131,7 @@ public class RegisterUserService {
 
     /** Datos del formulario ya validados; agrupa los valores para no pasar más de tres parámetros. */
     private record ValidRegistration(EmailAddress email, RawPassword password, BirthDate birthDate,
-            PhoneNumber phoneNumber, PersonName firstName, PersonName lastName, Pronoun pronoun) { }
+            PhoneNumber phoneNumber, PersonName firstName, PersonName lastName, Pronoun pronoun, String requestId) { }
 
     /** Aplica las reglas del dominio a los datos del formulario antes de tocar ningún sistema externo. */
     private ValidRegistration validar(RegisterUserCommand command) {
@@ -141,7 +147,7 @@ public class RegisterUserService {
         politicaDeEdad.verify(birthDate);
         politicaDeContrasenia.verify(password);
         return new ValidRegistration(email, password, birthDate, phoneNumber, firstName, lastName,
-                command.pronoun());
+                command.pronoun(), command.requestId());
     }
 
     /**
@@ -200,7 +206,9 @@ public class RegisterUserService {
             Account cuenta = Account.register(firebaseUid, registro.firstName().value(),
                     registro.lastName().value(), registro.birthDate(), registro.phoneNumber(),
                     registro.pronoun());
-            Account guardada = repositorio.save(cuenta);
+            // La fila de la cuenta y el evento cuenta.creada se guardan en una sola transacción; un fallo aquí sigue
+            // compensando la credencial.
+            Account guardada = accountRecorder.recordNewAccount(cuenta, registro.email(), registro.requestId()).account();
 
             logger.info("Cuenta registrada para el usuario {}", firebaseUid);
             return new RegisterUserResult(guardada, true);

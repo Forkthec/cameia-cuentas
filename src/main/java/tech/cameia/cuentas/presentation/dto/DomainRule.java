@@ -87,7 +87,7 @@ public @interface DomainRule {
 
         /**
          * Celular válido para el país de su indicativo, en E.164. Se recorta como lo hace
-         * {@link RegisterUserRequest#toCommand()}: lo que queda vacío es «sin celular».
+         * {@link RegisterUserRequest#toCommand(String)}: lo que queda vacío es «sin celular».
          */
         PHONE_NUMBER(text -> {
             String phoneNumber = SingleLineText.normalize(text);

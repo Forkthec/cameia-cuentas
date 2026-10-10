@@ -105,13 +105,14 @@ public record RegisterUserRequest(
      * <p>Usa el mismo formato con el que se validó la fecha, así que validar y convertir no
      * pueden separarse.</p>
      *
+     * @param requestId {@code X-Request-Id} de la petición, puede ser {@code null}
      * @return el comando con la fecha y el pronombre ya interpretados
      * @throws java.util.NoSuchElementException si se llama sin haber validado el formato de
      *                                          la fecha
      * @throws tech.cameia.cuentas.domain.exception.InvalidPronounException si se llama sin haber
      *                                          validado el pronombre
      */
-    public RegisterUserCommand toCommand() {
+    public RegisterUserCommand toCommand(String requestId) {
         LocalDate parsedBirthDate = BirthDateFormatValidator.parse(birthDate).orElseThrow();
         // Un celular vacío o en blanco es «sin celular»: el formulario envía el campo aunque la
         // persona no lo llene.
@@ -119,6 +120,6 @@ public record RegisterUserRequest(
         String declaredPhoneNumber =
                 trimmedPhoneNumber == null || trimmedPhoneNumber.isEmpty() ? null : trimmedPhoneNumber;
         return new RegisterUserCommand(firstName, lastName, parsedBirthDate, email, password, declaredPhoneNumber,
-                Pronoun.of(pronoun));
+                Pronoun.of(pronoun), requestId);
     }
 }

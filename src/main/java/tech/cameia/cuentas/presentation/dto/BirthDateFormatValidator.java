@@ -22,7 +22,7 @@ import jakarta.validation.ConstraintValidatorContext;
 public class BirthDateFormatValidator implements ConstraintValidator<BirthDateFormat, String> {
 
     /**
-     * Formato del contrato, el mismo con el que {@link RegisterUserRequest#toCommand()}
+     * Formato del contrato, el mismo con el que {@link RegisterUserRequest#toCommand(String)}
      * convierte el texto: un solo formato para validar y para convertir.
      *
      * <p>Cada parte tiene un ancho fijo y sin signo: dos dígitos de día, dos de mes y cuatro de
