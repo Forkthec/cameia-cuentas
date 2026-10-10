@@ -1,6 +1,8 @@
 package tech.cameia.cuentas.application.service;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,6 +28,8 @@ public class OutboxRelayService {
     static final int BATCH_SIZE = 100;
     static final int MAX_BATCHES = 50;
     static final int ALERT_ATTEMPTS = 10;
+    /** Tiempo máximo de una corrida: debe terminar y registrar su resumen antes del plazo de 10 minutos del Cloud Run Job. */
+    static final Duration RUN_BUDGET = Duration.ofMinutes(4);
 
     private static final Logger logger = LoggerFactory.getLogger(OutboxRelayService.class);
 
@@ -75,11 +79,15 @@ public class OutboxRelayService {
      * el lote siguiente, con lo que un mismo evento sumaría muchos intentos en una sola corrida y dispararía la alerta sin
      * motivo. La tarea de relevo vuelve a intentarlo en su próxima ejecución.</p>
      *
+     * <p>Corta la corrida al pasar {@link #RUN_BUDGET} para terminar y registrar el resumen antes del plazo del Job; lo que
+     * quede sin publicar se reintenta en la ejecución siguiente.</p>
+     *
      * @return cuántos se publicaron, cuántos intentos fallaron y cuántos siguen pendientes
      */
     public RelaySummary relayPending() {
         int published = 0;
         int failed = 0;
+        Instant deadline = clock.instant().plus(RUN_BUDGET);
         for (int batch = 0; batch < MAX_BATCHES; batch++) {
             List<OutboundEvent> events = outbox.findPending(BATCH_SIZE);
             if (events.isEmpty()) {
@@ -87,6 +95,9 @@ public class OutboxRelayService {
             }
             int failedInBatch = 0;
             for (OutboundEvent event : events) {
+                if (!clock.instant().isBefore(deadline)) {
+                    return new RelaySummary(published, failed + failedInBatch, outbox.countPending());
+                }
                 if (publishOne(event)) {
                     published++;
                 } else {

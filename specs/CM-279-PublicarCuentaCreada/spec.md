@@ -456,6 +456,7 @@ Preguntas abiertas: ninguna.
 | Cuentas omitidas de forma permanente (usuario ausente en Firebase) se vuelven a consultar en cada ejecución; si pasaran de 5000 ocuparían todo el lote y las más nuevas no se procesarían | Aceptado para el MVP (unos 60 usuarios). `omitidos` y `faltanPorRegistrar` salen en el resumen `INFO`; si crecen, se agrega un cursor por `fecha_creacion` |
 | Evento publicado dos veces (relevos simultáneos) | Contrato de al menos una vez; Perfil lo descarta por el Inbox |
 | Registro que espera hasta 1 s si el broker está caído | Medido y acotado (DES-02); el 201 no cambia |
+| Evento pendiente de una cuenta que luego se anonimice: la fila conserva el correo y la fecha de nacimiento y el relevo los publicaría igual (hoy ninguna ruta anonimiza) | Aceptado con destino: anonimizar una cuenta debe, en la misma transacción, poner en nulo `evento_saliente.carga` de sus eventos pendientes y marcarlos como publicados sin enviarlos. Destino: la tarea de anonimización de cuentas (aún sin spec); el relevo actual no consulta el estado de la cuenta |
 
 ## 19. Integración con las otras CM de Cuentas
 

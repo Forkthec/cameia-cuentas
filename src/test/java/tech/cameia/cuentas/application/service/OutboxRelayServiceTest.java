@@ -3,8 +3,11 @@ package tech.cameia.cuentas.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +18,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import tech.cameia.cuentas.domain.event.OutboundEvent;
+import tech.cameia.cuentas.domain.port.EventPublisher;
 import tech.cameia.cuentas.infrastructure.messaging.InMemoryEventPublisher;
 import tech.cameia.cuentas.infrastructure.persistence.InMemoryOutboxRepository;
 
@@ -169,6 +173,44 @@ class OutboxRelayServiceTest {
         assertThat(summary.published()).isEqualTo(1);
         assertThat(summary.failed()).isEqualTo(1);
         assertThat(summary.stillPending()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("corta la corrida al pasar el tiempo máximo y deja el resto pendiente con su resumen")
+    void relayPending_shouldStopWithinBudget_whenPublishingIsSlow() {
+        AtomicReference<Instant> now = new AtomicReference<>(NOW);
+        Clock movingClock = new Clock() {
+            @Override
+            public ZoneOffset getZone() {
+                return ZoneOffset.UTC;
+            }
+
+            @Override
+            public Clock withZone(java.time.ZoneId zone) {
+                return this;
+            }
+
+            @Override
+            public Instant instant() {
+                return now.get();
+            }
+        };
+        AtomicInteger calls = new AtomicInteger();
+        // Cada intento tarda 2 minutos y el broker no confirma: con un tope de 4 minutos solo caben dos intentos
+        EventPublisher slowPublisher = event -> {
+            calls.incrementAndGet();
+            now.updateAndGet(instant -> instant.plus(Duration.ofMinutes(2)));
+            return false;
+        };
+        OutboxRelayService slowRelay = new OutboxRelayService(outbox, slowPublisher, movingClock);
+        for (int i = 1; i <= 5; i++) {
+            outbox.seed(event(i, 0));
+        }
+
+        RelaySummary summary = slowRelay.relayPending();
+
+        assertThat(calls.get()).isEqualTo(2);
+        assertThat(summary).isEqualTo(new RelaySummary(0, 2, 5));
     }
 
     private static Instant at(int second) {

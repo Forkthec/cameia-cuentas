@@ -53,6 +53,11 @@ suma más de 1 s por la publicación). El estándar del Backend exige Outbox par
 - **Réplica con retraso posible.** Si el broker falla, Perfil recibe el evento en la siguiente ejecución del Job (hasta 5 minutos).
 - **Dos entregas posibles.** Si dos relevos coinciden, el mismo evento puede publicarse dos veces; no se retiene un bloqueo de fila
   durante las llamadas de red.
+- **Anonimización pendiente.** Un evento pendiente guarda el correo y la fecha de nacimiento de su cuenta. Anonimizar una cuenta debe,
+  en la misma transacción, poner en nulo `evento_saliente.carga` de sus eventos pendientes y marcarlos como publicados sin
+  enviarlos; es trabajo de la tarea de anonimización de cuentas, porque el relevo actual no consulta el estado de la cuenta.
+- **Tiempo máximo del relevo.** Una corrida se corta a los 4 minutos para terminar y registrar su resumen antes del plazo de 10
+  minutos del Cloud Run Job; lo que quede se reintenta en la ejecución siguiente.
 - **Eventos nuevos.** Un tipo de evento nuevo agrega su valor a `ck_evento_saliente_tipo` con una migración nueva.
 - **Un Job con perfil propio.** El proceso sale con el código del contexto de Spring cuando el perfil de tarea está activo; los
   hilos de RabbitMQ mantendrían viva la JVM.
