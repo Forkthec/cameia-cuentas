@@ -67,7 +67,7 @@ T-36.0 es el PR 0 (solo documentos, ≈ 455 líneas); T-36.1 a T-36.7, el PR 1.
   (`orElseThrow`, ya clasificado), `AccountTest`, `AccountRepositoryAdapterTest`. Entorno: el IDE deja clases compiladas con nombres de lambda propios
   en `target/` y `UntypedExceptionClassificationTest` falla con `StringIndexOutOfBounds`; se resuelve con `clean`.
 
-## [ ] T-36.2 · Caso de uso — ≤ 25 min, ≈ 120 líneas
+## [x] T-36.2 · Caso de uso — ≤ 25 min, ≈ 120 líneas
 
 - **Crear** `domain/exception/IdentityRequiredException.java`:
   ```java
@@ -121,6 +121,10 @@ T-36.0 es el PR 0 (solo documentos, ≈ 455 líneas); T-36.1 a T-36.7, el PR 1.
   repositorio); `find_shouldLookUp_whenIdentityHas128Characters`; `find_shouldNeverWrite_whenReading` (`verify(repository, never()).save(any())`).
 - **Comandos:** `./mvnw.cmd -q -B "-Dtest=GetCurrentAccountServiceTest,LayeredArchitectureTest" test`.
 - **Commit:** `CM-297 | feat(cuentas): caso de uso que lee la cuenta de quien llama`.
+- **Resultado (10-oct-2026):** rojo: `cannot find symbol` para `GetCurrentAccountService` e `IdentityRequiredException` (la compilación de la
+  prueba falla). Verde: `GetCurrentAccountServiceTest` 13 pruebas, `LayeredArchitectureTest` 3 y `UntypedExceptionClassificationTest` 1, 0 fallos.
+  Se agregó `find_shouldRejectIdentity_whenNull` (identidad nula, rama que la tarjeta no listaba) y el caso `"\n"` a la parametrizada; el límite
+  de 129 caracteres vive en `find_shouldLookUp_whenIdentityHas128Characters` (n y n+1 juntos).
 
 ## [ ] T-36.3 · Controlador, DTO, manejador y OpenAPI — ≤ 30 min, ≈ 170 líneas
 
