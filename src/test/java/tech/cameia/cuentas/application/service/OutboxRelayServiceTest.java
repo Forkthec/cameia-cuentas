@@ -136,6 +136,19 @@ class OutboxRelayServiceTest {
     }
 
     @Test
+    @DisplayName("se detiene en el tope de lotes y deja el resto pendiente")
+    void relayPending_shouldStopAtMaxBatches_whenMoreThanLimitArePending() {
+        int total = OutboxRelayService.BATCH_SIZE * OutboxRelayService.MAX_BATCHES + 100;
+        for (int i = 1; i <= total; i++) {
+            outbox.seed(event(i, 0));
+        }
+
+        RelaySummary summary = relay.relayPending();
+
+        assertThat(summary).isEqualTo(new RelaySummary(5000, 0, 100));
+    }
+
+    @Test
     @DisplayName("devuelve ceros cuando no hay pendientes")
     void relayPending_shouldReturnZeros_whenNothingIsPending() {
         RelaySummary summary = relay.relayPending();
