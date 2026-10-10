@@ -192,13 +192,15 @@ T-36.0 es el PR 0 (solo documentos, ≈ 455 líneas); T-36.1 a T-36.7, el PR 1.
   prueba de registro afirma el `charset=UTF-8` del 200 que el test del controlador no puede ver. Las filas anteriores al registro con fecha se
   insertan con `JdbcTemplate`; los pronombres de esas filas son `THEY` porque `ck_cuenta_pronombres_valor` (V3) exige valor salvo en `ANONYMIZED`.
 
-## [ ] T-36.5 · Catálogo de errores — ≤ 10 min
+## [x] T-36.5 · Catálogo de errores — ≤ 10 min
 
 `docs/errores.md`: fila de `ACCOUNT_NOT_FOUND` → endpoints «activación, `GET /api/v1/users/me`» y origen «`AccountNotFoundException` (sin cuenta, o
 cuenta anonimizada en la consulta)», pruebas `+ GetCurrentAccountServiceTest, CurrentAccountControllerTest`; fila de `IDENTITY_REQUIRED` → endpoints
 «activación, `GET /api/v1/users/me`», origen «Falta `X-User-Id` (`ServletRequestBindingException`) o llega en blanco o con más de 128 caracteres
 (`IdentityRequiredException`)», pruebas `+ CurrentAccountControllerTest`. `./mvnw.cmd -q -B "-Dtest=ErrorCodeDocumentationTest" test`.
 Commit: `CM-297 | docs(cuentas): catálogo de errores con la consulta de mi cuenta`.
+**Resultado (10-oct-2026):** `ErrorCodeDocumentationTest` 34 pruebas, 0 fallos. Las filas de `ACCOUNT_NOT_FOUND` e `IDENTITY_REQUIRED` suman el endpoint, el origen y las
+pruebas (`GetCurrentAccountServiceTest`, `CurrentAccountControllerTest`, `CurrentAccountEndToEndTest`).
 
 ## [ ] T-36.6 · Postman — ≤ 25 min, ≈ 260 líneas
 
