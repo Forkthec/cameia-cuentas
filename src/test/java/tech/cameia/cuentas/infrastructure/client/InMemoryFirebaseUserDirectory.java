@@ -46,6 +46,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     private volatile boolean indisponibleAlEscribirElPlan;
     private volatile boolean fallarAlBorrar;
     private volatile boolean fallarAlConsultar;
+    private volatile int consultasDeCorreoRestantes = -1;
     private volatile boolean reintentoDelSdk;
     private volatile boolean respuestaPerdida;
 
@@ -89,6 +90,12 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     @Override
     public synchronized Optional<EmailAddress> findEmail(String firebaseUid) {
         consultas.incrementAndGet();
+        if (consultasDeCorreoRestantes == 0) {
+            throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
+        }
+        if (consultasDeCorreoRestantes > 0) {
+            consultasDeCorreoRestantes--;
+        }
         if (fallarAlConsultar) {
             throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
         }
@@ -232,6 +239,16 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         return borrados.get();
     }
 
+    /**
+     * Hace que {@code findEmail} falle como si Firebase no estuviera disponible después de {@code consultasExitosas}
+     * consultas de correo por identificador.
+     *
+     * @param consultasExitosas cuántas consultas se atienden antes de empezar a fallar
+     */
+    public void failAfterLookups(int consultasExitosas) {
+        this.consultasDeCorreoRestantes = consultasExitosas;
+    }
+
     /** Hace que la consulta por correo falle como si Firebase no estuviera disponible. */
     public void fallarAlConsultar() {
         this.fallarAlConsultar = true;
@@ -268,6 +285,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         this.indisponibleAlEscribirElPlan = false;
         this.fallarAlBorrar = false;
         this.fallarAlConsultar = false;
+        this.consultasDeCorreoRestantes = -1;
         this.reintentoDelSdk = false;
         this.respuestaPerdida = false;
     }
