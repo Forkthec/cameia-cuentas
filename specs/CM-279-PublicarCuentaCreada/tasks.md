@@ -451,6 +451,7 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
   no dejar credenciales por defecto, igual que `DB_PASSWORD`; no es la corrección de un fallo. Las pruebas con Testcontainers sí usan
   `guest` (regla 4).
 - **Verificar:** `docker compose config` sin errores; `.\mvnw.cmd test` en verde (con `EVENTS_ENABLED=false` ningún contexto se conecta).
+- **Resultado (9-oct-2026):** hecha. Es solo configuración (no hay prueba que falle primero): `docker compose config` sin errores (con `DB_PASSWORD`, `FIREBASE_PROJECT_ID` y `SPRING_RABBITMQ_PASSWORD` definidas); `CuentasApplicationTests` 1 y `AccountRegistrationEndToEndTest` 41 en verde con `spring-boot-starter-amqp` y `EVENTS_ENABLED=false` (ningún contexto se conecta al broker). La suite completa corre al cerrar C2 (T-C2.6).
 
 ### T-C2.2 · Puerto `EventPublisher`, `RabbitEventPublisher` y configuración
 
