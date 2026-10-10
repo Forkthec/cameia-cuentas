@@ -46,6 +46,15 @@ public interface FirebaseUserDirectory {
     Optional<DirectoryUser> findByEmail(EmailAddress email);
 
     /**
+     * Lee el correo de un usuario, para los eventos que se emiten después de la petición de registro.
+     *
+     * @param firebaseUid identificador del usuario
+     * @return el correo normalizado, o vacío si el usuario no existe, no tiene correo o el que tiene no es válido
+     * @throws DependencyUnavailableException si el directorio no respondió o falló de su lado
+     */
+    Optional<EmailAddress> findEmail(String firebaseUid);
+
+    /**
      * Marca al usuario con el plan gratuito.
      *
      * <p>Escribe el custom claim {@code plan} con el valor {@code FREE}. Ese claim todavía

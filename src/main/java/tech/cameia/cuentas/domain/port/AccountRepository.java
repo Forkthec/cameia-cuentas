@@ -1,8 +1,10 @@
 package tech.cameia.cuentas.domain.port;
 
+import java.util.List;
 import java.util.Optional;
 
 import tech.cameia.cuentas.domain.model.Account;
+import tech.cameia.cuentas.domain.model.UnannouncedAccount;
 
 /**
  * Acceso a las cuentas almacenadas.
@@ -27,4 +29,13 @@ public interface AccountRepository {
      * @return la cuenta, o vacío si ese usuario no tiene cuenta local
      */
     Optional<Account> findByFirebaseUid(String firebaseUid);
+
+    /**
+     * Lista las cuentas que no tienen evento de cuenta creada.
+     *
+     * @param limit cantidad máxima de cuentas
+     * @return las cuentas que no están anonimizadas, tienen fecha de nacimiento y no tienen {@code cuenta.creada} en la tabla
+     *         de salida, la más antigua primero, como máximo {@code limit}
+     */
+    List<UnannouncedAccount> findUnannounced(int limit);
 }

@@ -36,6 +36,17 @@ public class InMemoryOutboxRepository implements OutboxRepository {
     }
 
     /**
+     * Borra la fila del evento de una cuenta, pendiente o publicada, como hace el {@code DELETE} del procedimiento de
+     * republicación: la cuenta vuelve a poder recibir un evento nuevo.
+     *
+     * @param firebaseUid identificador de la cuenta
+     */
+    public void deleteEventRowOf(String firebaseUid) {
+        appended.remove(firebaseUid);
+        pending.values().removeIf(event -> event.aggregateId().equals(firebaseUid));
+    }
+
+    /**
      * Instante en que se marcó publicado un evento.
      *
      * @param id identificador del evento

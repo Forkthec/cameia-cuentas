@@ -735,6 +735,8 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
   `..._shouldExcludeMissingBirthDate`; `..._shouldReturnOldestFirstAndRespectLimit` (límite 1); `..._shouldIgnorePublishedEventsToo`
   (una cuenta con evento publicado, `carga` NULL, no sale). Agrega la comparación `UnannouncedAccount.FIREBASE_UID_MAX_LENGTH` = 128 en
   `EventoSalienteSchemaMigrationTest.columnLengths_shouldMatchDomainLimits`.
+- **Resultado (9-oct-2026):** hecha. Primero no compilaban las pruebas (`UnannouncedAccount` y `findUnannounced` no existían). Después `UnannouncedAccountsQueryTest` 6 y `EventoSalienteSchemaMigrationTest` 15 en verde contra PostgreSQL real.
+  - *Nota de ejecución:* las seis pruebas de la consulta están en la clase nueva `UnannouncedAccountsQueryTest`, no en `AccountRepositoryAdapterTest`: necesitan vaciar `cuenta` y `evento_saliente` antes de cada prueba y esa clase comparte filas entre sus pruebas. Los dobles de `AccountRepository` de las pruebas devuelven lista vacía (el doble compartido permite preparar cuentas con `seedUnannounced`).
 
 ### T-C3.2 · Correo por `firebaseUid` en Firebase
 
@@ -758,6 +760,8 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
   `findEmail_shouldReturnNormalizedEmail_whenUserExists` (`Ana.Perez@Ejemplo.test` → `ana.perez@ejemplo.test`);
   `findEmail_shouldBeEmpty_whenUserNotFound`; `findEmail_shouldBeEmpty_whenUserHasNoEmail`;
   `findEmail_shouldThrowDependencyUnavailable_whenFirebaseIsUnavailable` (`UNAVAILABLE`).
+- **Resultado (9-oct-2026):** hecha. Primero no compilaban las pruebas (`findEmail` no existía en el puerto). Después `FirebaseUserDirectoryAdapterTest` 36 en verde (siete pruebas nuevas de `findEmail`: correo normalizado, usuario ausente, correo nulo, vacío o en blanco, correo guardado inválido, indisponibilidad con `UNAVAILABLE`, `DEADLINE_EXCEEDED` e `INTERNAL`, y rechazo técnico) y `UntypedExceptionClassificationTest` en verde.
+  - *Nota de ejecución:* las pruebas de `findEmail` usan el patrón de `FirebaseUserDirectoryAdapterTest` (el SDK simulado con Mockito), porque `FirebaseRejectionsWithSdkTest` solo cubre rechazos HTTP del SDK real.
 
 ### T-C3.3 · `AccountCreatedBackfillService`
 
@@ -798,6 +802,8 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
   - En `AccountRepositoryAdapterTest`, `findUnannounced_shouldReturnAccount_whenItsEventRowWasDeleted` (SQL: cuenta con evento publicado;
     `DELETE` de esa fila de `evento_saliente` → la cuenta vuelve a salir).
   - `enqueueMissing_shouldReportMoreRemain_whenLimitReached` (doble que devuelve exactamente `MAX_ACCOUNTS`).
+- **Resultado (9-oct-2026):** hecha. Primero no compilaban las pruebas (`AccountCreatedBackfillService` y `BackfillSummary` no existían). Después `AccountCreatedBackfillServiceTest` 8 en verde (las siete de la tarjeta, incluida `findUnannounced_shouldReturnAccount_whenItsEventRowWasDeleted` en `UnannouncedAccountsQueryTest` de T-C3.1, más la del aviso único con diez ejemplos y la de «nada por registrar»), `LayeredArchitectureTest` y `UntypedExceptionClassificationTest` en verde.
+  - *Nota de ejecución:* el doble `InMemoryOutboxRepository` gana `deleteEventRowOf(uid)` (simula el `DELETE` del procedimiento de republicación) y `InMemoryFirebaseUserDirectory` gana `fallarDespuesDeConsultas(n)`. La carga completa del evento republicado la comprueba `OutboxRepositoryAdapterTest`; el doble guarda una carga mínima.
 
 ### T-C3.4 · Tarea `account-events-relay` (Cloud Run Job)
 
