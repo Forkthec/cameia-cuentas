@@ -87,6 +87,15 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     }
 
     @Override
+    public synchronized Optional<EmailAddress> findEmail(String firebaseUid) {
+        consultas.incrementAndGet();
+        if (fallarAlConsultar) {
+            throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
+        }
+        return Optional.ofNullable(correosPorUid.get(firebaseUid)).map(EmailAddress::new);
+    }
+
+    @Override
     public void assignFreePlanClaim(String firebaseUid) {
         if (fallarAlEscribirElPlan) {
             throw new IllegalStateException("Firebase rechazó la escritura del plan del usuario");
