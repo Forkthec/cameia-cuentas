@@ -122,7 +122,7 @@ T-36.0 es el PR 0 (solo documentos, ≈ 455 líneas); T-36.1 a T-36.7, el PR 1.
   `public record CurrentAccountResponse(UUID id, String firstName, String lastName, LocalDate birthDate, String phoneNumber, String pronoun, String status, String plan)`
   con `@Schema` en cada componente (descripción en español, ejemplo, `nullable = true` en `birthDate`, `phoneNumber` y `pronoun`;
   `allowableValues` `{"HE","SHE","THEY"}`, `{"PENDING_VERIFICATION","ACTIVE","DISABLED"}`, `{"FREE"}`; `format = "date"` en `birthDate`), constante
-  `FREE_PLAN = "FREE"` y fábrica `static CurrentAccountResponse de(Account account)` que usa `getBirthDate().map(BirthDate::value).orElse(null)`,
+  `FREE_PLAN = "FREE"` y fábrica `static CurrentAccountResponse from(Account account)` que usa `getBirthDate().map(BirthDate::value).orElse(null)`,
   `getPhoneNumber().map(PhoneNumber::value).orElse(null)` y `getPronoun().map(Enum::name).orElse(null)`. Javadoc: «No incluye correo ni contraseña:
   son de Firebase y la historia los excluye. El plan es siempre FREE hasta que existan los planes de pago.».
 - **Crear** `presentation/controller/CurrentAccountController.java` (package-private, como `AccountActivationController`):

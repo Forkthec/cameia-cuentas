@@ -25,7 +25,7 @@
 | PR | Rama | Base | Qué entrega | Tamaño |
 |---|---|---|---|---|
 | 0 | `CM-297-spec-consulta-de-mi-cuenta` | punta de `CM-279-postman-eventos-cuenta` | solo spec, plan y tarjetas (no caben con el código: ≈ 455 líneas) | ≈ 455 |
-| 1 | `CM-297-consulta-de-mi-cuenta` | PR 0 | fecha desconocida en `Account` y `AccountMapper`; caso de uso, controlador, DTO, excepción de identidad en blanco; OpenAPI; `docs/errores.md`; pruebas; Postman | ≈ 830 |
+| 1 | `CM-297-consulta-de-mi-cuenta` | PR 0 | fecha desconocida en `Account` y `AccountMapper`; caso de uso, controlador, DTO, excepción de identidad en blanco; OpenAPI; `docs/errores.md`; pruebas; Postman | 922 |
 
 Si al cerrar el PR 1 pasa de 800, la tarjeta de Postman (T-36.6) sale a una capa propia `CM-297-postman-consulta-de-mi-cuenta`. Fuera de alcance: sección 13.
 
@@ -39,7 +39,7 @@ Si al cerrar el PR 1 pasa de 800, la tarjeta de Postman (T-36.6) sale a una capa
 | CA-1.5.4 | `?firebase_uid=<otro>` → 200 con los datos del dueño del token; el parámetro se ignora | REQ-36-04 | `CurrentAccountEndToEndTest.getMe_shouldIgnoreQueryIdentity_whenAnotherUidIsSent` | `M-03 · 200 ignora firebase_uid de otra cuenta` |
 | CA-1.10.4 (Google) | 404 sin fila en `cuenta` | REQ-36-05 | `GetCurrentAccountServiceTest.find_shouldThrowNotFound_whenNoAccount` | `M-04 · 404 sin cuenta` |
 | RT-02 | identidad del Gateway | REQ-36-06 | `CurrentAccountControllerTest.getMe_shouldReturn400_whenIdentityHeaderIsMissing` y `…_whenIdentityHeaderIsBlank` | `M-05 · 400 sin X-User-Id`, `M-06 · 400 X-User-Id en blanco` |
-| RT-05 | sin detalles internos | REQ-36-08 | `CurrentAccountEndToEndTest.getMe_shouldReturnBirthDateNull_whenLegacyAccountHasNoBirthDate` | `M-07 · 200 cuenta antigua sin fecha` |
+| RT-05 | sin detalles internos | REQ-36-08 | `CurrentAccountEndToEndTest.getMe_shouldReturnBirthDateNull_whenLegacyAccountHasNoBirthDate` | — (la cubre el E2E; la fila no se puede crear por la API) |
 
 ## 4. Requisitos (EARS)
 
@@ -73,6 +73,7 @@ Si al cerrar el PR 1 pasa de 800, la tarjeta de Postman (T-36.6) sale a una capa
 | ídem | `"' OR 1=1 --"` | 404 | `ACCOUNT_NOT_FOUND` | ídem (consulta parametrizada) | `CurrentAccountEndToEndTest.getMe_shouldReturn404_whenIdentityLooksLikeSql` |
 | consulta | `?firebase_uid=otro&id=…` | 200 | — | datos propios | REQ-36-04 |
 | `Accept` | `application/xml` | 406 | `MEDIA_TYPE_NOT_ACCEPTABLE` | existente | `M-08 · 406 si solo acepta XML` |
+| `Accept` | `lo///malo` (mal formado) | 406 con cuerpo vacío, sin `code` ni `requestId` | — | existente en todas las rutas; **PENDIENTE de Paula** (tarea transversal para responder `MEDIA_TYPE_NOT_ACCEPTABLE` también con un `Accept` que no se puede interpretar) | sonda con petición real; sin prueba en el repo |
 | método | `PUT`, `DELETE`, `POST /api/v1/users/me` | 405 | `METHOD_NOT_ALLOWED` | existente | `FrameworkErrorsTest` (existente) |
 | cuerpo | un cuerpo en el `GET` | se ignora | — | — | justificación: `GET` sin `@RequestBody` |
 
@@ -97,8 +98,8 @@ Sin migración. Lee `microcuentas.cuenta` por `firebase_uid` (único e indexado 
 | Texto | nombre `"<script>alert(1)</script>"` guardado | 200 como texto JSON (sin interpretarlo) | ídem (segundo caso) |
 | Fechas | `fecha_nacimiento` `2000-02-29` | `"2000-02-29"` | ídem |
 | Concurrencia | lectura mientras otra petición activa la cuenta | 200 con el estado confirmado en ese momento (lectura sin bloqueo, `READ COMMITTED`) | justificación: solo lectura |
-| Dependencia lenta o caída | PostgreSQL no responde | 500 `INTERNAL_ERROR` con traza en `ERROR` (no previsible por el cliente); el pool de Hikari corta la espera de conexión a los 30 s (valor por defecto) | `BusinessExceptionHandlerTest` (existente para el 500); sin Firebase en esta operación |
-| Carga | cabecera `X-User-Id` de 10 000 caracteres | 400 (n+1 ya cubre la regla); Tomcat limita el tamaño de cabeceras | n+1 |
+| Dependencia lenta o caída | PostgreSQL no responde | 500 `INTERNAL_ERROR` con traza en `ERROR`, comprobado con la base detenida (417 ms); con la base colgada el pool de Hikari espera 30 s (valor por defecto). Una dependencia caída es un fallo previsible y debería responder 503 `DEPENDENCY_UNAVAILABLE`; afecta a todas las rutas de Cuentas, así que queda fuera de esta tarea: **PENDIENTE de Paula** (decidir la tarea transversal) | `BusinessExceptionHandlerTest` (existente para el 500); sin Firebase en esta operación |
+| Carga | cabecera `X-User-Id` de 10 000 caracteres | 400 con HTML de Tomcat (límite de 8 KB de `server.max-http-request-header-size`), respuesta fuera del manejador de errores y sin `code` ni `requestId`; la regla de n+1 (129 caracteres) solo cubre los valores que llegan al controlador. Existe en todas las rutas de Cuentas y solo es alcanzable sin pasar por el Gateway: **PENDIENTE de Paula** (¿tarea transversal de errores del contenedor?) | sonda con petición real; sin prueba en el repo |
 
 ## 8. Errores
 
@@ -140,9 +141,10 @@ Rutas al 500 cerradas: fecha nula (D2, REQ-36-08); estado `ANONYMIZED` (404); `O
 | ASVS 14.2.1 | Sí | Ningún dato sensible en la URL; la identidad viaja en cabecera | revisión |
 | ASVS 1.2.4 | Sí | Spring Data con parámetro (`findByFirebaseUid`) | `getMe_shouldReturn404_whenIdentityLooksLikeSql` |
 | ASVS 4.1.1 | Sí | `charset=UTF-8` | `getMe_shouldReturnAccountFields_whenAccountExists` afirma el `Content-Type` |
+| ASVS 14.3 / OWASP API8 | Sí | La respuesta 200 lleva `Cache-Control: no-store`: nombre, fecha de nacimiento y celular no se guardan en cachés del navegador ni de proxies compartidos | `getMe_shouldSendNoStore_whenAccountExists` |
 | ASVS 8.2.1 / OWASP API5 | Sí | La ruta exige identidad del Gateway; el Gateway enruta `/api/v1/users/**` a Cuentas | 400 sin identidad |
 | SEG-02 | Sí | dos cuentas A y B: B nunca ve datos de A | E2E de REQ-36-04 |
-| SEG-04 / REST-0003 | Sí | Sin registro en el éxito; el rechazo registra `code`, `requestId` y el uid, nunca nombres, fecha ni celular | `BusinessExceptionHandlerTest` (existente) y revisión del diff |
+| SEG-04 / REST-0003 | Sí | Sin registro en el éxito; el rechazo registra `code` y `requestId` (el uid en el registro de rechazo es una mejora transversal **PENDIENTE de Paula**), nunca nombres, fecha ni celular | `BusinessExceptionHandlerTest` (existente) y revisión del diff |
 | OWASP API4, API6, API7, API8, API9, API10 | No aplica / sin cambio | Lectura de una fila; sin flujo sensible, URL de entrada ni integración; ruta bajo `/api/v1/users` documentada en OpenAPI | — |
 
 ## 11. Atributos de calidad
