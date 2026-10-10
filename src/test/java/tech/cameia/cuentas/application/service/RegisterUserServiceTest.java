@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -36,6 +37,7 @@ import tech.cameia.cuentas.domain.model.DirectoryUser;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.Pronoun;
 import tech.cameia.cuentas.domain.model.RawPassword;
+import tech.cameia.cuentas.domain.model.UnannouncedAccount;
 import tech.cameia.cuentas.domain.policy.AgePolicy;
 import tech.cameia.cuentas.domain.policy.PasswordPolicy;
 import tech.cameia.cuentas.domain.port.AccountRepository;
@@ -585,6 +587,11 @@ class RegisterUserServiceTest {
 
     /** Repositorio en memoria que puede simular un fallo de la base de datos. */
     private static class RepositorioEnMemoria implements AccountRepository {
+
+        @Override
+        public List<UnannouncedAccount> findUnannounced(int limit) {
+            return List.of();
+        }
 
         private final Map<String, Account> guardadas = new HashMap<>();
         private int guardados;

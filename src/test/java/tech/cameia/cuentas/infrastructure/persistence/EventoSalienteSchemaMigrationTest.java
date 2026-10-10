@@ -20,6 +20,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import tech.cameia.cuentas.domain.event.CorrelationId;
+import tech.cameia.cuentas.domain.model.UnannouncedAccount;
 
 /**
  * Prueba de integración del esquema de la tabla de salida {@code evento_saliente}.
@@ -146,6 +147,7 @@ class EventoSalienteSchemaMigrationTest {
         Map<String, Integer> lengths = lengthsOf("evento_saliente");
 
         assertThat(lengths.get("agregado_id")).isEqualTo(lengthsOf("cuenta").get("firebase_uid")).isEqualTo(128);
+        assertThat(lengths.get("agregado_id")).isEqualTo(UnannouncedAccount.FIREBASE_UID_MAX_LENGTH);
         assertThat(lengths.get("id_correlacion")).isEqualTo(CorrelationId.MAX_LENGTH).isEqualTo(64);
     }
 

@@ -1,10 +1,13 @@
 package tech.cameia.cuentas.infrastructure.persistence.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.stereotype.Repository;
 
 import tech.cameia.cuentas.domain.model.Account;
+import tech.cameia.cuentas.domain.model.BirthDate;
+import tech.cameia.cuentas.domain.model.UnannouncedAccount;
 import tech.cameia.cuentas.domain.port.AccountRepository;
 import tech.cameia.cuentas.infrastructure.persistence.entity.AccountEntity;
 import tech.cameia.cuentas.infrastructure.persistence.mapper.AccountMapper;
@@ -63,5 +66,19 @@ public class AccountRepositoryAdapter implements AccountRepository {
     @Override
     public Optional<Account> findByFirebaseUid(String firebaseUid) {
         return repositorio.findByFirebaseUid(firebaseUid).map(mapeador::toDomain);
+    }
+
+    /**
+     * Lista las cuentas que no tienen evento de cuenta creada.
+     *
+     * @param limit cantidad máxima de cuentas
+     * @return las cuentas sin evento, la más antigua primero
+     */
+    @Override
+    public List<UnannouncedAccount> findUnannounced(int limit) {
+        return repositorio.findUnannounced(limit).stream()
+                .map(row -> new UnannouncedAccount(row.getFirebaseUid(), new BirthDate(row.getFechaNacimiento()),
+                        row.getFechaCreacion()))
+                .toList();
     }
 }
