@@ -614,6 +614,8 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
   - `relayPending_shouldProcessSeveralBatches_whenMoreThanBatchSize` (250 eventos → 250 publicados).
   - `relayPending_shouldReturnZeros_whenNothingIsPending`.
 - **Verificar:** `.\mvnw.cmd -q test -Dtest=OutboxRelayServiceTest`.
+- **Resultado (9-oct-2026):** hecha. Primero no compilaban las pruebas (`OutboxRelayService` y `RelaySummary` no existían); después `OutboxRelayServiceTest` 9 pruebas en verde, 0 fallos (`BUILD SUCCESS`).
+  - *Nota de ejecución:* `relayPending` corta la corrida cuando un lote tiene cualquier fallo, no solo cuando falla el lote entero: los fallidos son los más antiguos y se releerían en el siguiente lote, sumando muchos intentos a un mismo evento y disparando la alerta de 10 intentos sin motivo. Lo cubre `relayPending_shouldStopAfterBatch_whenAnyEventFails`. El doble `InMemoryOutboxRepository` ganó `seed` y `publishedAt` y ordena `findPending` por instante e id, como la consulta real.
 
 ### T-C2.4 · Intento inmediato tras el registro
 

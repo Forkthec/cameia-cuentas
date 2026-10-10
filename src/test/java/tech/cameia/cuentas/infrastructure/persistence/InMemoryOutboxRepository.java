@@ -2,6 +2,7 @@ package tech.cameia.cuentas.infrastructure.persistence;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,7 +21,29 @@ public class InMemoryOutboxRepository implements OutboxRepository {
 
     private final Map<String, AccountCreated> appended = new LinkedHashMap<>();
     private final Map<UUID, OutboundEvent> pending = new LinkedHashMap<>();
+    private final Map<UUID, Instant> publishedTimes = new LinkedHashMap<>();
     private boolean failNextAppend;
+
+    /**
+     * Agrega un evento pendiente tal cual, sin pasar por la cuenta que lo origina.
+     *
+     * @param event evento pendiente
+     * @return identificador del evento
+     */
+    public UUID seed(OutboundEvent event) {
+        pending.put(event.id(), event);
+        return event.id();
+    }
+
+    /**
+     * Instante en que se marcó publicado un evento.
+     *
+     * @param id identificador del evento
+     * @return el instante, o {@code null} si no se ha marcado
+     */
+    public Instant publishedAt(UUID id) {
+        return publishedTimes.get(id);
+    }
 
     /**
      * Hace que el próximo {@link #appendAccountCreated} lance una excepción.
@@ -72,7 +95,9 @@ public class InMemoryOutboxRepository implements OutboxRepository {
     /** {@inheritDoc} */
     @Override
     public List<OutboundEvent> findPending(int limit) {
-        return pending.values().stream().limit(limit).toList();
+        return pending.values().stream()
+                .sorted(Comparator.comparing(OutboundEvent::createdAt).thenComparing(OutboundEvent::id))
+                .limit(limit).toList();
     }
 
     /** {@inheritDoc} */
@@ -84,7 +109,11 @@ public class InMemoryOutboxRepository implements OutboxRepository {
     /** {@inheritDoc} */
     @Override
     public boolean markPublished(UUID id, Instant publishedAt) {
-        return pending.remove(id) != null;
+        boolean wasPending = pending.remove(id) != null;
+        if (wasPending) {
+            publishedTimes.put(id, publishedAt);
+        }
+        return wasPending;
     }
 
     /** {@inheritDoc} */
