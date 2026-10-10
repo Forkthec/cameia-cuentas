@@ -130,7 +130,7 @@ Tabla `microcuentas.evento_saliente` (tabla de salida de eventos, [ADR 0003](doc
 | `fecha_publicacion` | `timestamptz` | Nulo mientras está pendiente; nunca anterior a `fecha_creacion` |
 | `intentos` | `integer` | Intentos de publicación fallidos; ≥ 0 |
 
-La tabla no guarda correo ni contraseña: son de Firebase. Las restricciones llevan nombre con los prefijos del [estándar](docs/estandar-backend.md#7-base-de-datos); las tablas y columnas van en `snake_case` español y en singular.
+La tabla `cuenta` no guarda correo ni contraseña: son de Firebase. `evento_saliente.carga` guarda el correo y la fecha de nacimiento solo mientras el evento está pendiente; al publicarse se pone en nulo (`ck_evento_saliente_carga_pendiente`). Las restricciones llevan nombre con los prefijos del [estándar](docs/estandar-backend.md#7-base-de-datos); las tablas y columnas van en `snake_case` español y en singular.
 
 ## 6. Seguridad
 
