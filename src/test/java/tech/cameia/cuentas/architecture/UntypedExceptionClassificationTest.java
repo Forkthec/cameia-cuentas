@@ -73,6 +73,7 @@ class UntypedExceptionClassificationTest {
             Map.entry(CONFIGURATION_PACKAGE + "CommonPasswordsLoader#validate", STARTUP),
             Map.entry(CONFIGURATION_PACKAGE + "FirebaseConfiguration#firebaseApp", STARTUP),
             Map.entry(CONFIGURATION_PACKAGE + "FirebaseConfiguration#rejectEmulatorInDeployment", STARTUP),
+            Map.entry(CONFIGURATION_PACKAGE + "BrokerSettingsGuard#<init>", STARTUP),
             Map.entry(CLIENT_PACKAGE + "FirebaseUserDirectoryAdapter#unavailableOrRejection", UNEXPECTED_FAILURE),
             Map.entry(CLIENT_PACKAGE + "FirebaseUserDirectoryAdapter#isEmailVerified", PENDING_CM_179));
 
