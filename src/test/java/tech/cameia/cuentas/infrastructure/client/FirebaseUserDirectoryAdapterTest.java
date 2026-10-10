@@ -26,6 +26,8 @@ import com.google.firebase.auth.UserRecord;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
@@ -224,6 +226,61 @@ class FirebaseUserDirectoryAdapterTest {
         Optional<DirectoryUser> encontrada = adaptador.findByEmail(new EmailAddress("ana@cameia.tech"));
 
         assertThat(encontrada).contains(new DirectoryUser(UID, Instant.ofEpochMilli(1_000L), true));
+    }
+
+    @Test
+    void findEmail_shouldReturnNormalizedEmail_whenUserExists() throws Exception {
+        UserRecord usuario = mock(UserRecord.class);
+        when(usuario.getEmail()).thenReturn("Ana.Perez@Ejemplo.test");
+        when(firebaseAuth.getUser(UID)).thenReturn(usuario);
+
+        assertThat(adaptador.findEmail(UID)).contains(new EmailAddress("ana.perez@ejemplo.test"));
+    }
+
+    @Test
+    void findEmail_shouldBeEmpty_whenUserNotFound() throws Exception {
+        when(firebaseAuth.getUser(UID)).thenThrow(errorDeFirebase(AuthErrorCode.USER_NOT_FOUND));
+
+        assertThat(adaptador.findEmail(UID)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"   "})
+    void findEmail_shouldBeEmpty_whenUserHasNoEmail(String correo) throws Exception {
+        UserRecord usuario = mock(UserRecord.class);
+        when(usuario.getEmail()).thenReturn(correo);
+        when(firebaseAuth.getUser(UID)).thenReturn(usuario);
+
+        assertThat(adaptador.findEmail(UID)).isEmpty();
+    }
+
+    @Test
+    void findEmail_shouldBeEmpty_whenStoredEmailIsNotValid() throws Exception {
+        UserRecord usuario = mock(UserRecord.class);
+        when(usuario.getEmail()).thenReturn("sin-arroba");
+        when(firebaseAuth.getUser(UID)).thenReturn(usuario);
+
+        assertThat(adaptador.findEmail(UID)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ErrorCode.class, names = {"UNAVAILABLE", "DEADLINE_EXCEEDED", "INTERNAL"})
+    void findEmail_shouldThrowDependencyUnavailable_whenFirebaseIsUnavailable(ErrorCode codigo) throws Exception {
+        when(firebaseAuth.getUser(UID))
+                .thenThrow(new FirebaseAuthException(codigo, "fallo del servidor", null, null, null));
+
+        assertThatThrownBy(() -> adaptador.findEmail(UID)).isInstanceOf(DependencyUnavailableException.class);
+    }
+
+    @Test
+    void findEmail_shouldThrowTechnicalFailure_whenFirebaseRejectsTheQuery() throws Exception {
+        when(firebaseAuth.getUser(UID))
+                .thenThrow(new FirebaseAuthException(ErrorCode.PERMISSION_DENIED, "sin permiso", null, null, null));
+
+        assertThatThrownBy(() -> adaptador.findEmail(UID))
+                .isInstanceOf(IllegalStateException.class)
+                .isNotInstanceOf(DependencyUnavailableException.class);
     }
 
     @Test

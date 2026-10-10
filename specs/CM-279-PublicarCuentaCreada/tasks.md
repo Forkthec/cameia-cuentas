@@ -760,6 +760,8 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
   `findEmail_shouldReturnNormalizedEmail_whenUserExists` (`Ana.Perez@Ejemplo.test` → `ana.perez@ejemplo.test`);
   `findEmail_shouldBeEmpty_whenUserNotFound`; `findEmail_shouldBeEmpty_whenUserHasNoEmail`;
   `findEmail_shouldThrowDependencyUnavailable_whenFirebaseIsUnavailable` (`UNAVAILABLE`).
+- **Resultado (9-oct-2026):** hecha. Primero no compilaban las pruebas (`findEmail` no existía en el puerto). Después `FirebaseUserDirectoryAdapterTest` 36 en verde (siete pruebas nuevas de `findEmail`: correo normalizado, usuario ausente, correo nulo, vacío o en blanco, correo guardado inválido, indisponibilidad con `UNAVAILABLE`, `DEADLINE_EXCEEDED` e `INTERNAL`, y rechazo técnico) y `UntypedExceptionClassificationTest` en verde.
+  - *Nota de ejecución:* las pruebas de `findEmail` usan el patrón de `FirebaseUserDirectoryAdapterTest` (el SDK simulado con Mockito), porque `FirebaseRejectionsWithSdkTest` solo cubre rechazos HTTP del SDK real.
 
 ### T-C3.3 · `AccountCreatedBackfillService`
 

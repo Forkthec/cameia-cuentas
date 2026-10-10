@@ -132,6 +132,37 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
     }
 
     /**
+     * Lee el correo de un usuario por su identificador.
+     *
+     * <p>Un usuario ausente o sin correo se informa como vacío y no como error: la carga inicial de eventos lo omite y
+     * sigue con el resto. Un correo guardado que no cumple la forma de {@link EmailAddress} también es vacío, con un aviso
+     * que lleva el identificador y nunca el correo.</p>
+     *
+     * @param firebaseUid identificador del usuario
+     * @return el correo normalizado, o vacío si no hay un correo utilizable
+     * @throws DependencyUnavailableException si Firebase no respondió, falló de su lado o agotó la cuota
+     * @throws IllegalStateException si Firebase rechaza la consulta por cualquier otro motivo
+     */
+    @Override
+    public Optional<EmailAddress> findEmail(String firebaseUid) {
+        try {
+            String raw = firebaseAuth.getUser(firebaseUid).getEmail();
+            if (raw == null || raw.isBlank()) {
+                return Optional.empty();
+            }
+            return Optional.of(new EmailAddress(raw));
+        } catch (InvalidEmailException invalid) {
+            logger.warn("El correo guardado en Firebase no es válido, uid {}", firebaseUid);
+            return Optional.empty();
+        } catch (FirebaseAuthException error) {
+            if (AuthErrorCode.USER_NOT_FOUND.equals(error.getAuthErrorCode())) {
+                return Optional.empty();
+            }
+            throw unavailableOrRejection(error, "Firebase rechazó la consulta del correo del usuario");
+        }
+    }
+
+    /**
      * Traduce un rechazo de Firebase a la excepción que corresponde.
      *
      * <p>Un correo que Firebase considera inválido es un error de la persona (CA-1.1.20). Lo demás
