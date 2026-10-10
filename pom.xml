@@ -46,6 +46,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
+		<!-- Publicación de eventos de dominio en RabbitMQ con confirmación del broker. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-amqp</artifactId>
+		</dependency>
 		<!--
 			Migraciones versionadas del esquema. Hibernate no genera esquemas, restricciones
 			compuestas ni objetos propios de PostgreSQL, y el perfil prod valida en lugar de
@@ -174,6 +179,7 @@
 					-->
 					<systemPropertyVariables>
 						<FIREBASE_ENABLED>false</FIREBASE_ENABLED>
+						<EVENTS_ENABLED>false</EVENTS_ENABLED>
 					</systemPropertyVariables>
 				</configuration>
 			</plugin>
