@@ -8,7 +8,7 @@ CAMEIA ofrece práctica y simulación de entrevistas virtuales para preparar ent
 - Gestiona planes, suscripciones, transacciones y su idempotencia.
 - Se integra con Wompi para pagos, una vez aprobado el contrato de integración.
 - Se integra con Firebase Admin SDK para consultar usuarios, actualizar sus datos y permisos, y bloquear cuentas cuando corresponda.
-- Publica cambios mediante contratos de eventos aprobados.
+- Publica cambios mediante contratos de eventos aprobados: hoy `cuenta.creada` versión 1 ([docs/eventos/cuenta-creada-v1.md](docs/eventos/cuenta-creada-v1.md)), con tabla de salida y relevo ([ADR 0003](docs/adr/0003-eventos-con-outbox.md)).
 - Mantiene persistencia propia, sin claves foráneas hacia otros microservicios.
 
 Las contraseñas y credenciales de autenticación permanecen en Firebase y nunca se almacenan aquí. El servicio no implementa la lógica de entrevistas ni registra el consumo de IA.
@@ -91,7 +91,7 @@ Una ruta nueva no se suma a esta lista sin una spec que lo justifique.
 
 ## 5. Datos
 
-Base PostgreSQL propia, esquema `microcuentas`, migraciones Flyway en `src/main/resources/db/migration` (`V1__esquema_inicial_cuenta.sql`, `V2__ajustar_version_inicial_cuenta.sql`, `V3__restringir_pronombres.sql` y `V4__relajar_minimo_telefono_e164.sql`).
+Base PostgreSQL propia, esquema `microcuentas`, migraciones Flyway en `src/main/resources/db/migration` (`V1__esquema_inicial_cuenta.sql`, `V2__ajustar_version_inicial_cuenta.sql`, `V3__restringir_pronombres.sql`, `V4__relajar_minimo_telefono_e164.sql` y `V5__evento_saliente.sql`).
 
 Flyway corre al arrancar la aplicación y anota cada migración aplicada en `microcuentas.flyway_schema_history`: reiniciar o
 recrear el contenedor no vuelve a aplicar nada ni toca las filas, y una migración nueva se aplica una sola vez, dentro de una
@@ -115,6 +115,20 @@ Tabla `microcuentas.cuenta`:
 | `version` | `bigint` | Control de concurrencia; ≥ 0 |
 | `fecha_creacion`, `fecha_actualizacion` | `timestamptz` | No nulas, en UTC |
 | `fecha_eliminacion` | `timestamptz` | Solo existe cuando el estado es `ANONYMIZED` |
+
+Tabla `microcuentas.evento_saliente` (tabla de salida de eventos, [ADR 0003](docs/adr/0003-eventos-con-outbox.md)):
+
+| Columna | Tipo | Regla |
+|---|---|---|
+| `id` | `uuid` | Clave primaria; es el `message_id` del mensaje |
+| `tipo` | `varchar(64)` | Hoy solo `cuenta.creada` (`ck_evento_saliente_tipo`) |
+| `version` | `smallint` | Versión del contrato; ≥ 1 |
+| `agregado_id` | `varchar(128)` | `firebaseUid` de la cuenta; no vacío; único junto con `tipo` (`uq_evento_saliente_tipo_agregado`) |
+| `carga` | `jsonb` | Cuerpo del evento; nulo solo cuando ya se publicó (`ck_evento_saliente_carga_pendiente`) |
+| `id_correlacion` | `varchar(64)` | `X-Request-Id` de la petición o el id del evento; `^[A-Za-z0-9._-]{1,64}$` |
+| `fecha_creacion` | `timestamptz` | Instante del evento, en UTC |
+| `fecha_publicacion` | `timestamptz` | Nulo mientras está pendiente; nunca anterior a `fecha_creacion` |
+| `intentos` | `integer` | Intentos de publicación fallidos; ≥ 0 |
 
 La tabla no guarda correo ni contraseña: son de Firebase. Las restricciones llevan nombre con los prefijos del [estándar](docs/estandar-backend.md#7-base-de-datos); las tablas y columnas van en `snake_case` español y en singular.
 
@@ -144,6 +158,17 @@ Verificación completa: `./mvnw.cmd clean verify`. Genera el informe de cobertur
 - Con Docker: `docker compose up --build -d` levanta Cuentas y PostgreSQL 16.
 - Con la aplicación en `http://localhost:8081`: salud en `/api/v1/users/health`, OpenAPI en `/v3/api-docs` y Swagger UI en `/swagger-ui.html` (con `API_DOCUMENTATION_ENABLED=true`).
 
+**Tarea de eventos de cuenta.** Registra los eventos `cuenta.creada` que faltan y publica los pendientes, una vez, y termina. Con la base
+y el broker de `docker compose` (`docker compose up -d db rabbitmq`) y el `.env` local:
+
+```text
+java -jar target\cuentas-0.0.1-SNAPSHOT.jar --spring.profiles.active=local,account-events-relay
+```
+
+No abre puerto HTTP; sale con código `0` y deja la línea `Relevo de eventos de cuenta terminado [...]`. En Cloud Run es un Job con
+`SPRING_PROFILES_ACTIVE=prod,account-events-relay` que dispara Cloud Scheduler cada 5 minutos. El broker local es el servicio
+`rabbitmq` de `docker-compose.yml` (AMQP en el puerto 5673 y consola en `http://localhost:15673`).
+
 ## 9. Contribución
 
 Rama, commit, tipos, título de PR, revisión y merge: rige [CONTRIBUTING.md](CONTRIBUTING.md). Lo que este repositorio añade:
@@ -161,3 +186,5 @@ Las specs nuevas viven en `specs/CM-NNN-Descripcion/` con `Descripcion` en Pasca
 | Pendiente | Responsable | Qué bloquea |
 |---|---|---|
 | Contrato de integración con Wompi | Product Owner | La integración de pagos y los webhooks |
+| Broker de staging con AMQPS y credenciales en el gestor de secretos | DevOps (por tarea de Product Owner) | La publicación de `cuenta.creada` en staging |
+| Cloud Run Job `account-events-relay` y Cloud Scheduler cada 5 minutos | DevOps (por tarea de Product Owner) | El reintento y la carga inicial de eventos en staging |
