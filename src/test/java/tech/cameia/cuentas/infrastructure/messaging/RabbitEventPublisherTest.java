@@ -81,7 +81,7 @@ class RabbitEventPublisherTest {
 
     @BeforeEach
     void bindTestQueue() {
-        Queue queue = new Queue(QUEUE, false, false, true);
+        Queue queue = new Queue(QUEUE, false, false, false);
         rabbitAdmin.declareQueue(queue);
         Binding binding = BindingBuilder.bind(queue).to(accountEventsExchange).with("cuenta.creada");
         rabbitAdmin.declareBinding(binding);
