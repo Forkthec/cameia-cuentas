@@ -859,6 +859,10 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
 - **Manual (en el PR):** `java -jar target\cuentas-0.0.1-SNAPSHOT.jar --spring.profiles.active=local,account-events-relay` con base y
   broker de compose → termina solo, código `0` (`echo $LASTEXITCODE`), línea `Relevo de eventos de cuenta terminado`.
 - **Cobertura:** las dos líneas de `System.exit` en `main` quedan sin cubrir (salir de la JVM en una prueba la terminaría): se reporta.
+- **Resultado (9-oct-2026):** hecha. `AccountEventsRelayJobRunnerTest` 4 en verde (relevo al arrancar en orden y una vez cada servicio, sin servidor web, plazo de 5 s, y propagación de `DependencyUnavailableException`). El contexto del perfil arranca sin puerto: la línea «Relevo de eventos de cuenta terminado [registrados=0, …]» aparece en el log de la prueba.
+  - *Nota de ejecución 1:* en esta tarjeta el código se escribió antes que la prueba (no hay salida de «falla primero»); la prueba se escribió enseguida y pasa.
+  - *Nota de ejecución 2:* los espías llevan `reset = MockReset.NONE`, porque el relevo corre al arrancar el contexto, antes de cada prueba, y el reinicio por defecto borraría esa interacción. La clase del relevo es `public` (la usa `CuentasApplication`, de otro paquete), y `CuentasApplication` no tenía condición previa para otro perfil de tarea.
+  - *Nota de ejecución 3:* la prueba manual con el jar queda PENDIENTE de Paula (exige `.env` y `docker compose`).
 
 ### T-C3.5 · Documentación
 
