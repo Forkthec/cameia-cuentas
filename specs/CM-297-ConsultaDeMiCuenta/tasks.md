@@ -229,10 +229,33 @@ pruebas (`GetCurrentAccountServiceTest`, `CurrentAccountControllerTest`, `Curren
   `POST` y `DELETE` sobre `/me` 405; cuerpo en el `GET` ignorado. P36-2 queda cerrado con credenciales sintéticas: solo falta la prueba con el `.env` real,
   que es de Paula. La colección crece 555 líneas por el formato de Postman, de ahí que sea una capa propia.
 
-## [ ] T-36.7 · Autoverificación y cierre — ≤ 30 min
+## [x] T-36.7 · Autoverificación y cierre — ≤ 30 min
 
 - Lista V1 a V13 de la spec §15 con salida real (V4, V6 y V7 son adversariales).
 - `./mvnw.cmd -B clean verify`; cobertura por clase de lo nuevo o modificado (≥ 90 % líneas y ramas; cada línea sin cubrir con su razón);
   `git diff --shortstat <punta del PR 0>...HEAD` (≤ 800; si pasa, T-36.6 a una capa propia).
 - `/simplify`, `/code-review high` y `/security-review` (toca identidad y datos personales); preparar el worktree del Prompt H (`flujo/ejecucion-en-cola.md`
   §7.2) y dejar la línea en la bandeja. Revisar `docs/bitacora-ia/` del repo antes de pedir el push.
+
+- **Resultado (10-oct-2026), lista V1 a V13 con salida real** (jar y contenedores desechables con credenciales sintéticas; `clean verify` de la punta del PR 1, árbol `7b073ea6`):
+
+  | # | Resultado |
+  |---|---|
+  | V1 | `CurrentAccountControllerTest` 7 pruebas, 0 fallos: ocho claves exactas; el `charset` del 200 se afirma en el E2E (desvío de T-36.3) |
+  | V2 | `CurrentAccountEndToEndTest.getMe_shouldReturnStoredAccount_whenRegistered` verde (9 pruebas del E2E, 0 fallos) |
+  | V3 | Newman M-02: `phoneNumber` presente y `null` |
+  | V4 | Newman M-03 con `?firebase_uid={{uidOtra}}&id={{idOtra}}&uid={{uidOtra}}`: devuelve el `id` propio y nunca el de la otra |
+  | V5 | Newman M-04: 404 `ACCOUNT_NOT_FOUND` con «No encontramos una cuenta para este usuario» |
+  | V6 | Newman M-05, M-06 y M-06b: 400 `IDENTITY_REQUIRED` (sin encabezado, en blanco, 129 caracteres) |
+  | V7 | Newman M-06c con `' OR 1=1 --`: 404 y el cuerpo no repite el valor |
+  | V8 | Con el jar: fila sin fecha insertada por SQL → GET 200 con `"birthDate":null`, activación 200 y estado `ACTIVE`; además el E2E |
+  | V9 | Newman «Mi cuenta» (12 peticiones, 72 aserciones) y «Registro» (8 peticiones, 35 aserciones): 0 fallos y 0 respuestas 5xx |
+  | V10 | `ErrorCodeDocumentationTest` 34 y `UntypedExceptionClassificationTest` 1, dentro del `clean verify` |
+  | V11 | `LayeredArchitectureTest` 3, dentro del `clean verify` |
+  | V12 | JaCoCo por clase, líneas/ramas: `GetCurrentAccountService` 8/8 y 8/8; `CurrentAccountController` 4/4; `CurrentAccountResponse` 9/9; `IdentityRequiredException` 2/2; `AccountMapper` 19/19 y 4/4; `Account` 36/36 y 12/12; `AccountRecordingService` 15/15 y 2/2; `BusinessExceptionHandler` 120/120 y 51/52 (la rama sin cubrir es anterior a esta CM y no está en el método nuevo). Global 1035/1040 líneas (99,52 %) y 349/356 ramas (98,03 %), por encima de la base (1008/1013 y 337/344) |
+  | V13 | Sin `CM-`, `TODO`, `System.out` ni `printStackTrace` en las líneas agregadas de `src`. Tamaño: PR 0 = 459, PR 1 = 881 (contra el PR 0), PR 2 de Postman = 587; el PR 1 pasa de la meta de ~800 por las pruebas (E2E, controlador, servicio) pero queda por debajo de ~900 y de 1 000 |
+
+  `clean verify` de la punta del PR 1: 931 pruebas, 0 fallos, 0 omitidas (897 de la base + 34 nuevas). El PR 2 solo cambia `postman/`, `postman/README.md` y este archivo: su árbol de Java es idéntico al del PR 1, así que hereda el resultado.
+- **Desvíos de la ejecución:** (1) la base es `origin/develop` `f671999` y no la punta de C3c porque CM-279 se fusionó; (2) la aserción del charset del 200 pasó del test del controlador al E2E; (3) dos aserciones antiguas cambiaron de `isEqualTo(x)` a `contains(x)` porque `getBirthDate()` devuelve `Optional` (D36-6), sin perder fuerza; (4) el PR 1 quedó en 881 líneas.
+- **Revisión:** `/simplify` hecho sin agentes sobre el diff de `src` (dos imports con nombre completo, corregidos con `fixup` en el PR 1; sin otros hallazgos). `/code-review high` y `/security-review` quedan para Paula en el worktree `Documents\cameia-worktrees\cuentas-rev-CM-36` (Prompt H), porque la CM toca identidad y datos personales. `docs/bitacora-ia/`: sin entrada nueva, ninguna decisión con peso humano surgió en la ejecución.
+- **Pendiente de Paula (P36-2):** la prueba con su `.env` real; Newman ya pasó con credenciales sintéticas. Clave definitiva de Jira para el endpoint (P36-1, de Vela).
