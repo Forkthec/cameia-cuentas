@@ -884,6 +884,8 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
   evento» (mismo destino, CM-290). No hay código nuevo, así que `ErrorCodeDocumentationTest` no cambia. El archivo no cita ningún libro del backlog.
 - **Verificar:** `python C:\Users\paanm\Documents\cameia\.claude\skills\backend-estandar\verificar-documentos.py` si aplica al repo
   (léelo antes: si no aplica, no lo corras y dilo).
+- **Resultado (9-oct-2026):** hecha. Se crearon `docs/eventos/cuenta-creada-v1.md` y `docs/adr/0003-eventos-con-outbox.md`; `CLAUDE.md` (§1 contratos de eventos, §5 tabla `evento_saliente` y `V5`, §8 «Tarea de eventos de cuenta», §10 dos pendientes de DevOps) y `docs/errores.md` (fila del 500 del registro) se actualizaron. `verificar-documentos.py` aplica al repo y se corrió con `--base origin/develop`: sus avisos V-13 son los archivos de código de la rama (el verificador está pensado para un PR solo de documentos) y los V-05 que quedan están en documentos previos (`docs/errores.md`, ADR 0002, `docs/verificaciones/`); el ADR 0003 no genera ninguno tras quitar el nombre propio. No hay código de error nuevo, así que `ErrorCodeDocumentationTest` no cambia.
+  - *Nota de ejecución:* §2 de `CLAUDE.md` no cambia, porque `domain/event`, `messaging/publisher` y `messaging/payload` ya figuran en la estructura.
 
 ### T-C3.6 · Postman y Newman
 
