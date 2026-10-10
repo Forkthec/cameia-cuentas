@@ -914,6 +914,45 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
 
 - `.\mvnw.cmd clean verify`, cobertura por clase (C1 a C3), Newman completo, `git diff --stat` por bloque. Reporte con: pruebas,
   cobertura con cada línea sin cubrir y su razón, salida de Newman, prueba manual de la tarea con su código de salida.
+- **Resultado (9-oct-2026):** `.\mvnw.cmd -B clean verify` por capa, con la cadena corregida tras la verificación independiente:
+  C1a 762, C1b 781, C1c 794, C2a 813, C2b 843, C3a 868, C3b 875 y C3c 875 pruebas; 0 fallos, 0 errores, 0 omitidas, BUILD SUCCESS en
+  todas (registros en `ejecucion/verify279/`). Cobertura global de la punta (JaCoCo): 986/991 líneas (99,50 %) y 318/324 ramas
+  (98,15 %), por encima de la base (99,35 % y 97,74 %).
+  - *Newman completo contra el jar empaquetado*, con PostgreSQL, RabbitMQ recién creado y emulador de Firebase propios y credenciales
+    sintéticas: 18 peticiones, 61 aserciones, 0 fallos (carpetas `Registro` y `Eventos de cuenta (local)`).
+  - *Prueba manual de la tarea con el jar:* código de salida 0, sin puerto HTTP y con la línea `Relevo de eventos de cuenta terminado`.
+    Con Firebase caído y un evento pendiente: código de salida 1 y el evento publicado (H-03).
+  - *Hallazgo de entorno:* al final de la suite Surefire imprime `Surefire is going to kill self fork JVM`: cada contexto de Spring en
+    caché cierra su pool de Hikari con el contenedor de PostgreSQL ya detenido y tarda unos 4 s. No cambia el resultado; no se corrige
+    en esta CM.
+
+## 8. Correcciones tras la verificación independiente
+
+Informe: `analisis/verificacion_CM-279-cuentas.md`. Todo hallazgo se corrigió con su prueba y se aplicó en la capa donde nació.
+
+| Hallazgo | Resolución | Prueba |
+|---|---|---|
+| H-01 (alta) broker colgado o congelado | `spring.rabbitmq.channel-rpc-timeout` (500 ms en el servicio web, 5 s en la tarea) y plazo del saludo AMQP igual al de conexión. No se agregó el hilo auxiliar con espera acotada que proponía el informe: con los plazos las pruebas pasan | `RabbitEventPublisherHungBrokerTest` (antes 10 064 ms) y `RabbitEventPublisherPausedBrokerTest` (antes bloqueada), ambas por debajo de 1 200 ms |
+| H-02 `SPRING_RABBITMQ_*` en `.env` | Marcadores explícitos en `application.properties` | `RabbitPropertiesBindingTest` |
+| H-03 Firebase caído frena el relevo | La tarea publica igual los pendientes y relanza el error: salida 1. Cambia REQ-EV-24 (decisión de Paula, 9-oct-2026) | `run_shouldRelayPendingAndStillFail_whenDirectoryIsUnavailable` y corrida real |
+| H-04 IDs de métricas y protocolos | DES-03 pasa a DES-02 y FIA-06 a FIA-05 en spec, plan, tarjetas, ADR y pruebas; 20 repeticiones de FIA-02 y 5 de FIA-01 | `register_shouldPublishOnce_whenRepeatedTwentyTimes`, `enqueueMissing_shouldNotDuplicate_whenRunTwentyTimes`, `relayPending_shouldPublish_whenProcessStopsAfterCommit` (5 repeticiones) |
+| H-05 Newman en un broker nuevo | Petición E-00 que declara el exchange; E-03 lee hasta 10 mensajes y exige uno | Newman real, 61 aserciones, 0 fallos |
+| H-06 PR 0 de 1 556 líneas | Partido en spec y plan (665) y tarjetas (891) | `git diff --shortstat` por rama |
+| H-07 correo con tildes | El esquema declara `idn-email` | `payload_shouldDeclareIdnEmail_whenEmailHasNonAsciiCharacters` |
+| H-08 `EVENTS_ENABLED=false` | El interruptor es solo de pruebas; se documenta en el ADR 0003 | Revisión del texto |
+| H-09 migración con datos | `MigracionEventoSalienteConDatosTest` migra a V4, inserta cuentas y migra a V5; se comprobó que falla si V5 crea eventos | `migrationV5_shouldKeepAccountsAndCreateNoEvents_whenAccountsExistBefore` |
+| H-10 cobertura | `CuentasApplication.exitWhenOneShotJob` extraído y probado; se eliminó `getPublishedAt` | `CuentasApplicationTest` |
+| H-11 identificadores en español | Renombrados a `accountRecorder`, `publishAfterCommit`, `failure`, `failAfterLookups` y `handlerLinesOnly` | Suite en verde |
+| H-12 pruebas citadas y lotes de 100 | Prueba de privacidad separada. REQ-EV-20 pedía lotes de 100: se mantiene una lectura de hasta 5 000, porque un cursor tocaría el puerto, el adaptador, la consulta y tres dobles sin beneficio (confirmado por Paula, 9-oct-2026) | `register_shouldNotLogPersonalData_whenEventIsPublished` |
+| H-13 encabezados internos y doble aviso | Callback de devolución vacío y los dos encabezados documentados en el contrato | `publish_shouldReturnFalse_whenNoQueueIsBound` |
+| H-14 `package-info` | Creados en `messaging/payload` y `messaging/publisher` | Compilación |
+| H-15 Postman | E-07 y E-08 (identificador inválido) y más propiedades AMQP en E-03 | Newman real |
+| H-16 comentario del compose | Corregido | Revisión del texto |
+
+Otros cambios: la prueba que cuenta líneas de log (`BusinessExceptionHandlerTest`) filtra por la clase del manejador porque otros hilos
+escriben en la misma salida; las pruebas E2E de eventos usan un plazo de publicación de 5 s porque comprueban lógica y no tiempos.
+Aviso a la mitad Perfil: la republicación sale con un `message_id` nuevo, así que debe tratar `cuenta.creada` como idempotente por
+`usuarioId`.
 
 ## 7. Prueba manual de punta a punta (después de Cuentas C2 y Perfil P2)
 
