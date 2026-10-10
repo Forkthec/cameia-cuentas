@@ -99,6 +99,12 @@ jobs:
       # Firebase y Cloud Run comparten proyecto de GCP, por eso se toma de GCP_PROJECT_ID.
       # Las pruebas de CI no lo detectan: corren con FIREBASE_ENABLED=false.
       #
+      # SPRING_RABBITMQ_ADDRESSES: este servicio publica eventos en el broker RabbitMQ de
+      # staging. Es la propiedad que Spring Boot lee para conectarse, y su valor (una URL
+      # AMQPS que incluye las credenciales) viene de un secreto gestionado, nunca en texto
+      # plano en este archivo. La cuenta de ejecucion del servicio solo tiene permiso de
+      # lectura sobre ese secreto.
+      #
       # --service-account: identidad de ejecucion dedicada y exclusiva de este servicio, no
       # la cuenta de Compute Engine que comparten otros servicios. Solo tiene lo que este
       # servicio necesita: administrar usuarios en Firebase Auth (roles/firebaseauth.admin)
@@ -126,7 +132,7 @@ jobs:
             --subnet="${{ env.VPC_SUBNET }}" \
             --vpc-egress=all-traffic \
             --set-env-vars="SPRING_PROFILES_ACTIVE=prod,DB_HOST=10.20.0.3,DB_PORT=5432,DB_NAME=cameia_cuentas,DB_USERNAME=cameia_cuentas,FIREBASE_PROJECT_ID=${{ vars.GCP_PROJECT_ID }}" \
-            --set-secrets="DB_PASSWORD=cloudsql-staging-cuentas-password:latest"
+            --set-secrets="DB_PASSWORD=cloudsql-staging-cuentas-password:latest,SPRING_RABBITMQ_ADDRESSES=rabbitmq-amqps-url:latest"
 
       - name: URL del servicio desplegado
         run: gcloud run services describe "${{ env.SERVICE }}" --project="${{ vars.GCP_PROJECT_ID }}" --region="${{ env.REGION }}" --format="value(status.url)"
