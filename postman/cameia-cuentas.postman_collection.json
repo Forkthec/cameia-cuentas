@@ -10,18 +10,21 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "const tipo = (pm.response.headers.get('Content-Type') || '').toLowerCase();",
-          "pm.test('Content-Type con charset utf-8', () => pm.expect(tipo).to.include('charset=utf-8'));",
-          "if (pm.response.code >= 400) {",
-          "    pm.test('Error: application/problem+json', () => pm.expect(tipo).to.include('application/problem+json'));",
-          "    pm.test('Error: requestId igual a X-Request-Id', () =>",
-          "        pm.expect(pm.response.json().requestId).to.eql(pm.response.headers.get('X-Request-Id')));",
-          "    pm.test('Error: sin detalle interno', () => {",
-          "        const texto = pm.response.text();",
-          "        ['Exception', 'SQL', 'org.', 'tech.cameia'].forEach((marca) => pm.expect(texto).to.not.include(marca));",
-          "    });",
-          "} else {",
-          "    pm.test('Éxito: JSON', () => pm.expect(tipo).to.include('application/json'));",
+          "const delBroker = (pm.request.url.toString().indexOf(pm.environment.get('rabbitManagementUrl') || '\\u0000') === 0);",
+          "if (!delBroker) {",
+          "    const tipo = (pm.response.headers.get('Content-Type') || '').toLowerCase();",
+          "    pm.test('Content-Type con charset utf-8', () => pm.expect(tipo).to.include('charset=utf-8'));",
+          "    if (pm.response.code >= 400) {",
+          "        pm.test('Error: application/problem+json', () => pm.expect(tipo).to.include('application/problem+json'));",
+          "        pm.test('Error: requestId igual a X-Request-Id', () =>",
+          "            pm.expect(pm.response.json().requestId).to.eql(pm.response.headers.get('X-Request-Id')));",
+          "        pm.test('Error: sin detalle interno', () => {",
+          "            const texto = pm.response.text();",
+          "            ['Exception', 'SQL', 'org.', 'tech.cameia'].forEach((marca) => pm.expect(texto).to.not.include(marca));",
+          "        });",
+          "    } else {",
+          "        pm.test('Éxito: JSON', () => pm.expect(tipo).to.include('application/json'));",
+          "    }",
           "}"
         ]
       }
@@ -54,6 +57,18 @@
     },
     {
       "key": "emailCaido",
+      "value": ""
+    },
+    {
+      "key": "eventEmail",
+      "value": ""
+    },
+    {
+      "key": "eventRequestId",
+      "value": ""
+    },
+    {
+      "key": "eventFirebaseUid",
       "value": ""
     }
   ],
@@ -524,6 +539,613 @@
                 "api",
                 "v1",
                 "users"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Eventos de cuenta (local)",
+      "description": "Requiere el broker de compose levantado y la contraseña del .env en rabbitPassword. Comprueba que un registro nuevo publica exactamente un evento cuenta.creada con la carga del contrato.",
+      "item": [
+        {
+          "name": "E-00 — 201 o 204 exchange de eventos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201 o 204', () => pm.expect(pm.response.code).to.be.oneOf([201, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{rabbitManagementUrl}}/api/exchanges/%2F/cuentas.events",
+              "host": [
+                "{{rabbitManagementUrl}}"
+              ],
+              "path": [
+                "api",
+                "exchanges",
+                "%2F",
+                "cuentas.events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"topic\",\n  \"durable\": true,\n  \"auto_delete\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-01a — 201 o 204 cola de prueba",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201 o 204', () => pm.expect(pm.response.code).to.be.oneOf([201, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{rabbitManagementUrl}}/api/queues/%2F/qa.cuenta-creada",
+              "host": [
+                "{{rabbitManagementUrl}}"
+              ],
+              "path": [
+                "api",
+                "queues",
+                "%2F",
+                "qa.cuenta-creada"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"durable\": false,\n  \"auto_delete\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-01b — 201 enlace de la cola con cuenta.creada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201 o 204', () => pm.expect(pm.response.code).to.be.oneOf([201, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{rabbitManagementUrl}}/api/bindings/%2F/e/cuentas.events/q/qa.cuenta-creada",
+              "host": [
+                "{{rabbitManagementUrl}}"
+              ],
+              "path": [
+                "api",
+                "bindings",
+                "%2F",
+                "e",
+                "cuentas.events",
+                "q",
+                "qa.cuenta-creada"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routing_key\": \"cuenta.creada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-02 — 201 registro que publica el evento",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// La marca de tiempo evita colisiones entre vueltas; el mismo identificador de petición viaja al evento.",
+                  "const marca = Date.now();",
+                  "pm.collectionVariables.set('eventEmail', 'evento+' + marca + '@ejemplo.test');",
+                  "pm.collectionVariables.set('eventRequestId', 'pm-' + marca);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('eventFirebaseUid', pm.response.json().firebaseUid);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{eventRequestId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"15/03/2008\",\n  \"email\": \"{{eventEmail}}\",\n  \"password\": \"una frase muy larga 2026\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "E-03 — un mensaje con la carga del contrato",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "const mensajes = pm.response.json();",
+                  "pm.test('Hay exactamente un mensaje', () => pm.expect(mensajes).to.have.lengthOf(1));",
+                  "const carga = JSON.parse(mensajes[0].payload);",
+                  "pm.test('La carga tiene exactamente las cuatro claves del contrato', () =>",
+                  "    pm.expect(Object.keys(carga).sort()).to.eql(['creadaEn', 'email', 'fechaNacimiento', 'usuarioId']));",
+                  "pm.test('usuarioId es el firebaseUid del registro', () =>",
+                  "    pm.expect(carga.usuarioId).to.eql(pm.collectionVariables.get('eventFirebaseUid')));",
+                  "pm.test('email en minúsculas', () =>",
+                  "    pm.expect(carga.email).to.eql(pm.collectionVariables.get('eventEmail').toLowerCase()));",
+                  "pm.test('fechaNacimiento 2008-03-15', () => pm.expect(carga.fechaNacimiento).to.eql('2008-03-15'));",
+                  "pm.test('creadaEn con milisegundos y Z', () =>",
+                  "    pm.expect(carga.creadaEn).to.match(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/));",
+                  "const propiedades = mensajes[0].properties;",
+                  "pm.test('Propiedades AMQP del contrato', () => {",
+                  "    pm.expect(propiedades.type).to.eql('cuenta.creada');",
+                  "    pm.expect(propiedades.app_id).to.eql('cameia-cuentas');",
+                  "    pm.expect(propiedades.correlation_id).to.eql(pm.collectionVariables.get('eventRequestId'));",
+                  "    pm.expect(propiedades.headers['x-event-version']).to.eql(1);",
+                  "    pm.expect(propiedades.content_type).to.eql('application/json');",
+                  "    pm.expect(propiedades.message_id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);",
+                  "    pm.expect(propiedades.delivery_mode).to.eql(2);",
+                  "    pm.expect(propiedades.content_encoding).to.eql('UTF-8');",
+                  "    pm.expect(propiedades.headers['x-causation-id']).to.eql(pm.collectionVariables.get('eventRequestId'));",
+                  "    pm.expect(propiedades.timestamp).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{rabbitManagementUrl}}/api/queues/%2F/qa.cuenta-creada/get",
+              "host": [
+                "{{rabbitManagementUrl}}"
+              ],
+              "path": [
+                "api",
+                "queues",
+                "%2F",
+                "qa.cuenta-creada",
+                "get"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 10,\n  \"ackmode\": \"ack_requeue_false\",\n  \"encoding\": \"auto\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-04 — 200 el mismo registro no publica otra vez",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{eventRequestId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"15/03/2008\",\n  \"email\": \"{{eventEmail}}\",\n  \"password\": \"una frase muy larga 2026\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "E-05 — la cola sigue vacía",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No hubo un segundo evento', () => pm.expect(pm.response.json()).to.eql([]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{rabbitManagementUrl}}/api/queues/%2F/qa.cuenta-creada/get",
+              "host": [
+                "{{rabbitManagementUrl}}"
+              ],
+              "path": [
+                "api",
+                "queues",
+                "%2F",
+                "qa.cuenta-creada",
+                "get"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 1,\n  \"ackmode\": \"ack_requeue_false\",\n  \"encoding\": \"auto\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-07 — 201 registro con X-Request-Id de 65 caracteres",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('hostileEmail', 'hostil+' + Date.now() + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"15/03/2008\",\n  \"email\": \"{{hostileEmail}}\",\n  \"password\": \"una frase muy larga 2026\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "E-08 — el identificador inválido se reemplaza por el message_id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "const mensajes = pm.response.json();",
+                  "pm.test('Hay exactamente un mensaje', () => pm.expect(mensajes).to.have.lengthOf(1));",
+                  "const propiedades = mensajes[0].properties;",
+                  "pm.test('correlation_id y x-causation-id son el message_id, no el identificador inválido', () => {",
+                  "    pm.expect(propiedades.correlation_id).to.eql(propiedades.message_id);",
+                  "    pm.expect(propiedades.headers['x-causation-id']).to.eql(propiedades.message_id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{rabbitManagementUrl}}/api/queues/%2F/qa.cuenta-creada/get",
+              "host": [
+                "{{rabbitManagementUrl}}"
+              ],
+              "path": [
+                "api",
+                "queues",
+                "%2F",
+                "qa.cuenta-creada",
+                "get"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 10,\n  \"ackmode\": \"ack_requeue_false\",\n  \"encoding\": \"auto\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-06 — 204 borrar la cola de prueba",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{rabbitManagementUrl}}/api/queues/%2F/qa.cuenta-creada",
+              "host": [
+                "{{rabbitManagementUrl}}"
+              ],
+              "path": [
+                "api",
+                "queues",
+                "%2F",
+                "qa.cuenta-creada"
               ]
             }
           }
