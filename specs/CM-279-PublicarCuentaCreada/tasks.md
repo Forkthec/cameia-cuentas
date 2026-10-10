@@ -451,6 +451,7 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
   no dejar credenciales por defecto, igual que `DB_PASSWORD`; no es la corrección de un fallo. Las pruebas con Testcontainers sí usan
   `guest` (regla 4).
 - **Verificar:** `docker compose config` sin errores; `.\mvnw.cmd test` en verde (con `EVENTS_ENABLED=false` ningún contexto se conecta).
+- **Resultado (9-oct-2026):** hecha. Es solo configuración (no hay prueba que falle primero): `docker compose config` sin errores (con `DB_PASSWORD`, `FIREBASE_PROJECT_ID` y `SPRING_RABBITMQ_PASSWORD` definidas); `CuentasApplicationTests` 1 y `AccountRegistrationEndToEndTest` 41 en verde con `spring-boot-starter-amqp` y `EVENTS_ENABLED=false` (ningún contexto se conecta al broker). La suite completa corre al cerrar C2 (T-C2.6).
 
 ### T-C2.2 · Puerto `EventPublisher`, `RabbitEventPublisher` y configuración
 
@@ -557,6 +558,11 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
   `getReturned()` devuelve `ReturnedMessage` y `Confirm` es un record con `ack()` y `reason()`. Si al ejecutar el jar del repo difiere, detente y reporta. Si `@ConditionalOnProperty` no
   desactiva la creación de la fábrica de conexiones (la crea la autoconfiguración de Boot), no importa: es perezosa.
 - **Verificar:** `.\mvnw.cmd -q test -Dtest="RabbitEventPublisherTest,AccountEventsPropertiesTest,LayeredArchitectureTest"` y la suite.
+- **Resultado (9-oct-2026):** hecha. Primero falló la compilación de las pruebas (`EventPublisher` y `AccountEventsProperties` no existían). Después: `AccountEventsPropertiesTest` 8, `RabbitEventPublisherTest` 2 y `RabbitEventPublisherBrokerDownTest` 1 (con broker caído responde `false` en menos de 1 200 ms), `LayeredArchitectureTest` 3 y `UntypedExceptionClassificationTest` 1 en verde; suite completa 804 pruebas, 0 fallos, BUILD SUCCESS.
+  - *Nota de ejecución 1:* el timestamp de AMQP guarda segundos, así que la prueba espera `2026-10-09T15:04:05Z`; los milisegundos viajan en `creadaEn` de la carga.
+  - *Nota de ejecución 2:* `@ConditionalOnMissingBean` en el doble no ve el bean real (se evalúa antes), así que `InMemoryEventPublisherConfiguration` usa `@ConditionalOnProperty(cuentas.events.enabled=false)`.
+  - *Nota de ejecución 3:* el caso del broker caído va en su propia clase (`RabbitEventPublisherBrokerDownTest`) porque necesita un contexto sin contenedor de RabbitMQ.
+  - *Nota de ejecución 4:* el plazo se valida con `@DurationMin/@DurationMax` de Hibernate Validator (sin constructor).
 
 ### T-C2.3 · `OutboxRelayService`
 

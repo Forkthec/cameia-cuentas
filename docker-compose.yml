@@ -27,6 +27,29 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  rabbitmq:
+    # Broker donde Cuentas publica sus eventos. El usuario y la contraseña salen del .env: no se
+    # dejan credenciales por defecto, igual que la contraseña de la base de datos.
+    image: rabbitmq:3.13-management-alpine
+    container_name: cameia-cuentas-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${SPRING_RABBITMQ_USERNAME:-cameia}
+      RABBITMQ_DEFAULT_PASS: ${SPRING_RABBITMQ_PASSWORD:?Defina SPRING_RABBITMQ_PASSWORD en el archivo .env}
+    ports:
+      # Puertos publicados en la máquina del desarrollador; por dentro el broker escucha en 5672 y 15672.
+      - "${RABBITMQ_PORT_HOST:-5673}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT_HOST:-15673}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - default
+      - cameia-net
+
   cuentas:
     build:
       context: .
@@ -37,6 +60,9 @@ services:
       db:
         # La aplicación no arranca hasta que PostgreSQL acepta conexiones; de lo
         # contrario Hibernate falla al validar el esquema.
+        condition: service_healthy
+      rabbitmq:
+        # La aplicación publica al registrar; el broker debe estar listo antes de la primera petición.
         condition: service_healthy
     environment:
       SERVER_PORT: ${SERVER_PORT:-8081}
@@ -51,6 +77,11 @@ services:
       DB_NAME: ${DB_NAME:-DB-cuentas}
       DB_USERNAME: ${DB_USERNAME:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD en el archivo .env}
+      # Broker de eventos: nombre de servicio y puerto interno de la red de Compose.
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${SPRING_RABBITMQ_USERNAME:-cameia}
+      SPRING_RABBITMQ_PASSWORD: ${SPRING_RABBITMQ_PASSWORD:?Defina SPRING_RABBITMQ_PASSWORD en el archivo .env}
       # Firebase custodia las credenciales de los usuarios. La ruta es la del archivo
       # dentro del contenedor, no la del host: el volumen de abajo monta ahí el JSON que
       # indica FIREBASE_KEY_PATH en el .env.
