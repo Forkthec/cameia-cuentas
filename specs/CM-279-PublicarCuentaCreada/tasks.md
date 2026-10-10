@@ -907,6 +907,8 @@ emite la carga inicial y permite republicar. Ninguna tarjeta está bloqueada.
   `npx newman run postman\cameia-cuentas.postman_collection.json -e postman\local.postman_environment.json --env-var rabbitPassword=<la del .env> --reporters cli,junit`
   y pega la salida (todas las peticiones de la colección, no solo la carpeta nueva).
 - **Modificar** `postman/README.md`: tabla de archivos y la carpeta nueva, con el requisito «broker de compose levantado».
+- **Resultado (9-oct-2026):** colección y entorno actualizados (carpeta «Eventos de cuenta (local)» con E-01a, E-01b y E-02 a E-06; `postman/README.md`). **Newman contra el jar real: PENDIENTE (Paula).** No se pudo ejecutar: la aplicación necesita el emulador de Firebase Auth (lo levanta `cameia-gateway`, que esta tarea no toca) y el `.env` con la contraseña del broker. Lo que sí se ejecutó: `npx newman run ... --folder "Eventos de cuenta (local)"` contra un simulacro local (HTTP en Node con la misma forma de respuestas de la aplicación y del API de administración del broker), con 7 peticiones, 15 aserciones y 0 fallos; sirve para comprobar que los scripts de la colección corren, no como evidencia del servicio. El mismo recorrido con el servicio real lo demuestra `AccountCreatedEventEndToEndTest` contra PostgreSQL y RabbitMQ reales.
+  - *Nota de ejecución:* el script de la colección envuelve sus comprobaciones de `charset` y `problem+json` en `if (!delBroker)`: el API de administración del broker no devuelve `charset` y sus éxitos incluyen un 204 sin cuerpo.
 
 ### T-C3.7 · Cierre del bloque C3 y de la mitad Cuentas
 
