@@ -4,7 +4,7 @@ Esta carpeta trae la colección de Postman del microservicio de Cuentas y el ent
 
 | Archivo | Contenido |
 |---|---|
-| `cameia-cuentas.postman_collection.json` | Colección v2.1: carpeta `Registro` (8 peticiones), carpeta `Firebase no disponible (manual)` (1 petición) y carpeta `Eventos de cuenta (local)` (10 peticiones) |
+| `cameia-cuentas.postman_collection.json` | Colección v2.1: carpeta `Registro` (8 peticiones), carpeta `Firebase no disponible (manual)` (1 petición), carpeta `Eventos de cuenta (local)` (10 peticiones) y carpeta `Mi cuenta` (12 peticiones) |
 | `local.postman_environment.json` | Entorno local: `baseUrl` (`http://localhost:8081`, el puerto de `SERVER_PORT`) y los datos del broker de compose (`rabbitManagementUrl`, `rabbitUser` y `rabbitPassword`, esta última vacía). No lleva secretos |
 
 ## Qué verifica
@@ -43,6 +43,25 @@ Carpeta `Eventos de cuenta (local)`: comprueba que un registro nuevo publica exa
 | E-08 | El `get` de E-03 | Un mensaje cuyo `correlation_id` y `x-causation-id` son su `message_id`: el identificador inválido se descarta |
 | E-06 | `DELETE .../qa.cuenta-creada` | 204 |
 
+Carpeta `Mi cuenta` (`GET /api/v1/users/me`): registra dos cuentas sintéticas y consulta la primera con la identidad que pondría el Gateway. Todas las peticiones comprueban además que respondan en menos de 2 s.
+
+| # | Petición | Resultado esperado |
+|---|---|---|
+| M-00 | Registro de la cuenta que se consultará | 201; guarda `meUid` |
+| M-00b | Registro de una segunda cuenta | 201; guarda `uidOtra` e `idOtra` |
+| M-01 | `GET /api/v1/users/me` con `X-User-Id: {{meUid}}` | 200 con exactamente `id`, `firstName`, `lastName`, `birthDate` (`1995-04-12`), `phoneNumber`, `pronoun`, `status` (`PENDING_VERIFICATION`) y `plan` (`FREE`); sin correo ni identificadores internos; encabezado `Cache-Control: no-store` |
+| M-02 | La misma consulta | 200 con `phoneNumber` presente y `null` (la cuenta se registró sin celular) |
+| M-03 | Consulta con `?firebase_uid={{uidOtra}}&id={{idOtra}}&uid={{uidOtra}}` | 200 con el `id` propio y nunca el de la otra cuenta |
+| M-04 | `X-User-Id` de una cuenta que no existe | 404 `ACCOUNT_NOT_FOUND` con «No encontramos una cuenta para este usuario» |
+| M-05 | Sin `X-User-Id` | 400 `IDENTITY_REQUIRED` con «La petición no incluye los datos que exige esta ruta» |
+| M-06 | `X-User-Id` en blanco | 400 `IDENTITY_REQUIRED` |
+| M-06b | `X-User-Id` de 129 caracteres | 400 `IDENTITY_REQUIRED` |
+| M-06c | `X-User-Id: ' OR 1=1 --` | 404 `ACCOUNT_NOT_FOUND`, sin repetir el valor |
+| M-08 | `Accept: application/xml` | 406 `MEDIA_TYPE_NOT_ACCEPTABLE` |
+| M-09 | `GET /v3/api-docs` | 200 con `GET /api/v1/users/me` y sus respuestas 200, 400, 404, 406 y 500; exige `API_DOCUMENTATION_ENABLED=true` |
+
+La cuenta anterior al registro con fecha (sin fecha de nacimiento, que se devuelve con `birthDate: null`) no se puede crear por la API, así que no tiene petición aquí: la cubre `CurrentAccountEndToEndTest.getMe_shouldReturnBirthDateNull_whenLegacyAccountHasNoBirthDate`.
+
 La carpeta `Firebase no disponible (manual)` tiene una sola petición: 503 `DEPENDENCY_UNAVAILABLE` en menos de 9 s.
 
 ## Cómo correrla
@@ -59,6 +78,7 @@ npx newman run postman/cameia-cuentas.postman_collection.json -e postman/local.p
   npx newman run postman/cameia-cuentas.postman_collection.json -e postman/local.postman_environment.json --folder "Eventos de cuenta (local)" --env-var rabbitPassword=<la del .env> --reporters cli,junit --reporter-junit-export target/newman-eventos.xml
   ```
 
+- La carpeta de la consulta se corre con `--folder "Mi cuenta"` y `--reporter-junit-export target/newman-mi-cuenta.xml`; no necesita el broker.
 - Para medir tiempos, `-n 100` repite la carpeta 100 veces; cada vuelta usa correos nuevos.
 - Para importarla en Postman: **Import** con los dos archivos `.json`, y elegir el entorno `cameia-cuentas local`.
 

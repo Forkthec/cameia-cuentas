@@ -70,6 +70,30 @@
     {
       "key": "eventFirebaseUid",
       "value": ""
+    },
+    {
+      "key": "meEmail",
+      "value": ""
+    },
+    {
+      "key": "otraEmail",
+      "value": ""
+    },
+    {
+      "key": "meUid",
+      "value": ""
+    },
+    {
+      "key": "meId",
+      "value": ""
+    },
+    {
+      "key": "uidOtra",
+      "value": ""
+    },
+    {
+      "key": "idOtra",
+      "value": ""
     }
   ],
   "item": [
@@ -1146,6 +1170,538 @@
                 "queues",
                 "%2F",
                 "qa.cuenta-creada"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mi cuenta",
+      "description": "GET /api/v1/users/me: la cuenta de quien llama, sin correo; la identidad sale solo de X-User-Id. M-09 exige API_DOCUMENTATION_ENABLED=true.",
+      "item": [
+        {
+          "name": "M-00 · 201 registro de la cuenta que se consultará",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('meEmail', 'mi-cuenta+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('meUid', pm.response.json().firebaseUid);",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{meEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "M-00b · 201 segunda cuenta",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('otraEmail', 'otra-cuenta+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('uidOtra', pm.response.json().firebaseUid);",
+                  "pm.collectionVariables.set('idOtra', pm.response.json().id);",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Beatriz\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{otraEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "M-01 · 200 mi cuenta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Cache-Control no-store', () => pm.expect(pm.response.headers.get('Cache-Control')).to.eql('no-store'));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('Exactamente los ocho campos de la historia', () =>",
+                  "    pm.expect(Object.keys(cuerpo).sort()).to.eql([\"birthDate\",\"firstName\",\"id\",\"lastName\",\"phoneNumber\",\"plan\",\"pronoun\",\"status\"]));",
+                  "pm.test('Datos registrados, estado pendiente y plan FREE', () => {",
+                  "    pm.expect(cuerpo.firstName).to.eql('Ana');",
+                  "    pm.expect(cuerpo.lastName).to.eql('Pérez');",
+                  "    pm.expect(cuerpo.birthDate).to.eql('1995-04-12');",
+                  "    pm.expect(cuerpo.pronoun).to.eql('SHE');",
+                  "    pm.expect(cuerpo.status).to.eql('PENDING_VERIFICATION');",
+                  "    pm.expect(cuerpo.plan).to.eql('FREE');",
+                  "});",
+                  "pm.test('Sin correo ni identificadores internos', () => {",
+                  "    const texto = pm.response.text();",
+                  "    pm.expect(texto).to.not.include('@ejemplo.test');",
+                  "    pm.expect(texto).to.not.include(pm.collectionVariables.get('meUid'));",
+                  "});",
+                  "pm.collectionVariables.set('meId', cuerpo.id);",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{meUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-02 · 200 sin celular",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('phoneNumber presente y nulo', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property('phoneNumber');",
+                  "    pm.expect(cuerpo.phoneNumber).to.eql(null);",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{meUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-03 · 200 ignora firebase_uid de otra cuenta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve la cuenta propia y nunca la de la otra', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.id).to.eql(pm.collectionVariables.get('meId'));",
+                  "    pm.expect(cuerpo.id).to.not.eql(pm.collectionVariables.get('idOtra'));",
+                  "    pm.expect(cuerpo.firstName).to.eql('Ana');",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{meUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me?firebase_uid={{uidOtra}}&id={{idOtra}}&uid={{uidOtra}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ],
+              "query": [
+                {
+                  "key": "firebase_uid",
+                  "value": "{{uidOtra}}"
+                },
+                {
+                  "key": "id",
+                  "value": "{{idOtra}}"
+                },
+                {
+                  "key": "uid",
+                  "value": "{{uidOtra}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-04 · 404 sin cuenta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 404', () => pm.response.to.have.status(404));",
+                  "pm.test('ACCOUNT_NOT_FOUND con su mensaje', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('ACCOUNT_NOT_FOUND');",
+                  "    pm.expect(cuerpo.detail).to.eql('No encontramos una cuenta para este usuario');",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "uid-inexistente-{{$timestamp}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-05 · 400 sin X-User-Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('IDENTITY_REQUIRED con su mensaje', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('IDENTITY_REQUIRED');",
+                  "    pm.expect(cuerpo.detail).to.eql('La petición no incluye los datos que exige esta ruta');",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-06 · 400 X-User-Id en blanco",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('IDENTITY_REQUIRED', () => pm.expect(pm.response.json().code).to.eql('IDENTITY_REQUIRED'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "   "
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-06b · 400 X-User-Id de 129 caracteres",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('IDENTITY_REQUIRED', () => pm.expect(pm.response.json().code).to.eql('IDENTITY_REQUIRED'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-06c · 404 X-User-Id con forma de inyección SQL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 404', () => pm.response.to.have.status(404));",
+                  "pm.test('ACCOUNT_NOT_FOUND sin eco del valor', () => {",
+                  "    pm.expect(pm.response.json().code).to.eql('ACCOUNT_NOT_FOUND');",
+                  "    pm.expect(pm.response.text()).to.not.include('OR 1=1');",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "' OR 1=1 --"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-08 · 406 si solo acepta XML",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 406', () => pm.response.to.have.status(406));",
+                  "pm.test('MEDIA_TYPE_NOT_ACCEPTABLE', () => pm.expect(pm.response.json().code).to.eql('MEDIA_TYPE_NOT_ACCEPTABLE'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{meUid}}"
+              },
+              {
+                "key": "Accept",
+                "value": "application/xml"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-09 · 200 OpenAPI publica GET /api/v1/users/me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Publica GET /api/v1/users/me con sus respuestas', () => {",
+                  "    const operacion = pm.response.json().paths['/api/v1/users/me'].get;",
+                  "    pm.expect(operacion).to.be.an('object');",
+                  "    ['200', '400', '404', '406', '500'].forEach((estado) => pm.expect(operacion.responses).to.have.property(estado));",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v3/api-docs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v3",
+                "api-docs"
               ]
             }
           }
