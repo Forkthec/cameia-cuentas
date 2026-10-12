@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import tech.cameia.cuentas.domain.exception.AccountConflictException;
 import tech.cameia.cuentas.domain.exception.ErrorCode;
@@ -52,6 +55,35 @@ class AccountRepositoryAdapterConflictTest {
                 .isInstanceOf(AccountConflictException.class)
                 .extracting(error -> ((AccountConflictException) error).getErrorCode())
                 .isEqualTo(ErrorCode.ACCOUNT_CONFLICT);
+    }
+
+    @Test
+    @DisplayName("Si la fila cambió desde que se leyó la cuenta, no se guarda nada")
+    void save_shouldThrowAccountConflict_whenRowVersionChangedAfterReading() {
+        AccountEntity actual = mapeador.toEntity(cuenta());
+        ReflectionTestUtils.setField(actual, "version", 4L);
+        when(jpa.findByFirebaseUid(UID)).thenReturn(Optional.of(actual));
+        Account leidaConVersionVieja = Account.rebuild(UUID.randomUUID(), UID, "Ana", "Pérez", null, null, Pronoun.SHE,
+                AccountStatus.PENDING_VERIFICATION, 3L);
+
+        assertThatThrownBy(() -> adaptador.save(leidaConVersionVieja)).isInstanceOf(AccountConflictException.class);
+
+        verify(jpa, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Si la versión leída sigue siendo la de la fila, se guarda")
+    void save_shouldSave_whenRowVersionIsTheOneRead() {
+        AccountEntity actual = mapeador.toEntity(cuenta());
+        ReflectionTestUtils.setField(actual, "version", 4L);
+        when(jpa.findByFirebaseUid(UID)).thenReturn(Optional.of(actual));
+        when(jpa.save(any())).thenReturn(actual);
+        Account leida = Account.rebuild(UUID.randomUUID(), UID, "Ana", "Pérez", null, null, Pronoun.SHE,
+                AccountStatus.PENDING_VERIFICATION, 4L);
+
+        assertThat(adaptador.save(leida).getVersion()).contains(4L);
+
+        verify(jpa).save(actual);
     }
 
     @Test

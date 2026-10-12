@@ -21,6 +21,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import tech.cameia.cuentas.domain.exception.AccountConflictException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
@@ -162,6 +163,34 @@ class AccountRepositoryAdapterTest {
         List<String> uids = repositorio.findPendingVerificationCreatedBefore(now.minus(168, ChronoUnit.HOURS), 2);
 
         assertThat(uids).containsExactly("uid-a", "uid-b");
+    }
+
+    @Test
+    @DisplayName("Activar una cuenta leída antes de que otra petición la deshabilitara no pisa el cambio")
+    void save_shouldThrowConflictAndKeepDisabled_whenRowChangedAfterReading() {
+        jdbc.update("DELETE FROM microcuentas.cuenta");
+        repositorio.save(cuentaDe("uid-carrera"));
+        Account leida = repositorio.findByFirebaseUid("uid-carrera").orElseThrow();
+        // Otra petición deshabilita la cuenta (y sube la versión) después de la lectura
+        jdbc.update("UPDATE microcuentas.cuenta SET estado = 'DISABLED', version = version + 1 WHERE firebase_uid = 'uid-carrera'");
+        leida.activate();
+
+        assertThatThrownBy(() -> repositorio.save(leida)).isInstanceOf(AccountConflictException.class);
+
+        assertThat(jdbc.queryForObject("SELECT estado FROM microcuentas.cuenta WHERE firebase_uid = 'uid-carrera'", String.class))
+                .isEqualTo("DISABLED");
+    }
+
+    @Test
+    @DisplayName("Dos guardados seguidos de la cuenta leída: el segundo ve la versión nueva y se rechaza")
+    void save_shouldThrowConflict_whenSavingTheSameStaleAccountTwice() {
+        jdbc.update("DELETE FROM microcuentas.cuenta");
+        repositorio.save(cuentaDe("uid-doble"));
+        Account leida = repositorio.findByFirebaseUid("uid-doble").orElseThrow();
+        leida.activate();
+        repositorio.save(leida);
+
+        assertThatThrownBy(() -> repositorio.save(leida)).isInstanceOf(AccountConflictException.class);
     }
 
     @Test

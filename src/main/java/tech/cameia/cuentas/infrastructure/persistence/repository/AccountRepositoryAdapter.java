@@ -52,14 +52,15 @@ public class AccountRepositoryAdapter implements AccountRepository {
      *
      * @param account cuenta a persistir
      * @return la cuenta tal como quedó almacenada
-     * @throws AccountConflictException si otra escritura cambió la fila al mismo tiempo
+     * @throws AccountConflictException si otra escritura cambió la fila después de leer la cuenta o al mismo tiempo
      */
     @Override
     public Account save(Account account) {
         AccountEntity entidad = repositorio.findByFirebaseUid(account.getFirebaseUid())
-                .map(existente -> {
-                    existente.setEstado(account.getStatus());
-                    return existente;
+                .map(existing -> {
+                    rejectIfRowChanged(account, existing);
+                    existing.setEstado(account.getStatus());
+                    return existing;
                 })
                 .orElseGet(() -> mapeador.toEntity(account));
 
@@ -69,6 +70,24 @@ public class AccountRepositoryAdapter implements AccountRepository {
             // Otra escritura cambió la fila entre su lectura y este guardado; el dominio no conoce JPA
             throw new AccountConflictException();
         }
+    }
+
+    /**
+     * Rechaza el guardado si la fila cambió desde que se leyó la cuenta.
+     *
+     * <p>Sin esta comparación, el guardado recargaría la fila con su versión actual y pisaría el cambio ajeno sin que el
+     * bloqueo optimista lo notara (por ejemplo, reactivar una cuenta que otra petición acaba de deshabilitar).</p>
+     *
+     * @param account cuenta que se guarda; si no trae versión, es nueva y no hay nada que comparar
+     * @param existing fila actual
+     * @throws AccountConflictException si la versión leída ya no es la de la fila
+     */
+    private static void rejectIfRowChanged(Account account, AccountEntity existing) {
+        account.getVersion().ifPresent(leida -> {
+            if (!leida.equals(existing.getVersion())) {
+                throw new AccountConflictException();
+            }
+        });
     }
 
     /**
