@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import tech.cameia.cuentas.domain.model.Account;
+import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.UnannouncedAccount;
 import tech.cameia.cuentas.domain.port.AccountRepository;
 
@@ -17,6 +18,7 @@ public class InMemoryAccountRepository implements AccountRepository {
 
     private final Map<String, Account> accounts = new LinkedHashMap<>();
     private final List<UnannouncedAccount> unannounced = new ArrayList<>();
+    private Boolean forcedDeleteResult;
 
     /**
      * Guarda la cuenta en memoria.
@@ -39,6 +41,35 @@ public class InMemoryAccountRepository implements AccountRepository {
     @Override
     public Optional<Account> findByFirebaseUid(String firebaseUid) {
         return Optional.ofNullable(accounts.get(firebaseUid));
+    }
+
+    /**
+     * Borra la cuenta si está pendiente de verificar, salvo que se haya pedido simular que ya no lo está.
+     *
+     * @param firebaseUid identidad de Firebase
+     * @return {@code true} si borró la cuenta
+     */
+    @Override
+    public boolean deletePendingByFirebaseUid(String firebaseUid) {
+        Account account = accounts.get(firebaseUid);
+        if (forcedDeleteResult != null) {
+            boolean forced = forcedDeleteResult;
+            forcedDeleteResult = null;
+            return forced && accounts.remove(firebaseUid) != null;
+        }
+        if (account == null || account.getStatus() != AccountStatus.PENDING_VERIFICATION) {
+            return false;
+        }
+        accounts.remove(firebaseUid);
+        return true;
+    }
+
+    /**
+     * Hace que el próximo borrado responda {@code false} sin tocar la cuenta, como si otra petición la hubiera activado
+     * entre la decisión y el borrado.
+     */
+    public void failNextDeleteAsNoLongerPending() {
+        forcedDeleteResult = Boolean.FALSE;
     }
 
     /**

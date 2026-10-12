@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:cameia:eventos:cuenta-eliminada:v1",
+  "title": "cuenta.eliminada versión 1",
+  "description": "Cuerpo del evento que publica cameia-cuentas en el exchange cuentas.events con la clave cuenta.eliminada.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["usuarioId", "eliminadaEn"],
+  "properties": {
+    "usuarioId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "eliminadaEn": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$" }
+  },
+  "examples": [
+    {
+      "usuarioId": "6f1d2c3b4a5e4f60718293a4b5c6d7e8",
+      "eliminadaEn": "2026-10-10T08:00:00.000Z"
+    }
+  ]
+}

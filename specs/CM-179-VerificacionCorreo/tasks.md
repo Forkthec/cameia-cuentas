@@ -226,7 +226,9 @@ Resultado: `V6` y `V7` (no había migraciones posteriores a `V5` en `develop`). 
 - **Pruebas:** en `CuentaSchemaMigrationTest`, `select indexdef from pg_indexes where indexname = 'ix_cuenta_pendiente_fecha_creacion'` contiene `WHERE` y `PENDING_VERIFICATION`. En `EventoSalienteSchemaMigrationTest`, `insert_shouldAccept_whenTypeIsAccountDeleted` (insertar `'cuenta.eliminada'` pasa); `insert_shouldFail_whenTypeIsUnknown` (existente, con `cuenta.borrada`) sigue en verde.
 - **Verificación:** con Docker, `./mvnw.cmd -q -B "-Dtest=CuentaSchemaMigrationTest,EventoSalienteSchemaMigrationTest,MigracionEventoSalienteConDatosTest" test`. Commit 5.
 
-## [ ] T-2.2 · Evento `cuenta.eliminada` y su contrato — ≤ 30 min
+## [x] T-2.2 · Evento `cuenta.eliminada` y su contrato — ≤ 30 min
+
+Resultado: `AccountDeletedTest` 3, `AccountDeletedPayloadV1Test` 6 y `OutboxRepositoryAdapterTest` 14 en verde (los dos nuevos de `appendAccountDeleted` y uno de convivencia con `cuenta.creada`). Trampa: `UntypedExceptionClassificationTest` exigió clasificar `AccountDeleted#<init>` como invariante defensivo (mismo precedente que `AccountCreated`).
 
 - **Cubre:** REQ-VC-27; IOP-01. **Crear:** `domain/event/AccountDeleted.java`, `infrastructure/messaging/payload/AccountDeletedPayloadV1.java`, `docs/eventos/cuenta-eliminada-v1.md`, `docs/eventos/cuenta-eliminada-v1.schema.json`, `src/test/java/tech/cameia/cuentas/domain/event/AccountDeletedTest.java`, `src/test/java/tech/cameia/cuentas/infrastructure/messaging/payload/AccountDeletedPayloadV1Test.java`. **Modificar:** `domain/port/OutboxRepository.java`, `infrastructure/persistence/repository/OutboxRepositoryAdapter.java`, el doble `src/test/java/tech/cameia/cuentas/infrastructure/persistence/InMemoryOutboxRepository.java`.
 - **Molde:** `AccountCreated` y `AccountCreatedPayloadV1` (mismo paquete, mismo estilo):
@@ -247,7 +249,9 @@ Resultado: `V6` y `V7` (no había migraciones posteriores a `V5` en `develop`). 
 - **Pruebas:** `AccountDeletedTest` (nulos rechazados; instante truncado a milisegundos). `AccountDeletedPayloadV1Test`, copiando `AccountCreatedPayloadV1Test`: la carga serializada valida contra `docs/eventos/cuenta-eliminada-v1.schema.json` y es exactamente `{"usuarioId":"uid-1","eliminadaEn":"2026-10-10T08:00:00.000Z"}` para `Instant.parse("2026-10-10T08:00:00.123456Z")` truncado. En `OutboxRepositoryAdapterTest` (Testcontainers): `appendAccountDeleted_shouldStorePendingEvent_whenNew` y `appendAccountDeleted_shouldReturnFalse_whenAlreadyStored`.
 - **Verificación:** `./mvnw.cmd -q -B "-Dtest=AccountDeletedTest,AccountDeletedPayloadV1Test,OutboxRepositoryAdapterTest" test` (la última con Docker).
 
-## [ ] T-2.3 · Transacción de borrado de la fila y su evento — ≤ 30 min
+## [x] T-2.3 · Transacción de borrado de la fila y su evento — ≤ 30 min
+
+Resultado: `PendingAccountDeletionServiceTest` 3 y `PendingAccountDeletionTransactionTest` 3 en verde con Docker (fila conservada si el INSERT del evento falla; cuenta activa no se borra). Los dobles `RepositorioEnMemoria` de `ActivateAccountServiceTest` y `RegisterUserServiceTest` ganaron el método nuevo del puerto.
 
 - **Cubre:** REQ-VC-22, 25, 27; FIA-01; IOP-04. **Modificar:** `domain/port/AccountRepository.java`, `infrastructure/persistence/repository/AccountJpaRepository.java`, `AccountRepositoryAdapter.java`, el doble `InMemoryAccountRepository`. **Crear:** `application/service/PendingAccountDeletionService.java`, `PendingAccountDeletionServiceTest.java` (sin Spring) y `PendingAccountDeletionTransactionTest.java` (Testcontainers, copiando `AccountRecordingTransactionTest`).
 - **Puerto:** `boolean deletePendingByFirebaseUid(String firebaseUid)`: «Borra la cuenta del usuario solo si sigue sin verificar. @return `true` si borró una fila; `false` si no existía o ya no estaba pendiente».

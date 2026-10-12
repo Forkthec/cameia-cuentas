@@ -78,6 +78,19 @@ public class AccountRepositoryAdapter implements AccountRepository {
     }
 
     /**
+     * Borra la cuenta del usuario solo si sigue sin verificar.
+     *
+     * <p>No abre transacción: la abre el servicio que la llama, para que el borrado y su evento se confirmen juntos.</p>
+     *
+     * @param firebaseUid identificador del usuario en Firebase Auth
+     * @return {@code true} si borró una fila; {@code false} si no existía o ya no estaba pendiente
+     */
+    @Override
+    public boolean deletePendingByFirebaseUid(String firebaseUid) {
+        return repositorio.deletePendingByFirebaseUid(firebaseUid) == 1;
+    }
+
+    /**
      * Lista las cuentas que no tienen evento de cuenta creada.
      *
      * @param limit cantidad máxima de cuentas

@@ -55,7 +55,9 @@ class UntypedExceptionClassificationTest {
 
     private static final Map<String, String> CLASSIFICATION = Map.ofEntries(
             Map.entry("tech.cameia.cuentas.application.service.AccountRecordingService#recordNewAccount", DEFENSIVE_INVARIANT),
+            Map.entry("tech.cameia.cuentas.application.service.PendingAccountDeletionService#deletePending", DEFENSIVE_INVARIANT),
             Map.entry(EVENT_PACKAGE + "AccountCreated#<init>", DEFENSIVE_INVARIANT),
+            Map.entry(EVENT_PACKAGE + "AccountDeleted#<init>", DEFENSIVE_INVARIANT),
             Map.entry(EVENT_PACKAGE + "CorrelationId#<init>", DEFENSIVE_INVARIANT),
             Map.entry(EVENT_PACKAGE + "OutboundEvent#<init>", DEFENSIVE_INVARIANT),
             Map.entry(MODEL_PACKAGE + "Account#exigirTexto", DEFENSIVE_INVARIANT),

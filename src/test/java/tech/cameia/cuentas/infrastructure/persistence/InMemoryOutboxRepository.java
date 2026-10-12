@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import tech.cameia.cuentas.domain.event.AccountCreated;
+import tech.cameia.cuentas.domain.event.AccountDeleted;
 import tech.cameia.cuentas.domain.event.OutboundEvent;
 import tech.cameia.cuentas.domain.port.OutboxRepository;
 
@@ -20,6 +21,7 @@ import tech.cameia.cuentas.domain.port.OutboxRepository;
 public class InMemoryOutboxRepository implements OutboxRepository {
 
     private final Map<String, AccountCreated> appended = new LinkedHashMap<>();
+    private final Map<String, AccountDeleted> deletions = new LinkedHashMap<>();
     private final Map<UUID, OutboundEvent> pending = new LinkedHashMap<>();
     private final Map<UUID, Instant> publishedTimes = new LinkedHashMap<>();
     private boolean failNextAppend;
@@ -83,6 +85,30 @@ public class InMemoryOutboxRepository implements OutboxRepository {
         pending.put(event.eventId(), new OutboundEvent(event.eventId(), AccountCreated.TYPE, AccountCreated.VERSION,
                 event.firebaseUid(), "{}", event.createdAt(), event.correlationId().value(), 0));
         return true;
+    }
+
+    /**
+     * Guarda el evento de eliminación si la cuenta no tiene uno.
+     *
+     * @param event evento a guardar
+     * @return {@code true} si se guardó; {@code false} si la cuenta ya tenía su evento de eliminación
+     */
+    @Override
+    public boolean appendAccountDeleted(AccountDeleted event) {
+        if (deletions.containsKey(event.firebaseUid())) {
+            return false;
+        }
+        deletions.put(event.firebaseUid(), event);
+        return true;
+    }
+
+    /**
+     * Lista los eventos de eliminación guardados, en el orden en que se guardaron.
+     *
+     * @return copia de los eventos guardados
+     */
+    public List<AccountDeleted> appendedDeletions() {
+        return new ArrayList<>(deletions.values());
     }
 
     /**

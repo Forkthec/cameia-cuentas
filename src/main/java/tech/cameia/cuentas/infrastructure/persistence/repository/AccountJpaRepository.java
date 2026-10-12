@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -47,6 +48,20 @@ public interface AccountJpaRepository extends JpaRepository<AccountEntity, UUID>
             LIMIT :limit
             """, nativeQuery = true)
     List<UnannouncedProjection> findUnannounced(@Param("limit") int limit);
+
+    /**
+     * Borra la fila del usuario solo si su estado sigue siendo {@code PENDING_VERIFICATION}.
+     *
+     * <p>La condición de estado va en el mismo {@code DELETE}: si alguien activó la cuenta entre la decisión y el borrado, la
+     * sentencia no toca ninguna fila.</p>
+     *
+     * @param firebaseUid identificador del usuario en Firebase Auth
+     * @return filas borradas: 1 o 0
+     */
+    @Modifying
+    @Query("delete from AccountEntity a where a.firebaseUid = :firebaseUid "
+            + "and a.estado = tech.cameia.cuentas.domain.model.AccountStatus.PENDING_VERIFICATION")
+    int deletePendingByFirebaseUid(@Param("firebaseUid") String firebaseUid);
 
     /** Proyección de la consulta de cuentas sin evento. */
     interface UnannouncedProjection {

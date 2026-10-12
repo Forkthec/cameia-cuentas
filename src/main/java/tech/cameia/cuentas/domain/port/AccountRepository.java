@@ -38,4 +38,14 @@ public interface AccountRepository {
      *         de salida, la más antigua primero, como máximo {@code limit}
      */
     List<UnannouncedAccount> findUnannounced(int limit);
+
+    /**
+     * Borra la cuenta del usuario solo si sigue sin verificar.
+     *
+     * <p>Debe llamarse dentro de una transacción: el servicio que la abre decide qué más ocurre con el borrado.</p>
+     *
+     * @param firebaseUid identificador del usuario en Firebase Auth
+     * @return {@code true} si borró una fila; {@code false} si no existía o ya no estaba pendiente
+     */
+    boolean deletePendingByFirebaseUid(String firebaseUid);
 }

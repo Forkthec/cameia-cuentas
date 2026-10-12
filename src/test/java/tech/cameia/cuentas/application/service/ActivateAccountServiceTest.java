@@ -201,6 +201,11 @@ class ActivateAccountServiceTest {
     private static class RepositorioEnMemoria implements AccountRepository {
 
         @Override
+        public boolean deletePendingByFirebaseUid(String firebaseUid) {
+            return false;
+        }
+
+        @Override
         public List<UnannouncedAccount> findUnannounced(int limit) {
             return List.of();
         }
