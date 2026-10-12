@@ -2,11 +2,14 @@ package tech.cameia.cuentas.infrastructure.persistence;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
@@ -99,6 +102,19 @@ public class InMemoryAccountRepository implements AccountRepository {
                 .map(Account::getFirebaseUid)
                 .limit(max)
                 .toList();
+    }
+
+    /**
+     * Indica cuáles de los usuarios indicados tienen cuenta guardada.
+     *
+     * @param firebaseUids identificadores a comprobar
+     * @return los que tienen cuenta, en cualquier estado
+     */
+    @Override
+    public Set<String> findExistingFirebaseUids(Collection<String> firebaseUids) {
+        Set<String> existing = new HashSet<>(accounts.keySet());
+        existing.retainAll(firebaseUids);
+        return existing;
     }
 
     /** @return el límite de antigüedad de la última lectura de candidatas, o nulo si no hubo ninguna */

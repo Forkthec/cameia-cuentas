@@ -1,5 +1,7 @@
 package tech.cameia.cuentas.domain.port;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
@@ -84,4 +86,17 @@ public interface FirebaseUserDirectory {
      * @throws DependencyUnavailableException si el directorio no respondió o falló de su lado
      */
     UserVerificationStatus verificationStatus(String firebaseUid);
+
+    /**
+     * Lista las credenciales de correo y contraseña sin verificar que llevan creadas desde antes de un instante.
+     *
+     * <p>Recorre el directorio por páginas hasta agotarlo o reunir {@code max}. Solo cuenta a quien tiene un único proveedor,
+     * {@code password}: una credencial de Google u otro proveedor no se toca.</p>
+     *
+     * @param limit instante, exclusivo: la credencial debe haberse creado antes
+     * @param max cantidad máxima de usuarios
+     * @return los identificadores de las credenciales que cumplen las tres condiciones, como máximo {@code max}
+     * @throws DependencyUnavailableException si el directorio no respondió o falló de su lado
+     */
+    List<String> findUnverifiedPasswordUsersCreatedBefore(Instant limit, int max);
 }

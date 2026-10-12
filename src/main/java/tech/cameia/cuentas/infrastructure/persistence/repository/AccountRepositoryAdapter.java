@@ -1,8 +1,11 @@
 package tech.cameia.cuentas.infrastructure.persistence.repository;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.data.domain.Limit;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -102,6 +105,20 @@ public class AccountRepositoryAdapter implements AccountRepository {
     @Override
     public List<String> findPendingVerificationCreatedBefore(Instant limit, int max) {
         return repositorio.findPendingFirebaseUids(limit, Limit.of(max));
+    }
+
+    /**
+     * Indica cuáles de los usuarios indicados tienen una cuenta local, en cualquier estado.
+     *
+     * @param firebaseUids identificadores a comprobar
+     * @return los que tienen fila
+     */
+    @Override
+    public Set<String> findExistingFirebaseUids(Collection<String> firebaseUids) {
+        if (firebaseUids.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(repositorio.findExistingFirebaseUids(firebaseUids));
     }
 
     /**

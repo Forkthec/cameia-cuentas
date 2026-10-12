@@ -172,6 +172,24 @@ class AccountRepositoryAdapterTest {
         assertThat(repositorio.findPendingVerificationCreatedBefore(Instant.parse("2026-10-10T08:00:00Z"), 5)).isEmpty();
     }
 
+    @Test
+    @DisplayName("Devuelve solo los usuarios que tienen cuenta, en cualquier estado")
+    void findExistingFirebaseUids_shouldReturnOnlyUsersWithAccount_whenSomeHaveNone() {
+        jdbc.update("DELETE FROM microcuentas.cuenta");
+        Instant now = Instant.parse("2026-10-10T08:00:00Z");
+        insertAt("uid-pendiente", "PENDING_VERIFICATION", now);
+        insertAt("uid-deshabilitada", "DISABLED", now);
+
+        assertThat(repositorio.findExistingFirebaseUids(List.of("uid-pendiente", "uid-deshabilitada", "uid-sin-cuenta")))
+                .containsExactlyInAnyOrder("uid-pendiente", "uid-deshabilitada");
+    }
+
+    @Test
+    @DisplayName("Una lista vacía devuelve un conjunto vacío sin consultar la base")
+    void findExistingFirebaseUids_shouldReturnEmpty_whenListIsEmpty() {
+        assertThat(repositorio.findExistingFirebaseUids(List.of())).isEmpty();
+    }
+
     private void insertAt(String firebaseUid, String status, Instant createdAt) {
         // fecha_actualizacion debe ser >= fecha_creacion (ck_cuenta_fecha_actualizacion)
         jdbc.update("""

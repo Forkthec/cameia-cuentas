@@ -1,8 +1,10 @@
 package tech.cameia.cuentas.domain.port;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.UnannouncedAccount;
@@ -59,4 +61,12 @@ public interface AccountRepository {
      *         antigua a la más nueva, como máximo {@code max}
      */
     List<String> findPendingVerificationCreatedBefore(Instant limit, int max);
+
+    /**
+     * Indica cuáles de los usuarios indicados tienen una cuenta local, en cualquier estado.
+     *
+     * @param firebaseUids identificadores a comprobar
+     * @return los que tienen fila en la tabla de cuentas
+     */
+    Set<String> findExistingFirebaseUids(Collection<String> firebaseUids);
 }

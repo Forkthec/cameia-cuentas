@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +25,7 @@ import tech.cameia.cuentas.domain.port.FirebaseUserDirectory;
  * <p>Se ejecuta una vez por invocación; la hora la decide quien la dispara. Antes de borrar consulta el directorio: si la
  * persona ya verificó, la cuenta se activa. Si no, se borra la credencial y después la fila, que lleva su evento. Cada cuenta
  * es independiente: un rechazo se cuenta y no detiene a las demás. Si el directorio no está disponible, se detiene y
- * lanza, para que la tarea termine con error y se reintente.</p>
+ * lanza, para que la tarea termine con error y se reintente. Al final concilia las credenciales huérfanas del registro.</p>
  *
  * <p>No es transaccional: un fallo en la cuenta 500 no debe deshacer las 499 anteriores. La única transacción es la de cada
  * borrado de fila con su evento, que vive en {@link PendingAccountDeletionService}.</p>
@@ -94,6 +95,7 @@ public class PurgeUnverifiedAccountsService {
                 totals.add(process(firebaseUid));
             }
             warnIfEveryAccountFailed(totals);
+            reconcileOrphanCredentials(limit, totals);
         } catch (DependencyUnavailableException unavailable) {
             logSummary(totals.summary(true));
             throw unavailable;
@@ -140,6 +142,35 @@ public class PurgeUnverifiedAccountsService {
         }
     }
 
+    /**
+     * Borra las credenciales de correo y contraseña sin verificar, de más de 168 horas, que no tienen cuenta local.
+     *
+     * <p>El registro las deja así cuando falla también su borrado compensatorio. No publica evento: nunca hubo
+     * {@code cuenta.creada}. Una credencial huérfana con el correo verificado o de otro proveedor se conserva.</p>
+     */
+    private void reconcileOrphanCredentials(Instant limit, Totals totals) {
+        List<String> credentials = directory.findUnverifiedPasswordUsersCreatedBefore(limit, maxAccountsPerRun);
+        Set<String> withAccount = accounts.findExistingFirebaseUids(credentials);
+        for (String firebaseUid : credentials) {
+            if (!withAccount.contains(firebaseUid)) {
+                totals.add(deleteOrphanCredential(firebaseUid));
+            }
+        }
+    }
+
+    private Outcome deleteOrphanCredential(String firebaseUid) {
+        try {
+            directory.deleteUser(firebaseUid);
+            return Outcome.ORPHAN_DELETED;
+        } catch (DependencyUnavailableException unavailable) {
+            throw unavailable;
+        } catch (RuntimeException error) {
+            logger.warn("No se pudo borrar la credencial huérfana del usuario {}: {}", firebaseUid,
+                    error.getClass().getSimpleName());
+            return Outcome.FAILED;
+        }
+    }
+
     /** La persona ya verificó su correo: la cuenta se activa en lugar de borrarse. */
     private Outcome activate(String firebaseUid) {
         Account account = accounts.findByFirebaseUid(firebaseUid).orElse(null);
@@ -179,7 +210,7 @@ public class PurgeUnverifiedAccountsService {
     }
 
     /** Lo que pasó con una cuenta. */
-    private enum Outcome { DELETED, ACTIVATED, FAILED }
+    private enum Outcome { DELETED, ACTIVATED, FAILED, ORPHAN_DELETED }
 
     /** Contadores de una ejecución; viven solo durante {@code purge()}. */
     private static final class Totals {
@@ -195,6 +226,7 @@ public class PurgeUnverifiedAccountsService {
                 case DELETED -> deleted++;
                 case ACTIVATED -> activated++;
                 case FAILED -> failed++;
+                case ORPHAN_DELETED -> orphanCredentialsDeleted++;
             }
         }
 

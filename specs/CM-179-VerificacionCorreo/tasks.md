@@ -405,7 +405,9 @@ Resultado: `PurgeUnverifiedAccountsServiceTest` 12/12 (las 10 de la tarjeta, má
 - **Verificación:** `./mvnw.cmd -q -B "-Dtest=PurgeUnverifiedAccountsServiceTest" test`; `LayeredArchitectureTest` en verde (el servicio no importa Firebase ni JPA).
 - **Punta a punta** (misma tarjeta, otra clase): crear `src/test/java/tech/cameia/cuentas/PurgeEndToEndTest.java` copiando la configuración de `AccountRegistrationEndToEndTest`. (1) Registrar `purga@correo.co` (201); envejecer la fila: `update microcuentas.cuenta set fecha_creacion = now() - interval '169 hours', fecha_actualizacion = now() - interval '169 hours' where firebase_uid = ?`; llamar a `purge()` del bean → `deleted=1`; la fila no está; `evento_saliente` tiene una fila `cuenta.eliminada` pendiente con ese `agregado_id`; registrar de nuevo el mismo correo → **201**. (2) Dos `purge()` seguidas → la segunda `reviewed=0`. (3) Una cuenta vieja que el doble marca verificada → `ACTIVE` en la base, sin evento. Con Docker: `./mvnw.cmd -q -B "-Dtest=PurgeEndToEndTest" test`. Commit 8.
 
-## [ ] T-2.8 · Conciliación de credenciales huérfanas — ≤ 30 min
+## [x] T-2.8 · Conciliación de credenciales huérfanas — ≤ 30 min
+
+Resultado: `PurgeUnverifiedAccountsServiceTest` 18/18, `FirebaseUserDirectoryAdapterTest` 45/45, `AccountRepositoryAdapterTest` 11/11 y `PurgeEndToEndTest` 5/5 en verde (huérfana sin verificar de 169 h borrada; verificada, de 10 h, con cuenta local y de Google se conservan; sin evento). Cambio de aserción: `purge_shouldReturnZeros_whenNoCandidates` ahora espera una sola consulta al directorio (el listado de huérfanas) porque la conciliación corre siempre al final. Limitación conocida: el listado se detiene al reunir `max` credenciales; si las primeras `max` credenciales sin verificar y viejas del directorio tuvieran todas cuenta local, las huérfanas posteriores esperarían a que esas se resuelvan.
 
 Opción C de la pregunta 18, elegida por Paula el 11-oct-2026: solo credenciales sin fila, con el correo sin verificar, de más de 168 h y con único proveedor `password`.
 

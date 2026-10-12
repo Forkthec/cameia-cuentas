@@ -2,6 +2,9 @@ package tech.cameia.cuentas;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -115,6 +118,21 @@ class PurgeEndToEndTest {
                 .isEqualTo("ACTIVE");
         assertThat(count("SELECT count(*) FROM microcuentas.evento_saliente WHERE tipo = 'cuenta.eliminada'", null)).isZero();
         assertThat(directory.existe(uid)).isTrue();
+    }
+
+    @Test
+    @DisplayName("Una credencial huérfana de 169 horas se borra, y una con cuenta local se conserva")
+    void purge_shouldDeleteOrphanCredentialOnly_whenItHasNoAccount() {
+        String orphan = directory.crearSinCuentaLocal("huerfana@correo.co", Instant.now().minus(169, ChronoUnit.HOURS));
+        register("con-cuenta@correo.co");
+        String withAccount = onlyUid();
+
+        PurgeSummary summary = purge.purge();
+
+        assertThat(summary.orphanCredentialsDeleted()).isEqualTo(1);
+        assertThat(directory.existe(orphan)).isFalse();
+        assertThat(directory.existe(withAccount)).isTrue();
+        assertThat(count("SELECT count(*) FROM microcuentas.evento_saliente WHERE tipo = 'cuenta.eliminada'", null)).isZero();
     }
 
     private ResponseEntity<String> register(String email) {

@@ -168,12 +168,14 @@ class PurgeUnverifiedAccountsServiceTest {
     }
 
     @Test
-    @DisplayName("Sin candidatas devuelve ceros y no consulta al directorio")
+    @DisplayName("Sin candidatas devuelve ceros y solo consulta al directorio el listado de huérfanas")
     void purge_shouldReturnZeros_whenNoCandidates() {
         PurgeSummary summary = service(10).purge();
 
         assertThat(summary).isEqualTo(new PurgeSummary(0, 0, 0, 0, 0, false));
-        assertThat(directory.consultas()).isZero();
+        // La única consulta es el listado de credenciales huérfanas: ninguna cuenta se consulta una por una
+        assertThat(directory.consultas()).isEqualTo(1);
+        assertThat(directory.borrados()).isZero();
     }
 
     @Test
@@ -239,6 +241,72 @@ class PurgeUnverifiedAccountsServiceTest {
         assertThat(accounts.findByFirebaseUid(second)).isPresent();
         assertThat(accounts.findByFirebaseUid(third)).isPresent();
         assertThat(directory.existe(third)).isTrue();
+    }
+
+    @Test
+    @DisplayName("Una credencial sin cuenta, sin verificar y de más de 168 horas se borra sin evento")
+    void purge_shouldDeleteOrphanCredential_whenUnverifiedOldPasswordUserHasNoAccount() {
+        String uid = directory.crearSinCuentaLocal("huerfana@correo.co", OLD);
+
+        PurgeSummary summary = service(10).purge();
+
+        assertThat(directory.existe(uid)).isFalse();
+        assertThat(summary).isEqualTo(new PurgeSummary(0, 0, 0, 0, 1, false));
+        assertThat(outbox.appendedDeletions()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Una credencial huérfana con el correo verificado se conserva")
+    void purge_shouldKeepOrphanCredential_whenEmailIsVerified() {
+        String uid = directory.crearSinCuentaLocal("huerfana@correo.co", OLD);
+        directory.marcarCorreoVerificado(uid);
+
+        PurgeSummary summary = service(10).purge();
+
+        assertThat(directory.existe(uid)).isTrue();
+        assertThat(summary.orphanCredentialsDeleted()).isZero();
+    }
+
+    @Test
+    @DisplayName("Una credencial huérfana de menos de 168 horas se conserva")
+    void purge_shouldKeepOrphanCredential_whenYoungerThan168Hours() {
+        String uid = directory.crearSinCuentaLocal("huerfana@correo.co", NOW.minus(10, ChronoUnit.HOURS));
+
+        service(10).purge();
+
+        assertThat(directory.existe(uid)).isTrue();
+    }
+
+    @Test
+    @DisplayName("Una credencial con cuenta local no es huérfana y se conserva")
+    void purge_shouldKeepCredential_whenAccountExists() {
+        String uid = directory.crearSinCuentaLocal("con-cuenta@correo.co", OLD);
+        accounts.save(Account.rebuild(java.util.UUID.randomUUID(), uid, "Ana", "Pérez",
+                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, AccountStatus.DISABLED));
+
+        PurgeSummary summary = service(10).purge();
+
+        assertThat(directory.existe(uid)).isTrue();
+        assertThat(summary.orphanCredentialsDeleted()).isZero();
+    }
+
+    @Test
+    @DisplayName("Una credencial de otro proveedor sin cuenta local no se toca")
+    void purge_shouldKeepOrphanCredential_whenProviderIsNotPassword() {
+        String uid = directory.crearSinCuentaLocalConProveedor("google@correo.co", OLD, "google.com");
+
+        PurgeSummary summary = service(10).purge();
+
+        assertThat(directory.existe(uid)).isTrue();
+        assertThat(summary.orphanCredentialsDeleted()).isZero();
+    }
+
+    @Test
+    @DisplayName("Si el directorio no responde al listar huérfanas, relanza la indisponibilidad")
+    void purge_shouldRethrow_whenDirectoryIsUnavailableListingOrphans() {
+        directory.fallarAlConsultar();
+
+        assertThatThrownBy(() -> service(10).purge()).isInstanceOf(DependencyUnavailableException.class);
     }
 
     @Test

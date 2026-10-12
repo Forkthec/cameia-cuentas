@@ -211,6 +211,11 @@ class ActivateAccountServiceTest {
         }
 
         @Override
+        public java.util.Set<String> findExistingFirebaseUids(java.util.Collection<String> firebaseUids) {
+            return java.util.Set.of();
+        }
+
+        @Override
         public List<UnannouncedAccount> findUnannounced(int limit) {
             return List.of();
         }

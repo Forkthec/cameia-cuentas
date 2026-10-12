@@ -2,6 +2,8 @@ package tech.cameia.cuentas.infrastructure.client;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -36,6 +38,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     private final Map<String, String> planesPorUid = new ConcurrentHashMap<>();
     private final Map<String, String> contrasenasPorUid = new ConcurrentHashMap<>();
     private final Map<String, Instant> creacionesPorUid = new ConcurrentHashMap<>();
+    private final Map<String, String> proveedoresPorUid = new ConcurrentHashMap<>();
     private final Set<String> correosVerificados = ConcurrentHashMap.newKeySet();
     private final Set<String> deshabilitados = ConcurrentHashMap.newKeySet();
     private final AtomicInteger consultas = new AtomicInteger();
@@ -126,8 +129,38 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         planesPorUid.remove(firebaseUid);
         contrasenasPorUid.remove(firebaseUid);
         creacionesPorUid.remove(firebaseUid);
+        proveedoresPorUid.remove(firebaseUid);
         correosVerificados.remove(firebaseUid);
         deshabilitados.remove(firebaseUid);
+    }
+
+    @Override
+    public synchronized List<String> findUnverifiedPasswordUsersCreatedBefore(Instant limit, int max) {
+        consultas.incrementAndGet();
+        if (fallarAlConsultar) {
+            throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
+        }
+        return correosPorUid.keySet().stream()
+                .filter(uid -> "password".equals(proveedoresPorUid.getOrDefault(uid, "password")))
+                .filter(uid -> !correosVerificados.contains(uid))
+                .filter(uid -> creacionesPorUid.get(uid).isBefore(limit))
+                .sorted(Comparator.comparing(creacionesPorUid::get))
+                .limit(max)
+                .toList();
+    }
+
+    /**
+     * Crea una credencial sin cuenta local que ingresa con otro proveedor, con la fecha de creación indicada.
+     *
+     * @param correo correo ya normalizado
+     * @param creada instante de creación de la credencial
+     * @param proveedor identificador del proveedor, por ejemplo {@code google.com}
+     * @return identificador de la credencial creada
+     */
+    public String crearSinCuentaLocalConProveedor(String correo, Instant creada, String proveedor) {
+        String uid = crearSinCuentaLocal(correo, creada);
+        proveedoresPorUid.put(uid, proveedor);
+        return uid;
     }
 
     @Override

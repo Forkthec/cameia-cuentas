@@ -6,20 +6,26 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import com.google.firebase.ErrorCode;
 import com.google.firebase.auth.AuthErrorCode;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.ExportedUserRecord;
 import com.google.firebase.auth.FirebaseAuthException;
+import com.google.firebase.auth.ListUsersPage;
+import com.google.firebase.auth.UserInfo;
 import com.google.firebase.auth.UserMetadata;
 import com.google.firebase.auth.UserRecord;
 
@@ -143,6 +149,106 @@ class FirebaseUserDirectoryAdapterTest {
         adaptador.deleteUser(UID);
 
         verify(firebaseAuth).deleteUser(UID);
+    }
+
+    private static final Instant LIMIT = Instant.parse("2026-10-03T08:00:00Z");
+    private static final long OLD_MILLIS = LIMIT.minusSeconds(3600).toEpochMilli();
+
+    private static ExportedUserRecord listedUser(String uid, boolean verified, long createdMillis, String... providers) {
+        ExportedUserRecord user = mock(ExportedUserRecord.class);
+        UserMetadata metadata = mock(UserMetadata.class);
+        UserInfo[] info = new UserInfo[providers.length];
+        for (int i = 0; i < providers.length; i++) {
+            info[i] = mock(UserInfo.class);
+            when(info[i].getProviderId()).thenReturn(providers[i]);
+        }
+        when(user.getUid()).thenReturn(uid);
+        when(user.isEmailVerified()).thenReturn(verified);
+        when(user.getProviderData()).thenReturn(info);
+        when(user.getUserMetadata()).thenReturn(metadata);
+        when(metadata.getCreationTimestamp()).thenReturn(createdMillis);
+        return user;
+    }
+
+    private static ListUsersPage page(String nextToken, ExportedUserRecord... users) {
+        ListUsersPage page = mock(ListUsersPage.class);
+        when(page.getValues()).thenReturn(List.of(users));
+        when(page.getNextPageToken()).thenReturn(nextToken);
+        return page;
+    }
+
+    @Test
+    @DisplayName("Lista solo a quien tiene un único proveedor password, sin verificar y creado antes del límite")
+    void findUnverifiedPasswordUsersCreatedBefore_shouldFilterByProviderVerificationAndAge() throws Exception {
+        doReturn(page("",
+                listedUser("viejo-sin-verificar", false, OLD_MILLIS, "password"),
+                listedUser("viejo-verificado", true, OLD_MILLIS, "password"),
+                listedUser("reciente", false, LIMIT.plusSeconds(60).toEpochMilli(), "password"),
+                listedUser("exacto-en-el-limite", false, LIMIT.toEpochMilli(), "password"),
+                listedUser("de-google", false, OLD_MILLIS, "google.com"),
+                listedUser("password-y-google", false, OLD_MILLIS, "password", "google.com"),
+                listedUser("sin-proveedor", false, OLD_MILLIS))).when(firebaseAuth).listUsers(null, 1000);
+
+        assertThat(adaptador.findUnverifiedPasswordUsersCreatedBefore(LIMIT, 1000)).containsExactly("viejo-sin-verificar");
+    }
+
+    @Test
+    @DisplayName("No lista a quien Firebase no informa la fecha de creación: una edad desconocida no autoriza borrar")
+    void findUnverifiedPasswordUsersCreatedBefore_shouldSkip_whenCreationDateIsUnknown() throws Exception {
+        doReturn(page("",
+                listedUser("sin-fecha", false, 0L, "password"),
+                listedUser("viejo-sin-verificar", false, OLD_MILLIS, "password"))).when(firebaseAuth).listUsers(null, 1000);
+
+        assertThat(adaptador.findUnverifiedPasswordUsersCreatedBefore(LIMIT, 1000)).containsExactly("viejo-sin-verificar");
+    }
+
+    @Test
+    @DisplayName("Recorre las páginas con el token de la anterior hasta que se acaban")
+    void findUnverifiedPasswordUsersCreatedBefore_shouldFollowPageTokens_whenSeveralPages() throws Exception {
+        doReturn(page("token-2", listedUser("uno", false, OLD_MILLIS, "password"))).when(firebaseAuth).listUsers(null, 1000);
+        doReturn(page("", listedUser("dos", false, OLD_MILLIS, "password"))).when(firebaseAuth).listUsers("token-2", 1000);
+
+        assertThat(adaptador.findUnverifiedPasswordUsersCreatedBefore(LIMIT, 1000)).containsExactly("uno", "dos");
+    }
+
+    @Test
+    @DisplayName("Se detiene al reunir el máximo sin pedir más páginas")
+    void findUnverifiedPasswordUsersCreatedBefore_shouldStopAtMax_whenMoreAreAvailable() throws Exception {
+        doReturn(page("token-2",
+                listedUser("uno", false, OLD_MILLIS, "password"),
+                listedUser("dos", false, OLD_MILLIS, "password"),
+                listedUser("tres", false, OLD_MILLIS, "password"))).when(firebaseAuth).listUsers(null, 1000);
+
+        assertThat(adaptador.findUnverifiedPasswordUsersCreatedBefore(LIMIT, 2)).containsExactly("uno", "dos");
+        verify(firebaseAuth, never()).listUsers("token-2", 1000);
+    }
+
+    @Test
+    @DisplayName("Un directorio vacío devuelve una lista vacía")
+    void findUnverifiedPasswordUsersCreatedBefore_shouldReturnEmpty_whenDirectoryIsEmpty() throws Exception {
+        doReturn(page("")).when(firebaseAuth).listUsers(null, 1000);
+
+        assertThat(adaptador.findUnverifiedPasswordUsersCreatedBefore(LIMIT, 1000)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Firebase caído al listar es indisponibilidad")
+    void findUnverifiedPasswordUsersCreatedBefore_shouldThrowDependencyUnavailable_whenFirebaseIsDown() throws Exception {
+        when(firebaseAuth.listUsers(null, 1000))
+                .thenThrow(new FirebaseAuthException(ErrorCode.UNAVAILABLE, "servicio caído", null, null, null));
+
+        assertThatThrownBy(() -> adaptador.findUnverifiedPasswordUsersCreatedBefore(LIMIT, 1000))
+                .isInstanceOf(DependencyUnavailableException.class);
+    }
+
+    @Test
+    @DisplayName("Un rechazo al listar por otra razón es un fallo imprevisto")
+    void findUnverifiedPasswordUsersCreatedBefore_shouldThrowIllegalState_whenRejectedForOtherReason() throws Exception {
+        when(firebaseAuth.listUsers(null, 1000)).thenThrow(errorDeFirebase(AuthErrorCode.UNAUTHORIZED_CONTINUE_URL));
+
+        assertThatThrownBy(() -> adaptador.findUnverifiedPasswordUsersCreatedBefore(LIMIT, 1000))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Firebase rechazó el listado de usuarios");
     }
 
     @Test

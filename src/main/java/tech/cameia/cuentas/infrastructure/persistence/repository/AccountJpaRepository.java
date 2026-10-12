@@ -2,6 +2,7 @@ package tech.cameia.cuentas.infrastructure.persistence.repository;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -77,6 +78,15 @@ public interface AccountJpaRepository extends JpaRepository<AccountEntity, UUID>
             + "where a.estado = tech.cameia.cuentas.domain.model.AccountStatus.PENDING_VERIFICATION "
             + "and a.fechaCreacion < :limite order by a.fechaCreacion asc, a.id asc")
     List<String> findPendingFirebaseUids(@Param("limite") Instant limite, Limit cantidad);
+
+    /**
+     * Devuelve cuáles de los usuarios indicados tienen fila, en cualquier estado.
+     *
+     * @param uids identificadores a comprobar (nunca vacío: una lista vacía no genera una consulta válida)
+     * @return los {@code firebaseUid} que existen
+     */
+    @Query("select a.firebaseUid from AccountEntity a where a.firebaseUid in :uids")
+    List<String> findExistingFirebaseUids(@Param("uids") Collection<String> uids);
 
     /** Proyección de la consulta de cuentas sin evento. */
     interface UnannouncedProjection {
