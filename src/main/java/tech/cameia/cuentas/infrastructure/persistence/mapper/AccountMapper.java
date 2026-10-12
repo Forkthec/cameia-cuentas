@@ -49,6 +49,7 @@ public class AccountMapper {
                 entity.getFechaNacimiento() == null ? null : new BirthDate(entity.getFechaNacimiento()),
                 entity.getTelefono() == null ? null : new PhoneNumber(entity.getTelefono()),
                 entity.getPronombres(),
-                entity.getEstado());
+                entity.getEstado(),
+                entity.getVersion());
     }
 }

@@ -25,9 +25,10 @@ registro no puede tardar más de lo permitido por la métrica de desempeño de l
 - **Carga borrada al publicar.** Al confirmarse la publicación se borra la carga y se conserva la fila como marca. Así la base no
   guarda el correo ni la fecha de nacimiento por duplicado (Ley 1581).
 - **Entrega al menos una vez.** Un reenvío lleva el mismo `message_id`; los consumidores son idempotentes (Inbox en Perfil).
-- **Interruptor** `cuentas.events.enabled` (`EVENTS_ENABLED`, por defecto `true`), solo para las pruebas: la suite corre sin
-  broker sustituyendo el publicador por un doble en memoria. No apaga los eventos en un despliegue: con `false` no existe el
-  publicador real y la aplicación no arranca (a diferencia de `FIREBASE_ENABLED`). En un despliegue no se define.
+- **Interruptor** `cuentas.events.enabled` (`EVENTS_ENABLED`, por defecto `true`), pensado para las pruebas y para levantar la
+  aplicación sin broker: con `false` el publicador es uno inerte que nunca confirma, así que los eventos quedan pendientes en la
+  tabla de salida y se publican cuando se vuelva a encender; la suite lo sustituye por un doble en memoria. Con el perfil `prod`
+  no se admite: la aplicación no arranca y lo explica, para que nadie deje los eventos sin publicar en un despliegue.
 
 ## Por qué
 

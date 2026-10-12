@@ -31,6 +31,18 @@ class CuentasApplicationTest {
     }
 
     @Test
+    @DisplayName("termina el proceso con el código del contexto y lo cierra cuando está activo el perfil de purga")
+    void exitWhenOneShotJob_shouldExitWithZeroAndCloseContext_whenPurgeProfileIsActive() {
+        GenericApplicationContext context = contextWithProfiles("local", "purge-job");
+        AtomicInteger exitCode = new AtomicInteger(NOT_CALLED);
+
+        CuentasApplication.exitWhenOneShotJob(context, exitCode::set);
+
+        assertThat(exitCode.get()).isZero();
+        assertThat(context.isActive()).isFalse();
+    }
+
+    @Test
     @DisplayName("no termina el proceso ni cierra el contexto cuando solo está activo el perfil local")
     void exitWhenOneShotJob_shouldDoNothing_whenOnlyLocalProfileIsActive() {
         GenericApplicationContext context = contextWithProfiles("local");

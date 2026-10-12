@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import tech.cameia.cuentas.domain.event.AccountCreated;
+import tech.cameia.cuentas.domain.event.AccountDeleted;
 import tech.cameia.cuentas.domain.event.OutboundEvent;
 
 /**
@@ -23,6 +24,14 @@ public interface OutboxRepository {
      * @return {@code true} si se guardó; {@code false} si la cuenta ya tiene un evento de ese tipo
      */
     boolean appendAccountCreated(AccountCreated event);
+
+    /**
+     * Guarda el evento de cuenta eliminada si la cuenta aún no tiene uno.
+     *
+     * @param event evento a guardar
+     * @return {@code true} si se guardó; {@code false} si la cuenta ya tiene un evento de ese tipo
+     */
+    boolean appendAccountDeleted(AccountDeleted event);
 
     /**
      * Lista los eventos pendientes de publicar.

@@ -35,6 +35,8 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import tech.cameia.cuentas.domain.exception.AccountConflictException;
+import tech.cameia.cuentas.domain.exception.AccountDisabledException;
 import tech.cameia.cuentas.domain.exception.AccountNotFoundException;
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
@@ -188,6 +190,28 @@ class BusinessExceptionHandler {
     }
 
     /**
+     * Cuenta deshabilitada.
+     *
+     * @param error excepción de negocio
+     * @return {@code 403 Forbidden}
+     */
+    @ExceptionHandler(AccountDisabledException.class)
+    ProblemDetail cuentaDeshabilitada(AccountDisabledException error) {
+        return rechazo(HttpStatus.FORBIDDEN, "Cuenta deshabilitada", error.getMessage(), error.getErrorCode());
+    }
+
+    /**
+     * Otra petición cambió la cuenta al mismo tiempo.
+     *
+     * @param error excepción de negocio
+     * @return {@code 409 Conflict}
+     */
+    @ExceptionHandler(AccountConflictException.class)
+    ProblemDetail conflictoDeCuenta(AccountConflictException error) {
+        return rechazo(HttpStatus.CONFLICT, "Conflicto de cuenta", error.getMessage(), error.getErrorCode());
+    }
+
+    /**
      * Usuario sin cuenta local.
      *
      * @param error excepción de negocio
@@ -261,7 +285,7 @@ class BusinessExceptionHandler {
                 ? "encabezado=" + encabezado.getHeaderName()
                 : "causa=" + error.getClass().getSimpleName();
         return rechazo(HttpStatus.BAD_REQUEST, "Petición incompleta",
-                "La petición no incluye los datos que exige esta ruta", ErrorCode.IDENTITY_REQUIRED, faltante);
+                "La petición no incluye los datos que exige esta ruta.", ErrorCode.IDENTITY_REQUIRED, faltante);
     }
 
     /**

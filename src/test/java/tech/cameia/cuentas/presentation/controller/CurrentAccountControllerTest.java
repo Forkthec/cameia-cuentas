@@ -140,7 +140,7 @@ class CurrentAccountControllerTest {
         mockMvc.perform(get(ROUTE).header("X-User-Id", "   "))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("IDENTITY_REQUIRED"))
-                .andExpect(jsonPath("$.detail").value("La petición no incluye los datos que exige esta ruta"));
+                .andExpect(jsonPath("$.detail").value("La petición no incluye los datos que exige esta ruta."));
     }
 
     @Test

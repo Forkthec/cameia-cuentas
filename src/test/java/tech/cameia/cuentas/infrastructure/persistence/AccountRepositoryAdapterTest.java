@@ -3,18 +3,25 @@ package tech.cameia.cuentas.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import tech.cameia.cuentas.domain.exception.AccountConflictException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
@@ -47,6 +54,9 @@ class AccountRepositoryAdapterTest {
 
     @Autowired
     private AccountJpaRepository repositorioJpa;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     @Test
     void guardaYRecuperaUnaCuentaConTodosSusDatos() {
@@ -123,6 +133,99 @@ class AccountRepositoryAdapterTest {
     @Test
     void buscarUnUsuarioSinCuentaDevuelveVacio() {
         assertThat(repositorio.findByFirebaseUid("uid-inexistente")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Solo lista las cuentas pendientes creadas antes del límite, excluyendo el instante exacto")
+    void findPendingVerificationCreatedBefore_shouldReturnOnlyOldPendingAccounts_whenMixedStates() {
+        jdbc.update("DELETE FROM microcuentas.cuenta");
+        Instant now = Instant.parse("2026-10-10T08:00:00Z");
+        insertAt("uid-169h", "PENDING_VERIFICATION", now.minus(169, ChronoUnit.HOURS));
+        insertAt("uid-168h", "PENDING_VERIFICATION", now.minus(168, ChronoUnit.HOURS));
+        insertAt("uid-10h", "PENDING_VERIFICATION", now.minus(10, ChronoUnit.HOURS));
+        insertAt("uid-activa", "ACTIVE", now.minus(300, ChronoUnit.HOURS));
+        insertAt("uid-deshabilitada", "DISABLED", now.minus(300, ChronoUnit.HOURS));
+
+        List<String> uids = repositorio.findPendingVerificationCreatedBefore(now.minus(168, ChronoUnit.HOURS), 10);
+
+        assertThat(uids).containsExactly("uid-169h");
+    }
+
+    @Test
+    @DisplayName("Respeta el máximo y devuelve las más antiguas primero")
+    void findPendingVerificationCreatedBefore_shouldReturnOldestFirst_whenMoreThanMax() {
+        jdbc.update("DELETE FROM microcuentas.cuenta");
+        Instant now = Instant.parse("2026-10-10T08:00:00Z");
+        insertAt("uid-b", "PENDING_VERIFICATION", now.minus(200, ChronoUnit.HOURS));
+        insertAt("uid-c", "PENDING_VERIFICATION", now.minus(180, ChronoUnit.HOURS));
+        insertAt("uid-a", "PENDING_VERIFICATION", now.minus(220, ChronoUnit.HOURS));
+
+        List<String> uids = repositorio.findPendingVerificationCreatedBefore(now.minus(168, ChronoUnit.HOURS), 2);
+
+        assertThat(uids).containsExactly("uid-a", "uid-b");
+    }
+
+    @Test
+    @DisplayName("Activar una cuenta leída antes de que otra petición la deshabilitara no pisa el cambio")
+    void save_shouldThrowConflictAndKeepDisabled_whenRowChangedAfterReading() {
+        jdbc.update("DELETE FROM microcuentas.cuenta");
+        repositorio.save(cuentaDe("uid-carrera"));
+        Account leida = repositorio.findByFirebaseUid("uid-carrera").orElseThrow();
+        // Otra petición deshabilita la cuenta (y sube la versión) después de la lectura
+        jdbc.update("UPDATE microcuentas.cuenta SET estado = 'DISABLED', version = version + 1 WHERE firebase_uid = 'uid-carrera'");
+        leida.activate();
+
+        assertThatThrownBy(() -> repositorio.save(leida)).isInstanceOf(AccountConflictException.class);
+
+        assertThat(jdbc.queryForObject("SELECT estado FROM microcuentas.cuenta WHERE firebase_uid = 'uid-carrera'", String.class))
+                .isEqualTo("DISABLED");
+    }
+
+    @Test
+    @DisplayName("Dos guardados seguidos de la cuenta leída: el segundo ve la versión nueva y se rechaza")
+    void save_shouldThrowConflict_whenSavingTheSameStaleAccountTwice() {
+        jdbc.update("DELETE FROM microcuentas.cuenta");
+        repositorio.save(cuentaDe("uid-doble"));
+        Account leida = repositorio.findByFirebaseUid("uid-doble").orElseThrow();
+        leida.activate();
+        repositorio.save(leida);
+
+        assertThatThrownBy(() -> repositorio.save(leida)).isInstanceOf(AccountConflictException.class);
+    }
+
+    @Test
+    @DisplayName("Sin cuentas pendientes viejas devuelve una lista vacía")
+    void findPendingVerificationCreatedBefore_shouldReturnEmpty_whenNothingMatches() {
+        jdbc.update("DELETE FROM microcuentas.cuenta");
+
+        assertThat(repositorio.findPendingVerificationCreatedBefore(Instant.parse("2026-10-10T08:00:00Z"), 5)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Devuelve solo los usuarios que tienen cuenta, en cualquier estado")
+    void findExistingFirebaseUids_shouldReturnOnlyUsersWithAccount_whenSomeHaveNone() {
+        jdbc.update("DELETE FROM microcuentas.cuenta");
+        Instant now = Instant.parse("2026-10-10T08:00:00Z");
+        insertAt("uid-pendiente", "PENDING_VERIFICATION", now);
+        insertAt("uid-deshabilitada", "DISABLED", now);
+
+        assertThat(repositorio.findExistingFirebaseUids(List.of("uid-pendiente", "uid-deshabilitada", "uid-sin-cuenta")))
+                .containsExactlyInAnyOrder("uid-pendiente", "uid-deshabilitada");
+    }
+
+    @Test
+    @DisplayName("Una lista vacía devuelve un conjunto vacío sin consultar la base")
+    void findExistingFirebaseUids_shouldReturnEmpty_whenListIsEmpty() {
+        assertThat(repositorio.findExistingFirebaseUids(List.of())).isEmpty();
+    }
+
+    private void insertAt(String firebaseUid, String status, Instant createdAt) {
+        // fecha_actualizacion debe ser >= fecha_creacion (ck_cuenta_fecha_actualizacion)
+        jdbc.update("""
+                INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido, estado, pronombres,
+                                                 fecha_creacion, fecha_actualizacion)
+                VALUES (gen_random_uuid(), ?, 'Ana', 'Perez', ?, 'SHE', ?, ?)
+                """, firebaseUid, status, Timestamp.from(createdAt), Timestamp.from(createdAt));
     }
 
     private Account cuentaDe(String firebaseUid) {

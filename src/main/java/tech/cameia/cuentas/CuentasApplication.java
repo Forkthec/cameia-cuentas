@@ -8,6 +8,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Profiles;
 
 import tech.cameia.cuentas.infrastructure.config.AccountEventsRelayJobRunner;
+import tech.cameia.cuentas.infrastructure.config.PurgeJobRunner;
 
 @SpringBootApplication
 public class CuentasApplication {
@@ -31,7 +32,8 @@ public class CuentasApplication {
 	 * @param exit acción que termina el proceso con el código recibido
 	 */
 	static void exitWhenOneShotJob(ConfigurableApplicationContext context, IntConsumer exit) {
-		if (context.getEnvironment().acceptsProfiles(Profiles.of(AccountEventsRelayJobRunner.PROFILE))) {
+		if (context.getEnvironment().acceptsProfiles(
+				Profiles.of(AccountEventsRelayJobRunner.PROFILE + " | " + PurgeJobRunner.PROFILE))) {
 			exit.accept(SpringApplication.exit(context));
 		}
 	}

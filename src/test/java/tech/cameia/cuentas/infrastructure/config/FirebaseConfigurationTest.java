@@ -4,6 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyPairGenerator;
+import java.util.Base64;
 
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
@@ -11,6 +15,7 @@ import com.google.firebase.FirebaseApp;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.core.env.Environment;
 import org.springframework.mock.env.MockEnvironment;
 
@@ -75,6 +80,21 @@ class FirebaseConfigurationTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(FirebaseConfiguration.EMULATOR_HOST_VARIABLE)
                 .hasMessageContaining("despliegue");
+        assertThat(FirebaseApp.getApps()).isEmpty();
+    }
+
+    /** En un Cloud Run Job (CLOUD_RUN_JOB, sin K_SERVICE) la variable también impide el arranque. */
+    @Test
+    void emulatorHost_onCloudRunJob_failsStartup() {
+        RecordingFirebaseConfiguration configuration = configurationWith("",
+                new MockEnvironment()
+                        .withProperty(FirebaseConfiguration.EMULATOR_HOST_VARIABLE, "localhost:9099")
+                        .withProperty("CLOUD_RUN_JOB", "cuentas-purga"));
+
+        assertThatThrownBy(configuration::firebaseApp)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(FirebaseConfiguration.EMULATOR_HOST_VARIABLE)
+                .hasMessageContaining("K_SERVICE o CLOUD_RUN_JOB definida");
         assertThat(FirebaseApp.getApps()).isEmpty();
     }
 
@@ -148,6 +168,55 @@ class FirebaseConfigurationTest {
 
         assertThat(configuration.defaultCredentialsRequests).isEqualTo(1);
         assertThat(FirebaseApp.getApps()).hasSize(1);
+    }
+
+    /** Una ruta de llave ausente (nula) se trata como vacía: se piden las credenciales por defecto. */
+    @Test
+    void noEmulatorHost_withNullKeyPath_usesDefaultCredentials() {
+        RecordingFirebaseConfiguration configuration = configurationWith(null, new MockEnvironment());
+
+        configuration.firebaseApp();
+
+        assertThat(configuration.defaultCredentialsRequests).isEqualTo(1);
+    }
+
+    /** Una segunda llamada reutiliza la aplicación ya creada en lugar de inicializar otra con el mismo nombre. */
+    @Test
+    void firebaseApp_calledTwice_returnsTheSameInstance() {
+        RecordingFirebaseConfiguration configuration = configurationWith("", new MockEnvironment());
+
+        FirebaseApp first = configuration.firebaseApp();
+        FirebaseApp second = configuration.firebaseApp();
+
+        assertThat(second).isSameAs(first);
+        assertThat(FirebaseApp.getApps()).hasSize(1);
+    }
+
+    /** Con una llave de cuenta de servicio válida en la ruta, las credenciales salen del archivo y no de Google. */
+    @Test
+    void noEmulatorHost_withValidKeyFile_buildsCredentialsFromTheFile(@TempDir Path directory) throws Exception {
+        Path keyFile = directory.resolve("llave.json");
+        Files.writeString(keyFile, serviceAccountJson());
+        RecordingFirebaseConfiguration configuration = configurationWith(keyFile.toString(), new MockEnvironment());
+
+        FirebaseApp app = configuration.firebaseApp();
+
+        assertThat(configuration.defaultCredentialsRequests).isZero();
+        assertThat(app.getOptions().getProjectId()).isEqualTo(PROJECT_ID);
+    }
+
+    /** JSON de cuenta de servicio con una llave RSA generada al vuelo: no es un secreto real. */
+    private static String serviceAccountJson() throws Exception {
+        KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+        generator.initialize(2048);
+        String body = Base64.getEncoder().encodeToString(generator.generateKeyPair().getPrivate().getEncoded());
+        // En JSON el salto de línea del PEM va escapado
+        String pem = "-----BEGIN PRIVATE KEY-----\n" + body + "\n-----END PRIVATE KEY-----\n";
+        return """
+                {"type":"service_account","project_id":"%s","private_key_id":"prueba","private_key":"%s",
+                 "client_email":"prueba@%s.iam.gserviceaccount.com","client_id":"1",
+                 "token_uri":"https://oauth2.googleapis.com/token"}
+                """.formatted(PROJECT_ID, pem, PROJECT_ID);
     }
 
     /** Toda llamada a Firebase tiene tiempo de espera: 3 s para conectar y 5 s para cada respuesta. */

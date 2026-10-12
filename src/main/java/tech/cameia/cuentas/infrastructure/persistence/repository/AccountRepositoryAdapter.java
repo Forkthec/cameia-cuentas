@@ -1,9 +1,17 @@
 package tech.cameia.cuentas.infrastructure.persistence.repository;
 
+import java.time.Instant;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
+import org.springframework.data.domain.Limit;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
+
+import tech.cameia.cuentas.domain.exception.AccountConflictException;
 
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.BirthDate;
@@ -44,17 +52,42 @@ public class AccountRepositoryAdapter implements AccountRepository {
      *
      * @param account cuenta a persistir
      * @return la cuenta tal como quedó almacenada
+     * @throws AccountConflictException si otra escritura cambió la fila después de leer la cuenta o al mismo tiempo
      */
     @Override
     public Account save(Account account) {
         AccountEntity entidad = repositorio.findByFirebaseUid(account.getFirebaseUid())
-                .map(existente -> {
-                    existente.setEstado(account.getStatus());
-                    return existente;
+                .map(existing -> {
+                    rejectIfRowChanged(account, existing);
+                    existing.setEstado(account.getStatus());
+                    return existing;
                 })
                 .orElseGet(() -> mapeador.toEntity(account));
 
-        return mapeador.toDomain(repositorio.save(entidad));
+        try {
+            return mapeador.toDomain(repositorio.save(entidad));
+        } catch (ObjectOptimisticLockingFailureException conflicto) {
+            // Otra escritura cambió la fila entre su lectura y este guardado; el dominio no conoce JPA
+            throw new AccountConflictException();
+        }
+    }
+
+    /**
+     * Rechaza el guardado si la fila cambió desde que se leyó la cuenta.
+     *
+     * <p>Sin esta comparación, el guardado recargaría la fila con su versión actual y pisaría el cambio ajeno sin que el
+     * bloqueo optimista lo notara (por ejemplo, reactivar una cuenta que otra petición acaba de deshabilitar).</p>
+     *
+     * @param account cuenta que se guarda; si no trae versión, es nueva y no hay nada que comparar
+     * @param existing fila actual
+     * @throws AccountConflictException si la versión leída ya no es la de la fila
+     */
+    private static void rejectIfRowChanged(Account account, AccountEntity existing) {
+        account.getVersion().ifPresent(leida -> {
+            if (!leida.equals(existing.getVersion())) {
+                throw new AccountConflictException();
+            }
+        });
     }
 
     /**
@@ -66,6 +99,45 @@ public class AccountRepositoryAdapter implements AccountRepository {
     @Override
     public Optional<Account> findByFirebaseUid(String firebaseUid) {
         return repositorio.findByFirebaseUid(firebaseUid).map(mapeador::toDomain);
+    }
+
+    /**
+     * Borra la cuenta del usuario solo si sigue sin verificar.
+     *
+     * <p>No abre transacción: la abre el servicio que la llama, para que el borrado y su evento se confirmen juntos.</p>
+     *
+     * @param firebaseUid identificador del usuario en Firebase Auth
+     * @return {@code true} si borró una fila; {@code false} si no existía o ya no estaba pendiente
+     */
+    @Override
+    public boolean deletePendingByFirebaseUid(String firebaseUid) {
+        return repositorio.deletePendingByFirebaseUid(firebaseUid) == 1;
+    }
+
+    /**
+     * Lista los usuarios cuya cuenta lleva sin verificar desde antes de un instante.
+     *
+     * @param limit instante, exclusivo
+     * @param max cantidad máxima de usuarios
+     * @return los {@code firebaseUid}, de la cuenta más antigua a la más nueva
+     */
+    @Override
+    public List<String> findPendingVerificationCreatedBefore(Instant limit, int max) {
+        return repositorio.findPendingFirebaseUids(limit, Limit.of(max));
+    }
+
+    /**
+     * Indica cuáles de los usuarios indicados tienen una cuenta local, en cualquier estado.
+     *
+     * @param firebaseUids identificadores a comprobar
+     * @return los que tienen fila
+     */
+    @Override
+    public Set<String> findExistingFirebaseUids(Collection<String> firebaseUids) {
+        if (firebaseUids.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(repositorio.findExistingFirebaseUids(firebaseUids));
     }
 
     /**

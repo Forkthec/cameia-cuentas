@@ -2,6 +2,8 @@ package tech.cameia.cuentas.infrastructure.client;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -14,6 +16,7 @@ import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.model.DirectoryUser;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.RawPassword;
+import tech.cameia.cuentas.domain.model.UserVerificationStatus;
 import tech.cameia.cuentas.domain.port.FirebaseUserDirectory;
 
 /**
@@ -35,6 +38,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     private final Map<String, String> planesPorUid = new ConcurrentHashMap<>();
     private final Map<String, String> contrasenasPorUid = new ConcurrentHashMap<>();
     private final Map<String, Instant> creacionesPorUid = new ConcurrentHashMap<>();
+    private final Map<String, String> proveedoresPorUid = new ConcurrentHashMap<>();
     private final Set<String> correosVerificados = ConcurrentHashMap.newKeySet();
     private final Set<String> deshabilitados = ConcurrentHashMap.newKeySet();
     private final AtomicInteger consultas = new AtomicInteger();
@@ -45,10 +49,13 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     private volatile boolean fallarAlEscribirElPlan;
     private volatile boolean indisponibleAlEscribirElPlan;
     private volatile boolean fallarAlBorrar;
+    private volatile boolean indisponibleAlBorrar;
     private volatile boolean fallarAlConsultar;
     private volatile int consultasDeCorreoRestantes = -1;
     private volatile boolean reintentoDelSdk;
     private volatile boolean respuestaPerdida;
+    private volatile String uidRechazado;
+    private volatile String uidIndisponible;
 
     @Override
     public synchronized void createUser(String firebaseUid, EmailAddress email, RawPassword password) {
@@ -115,6 +122,9 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
 
     @Override
     public void deleteUser(String firebaseUid) {
+        if (indisponibleAlBorrar) {
+            throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
+        }
         if (fallarAlBorrar) {
             throw new IllegalStateException("Firebase rechazó la eliminación del usuario");
         }
@@ -123,13 +133,74 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         planesPorUid.remove(firebaseUid);
         contrasenasPorUid.remove(firebaseUid);
         creacionesPorUid.remove(firebaseUid);
+        proveedoresPorUid.remove(firebaseUid);
         correosVerificados.remove(firebaseUid);
         deshabilitados.remove(firebaseUid);
     }
 
     @Override
-    public boolean isEmailVerified(String firebaseUid) {
-        return correosVerificados.contains(firebaseUid);
+    public synchronized List<String> findUnverifiedPasswordUsersCreatedBefore(Instant limit, int max) {
+        consultas.incrementAndGet();
+        if (fallarAlConsultar) {
+            throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
+        }
+        return correosPorUid.keySet().stream()
+                .filter(uid -> "password".equals(proveedoresPorUid.getOrDefault(uid, "password")))
+                .filter(uid -> !correosVerificados.contains(uid))
+                .filter(uid -> creacionesPorUid.get(uid).isBefore(limit))
+                .sorted(Comparator.comparing(creacionesPorUid::get))
+                .limit(max)
+                .toList();
+    }
+
+    /**
+     * Crea una credencial sin cuenta local que ingresa con otro proveedor, con la fecha de creación indicada.
+     *
+     * @param correo correo ya normalizado
+     * @param creada instante de creación de la credencial
+     * @param proveedor identificador del proveedor, por ejemplo {@code google.com}
+     * @return identificador de la credencial creada
+     */
+    public String crearSinCuentaLocalConProveedor(String correo, Instant creada, String proveedor) {
+        String uid = crearSinCuentaLocal(correo, creada);
+        proveedoresPorUid.put(uid, proveedor);
+        return uid;
+    }
+
+    @Override
+    public UserVerificationStatus verificationStatus(String firebaseUid) {
+        consultas.incrementAndGet();
+        if (fallarAlConsultar) {
+            throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
+        }
+        if (firebaseUid.equals(uidIndisponible)) {
+            throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
+        }
+        if (firebaseUid.equals(uidRechazado)) {
+            throw new IllegalStateException("Firebase rechazó la consulta del estado del correo");
+        }
+        if (correosVerificados.contains(firebaseUid)) {
+            return UserVerificationStatus.VERIFIED;
+        }
+        return correosPorUid.containsKey(firebaseUid) ? UserVerificationStatus.NOT_VERIFIED : UserVerificationStatus.NOT_FOUND;
+    }
+
+    /**
+     * Hace que la consulta del estado del correo de un usuario falle como si Firebase no estuviera disponible.
+     *
+     * @param firebaseUid identificador del usuario cuya consulta no responde
+     */
+    public void quedarIndisponibleAlConsultarA(String firebaseUid) {
+        this.uidIndisponible = firebaseUid;
+    }
+
+    /**
+     * Hace que la consulta del estado del correo de un usuario falle como un rechazo de Firebase.
+     *
+     * @param firebaseUid identificador del usuario cuya consulta se rechaza
+     */
+    public void rejectLookupOf(String firebaseUid) {
+        this.uidRechazado = firebaseUid;
     }
 
     /**
@@ -274,6 +345,11 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         this.indisponibleAlEscribirElPlan = true;
     }
 
+    /** Hace que el borrado de una credencial falle como si Firebase no estuviera disponible. */
+    public void quedarIndisponibleAlBorrar() {
+        this.indisponibleAlBorrar = true;
+    }
+
     /** Hace que el borrado de credenciales falle, para probar la compensación fallida. */
     public void fallarAlBorrar() {
         this.fallarAlBorrar = true;
@@ -283,6 +359,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     public void dejarDeFallar() {
         this.fallarAlEscribirElPlan = false;
         this.indisponibleAlEscribirElPlan = false;
+        this.indisponibleAlBorrar = false;
         this.fallarAlBorrar = false;
         this.fallarAlConsultar = false;
         this.consultasDeCorreoRestantes = -1;
@@ -305,6 +382,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         fallarAlConsultar = false;
         fallarAlEscribirElPlan = false;
         indisponibleAlEscribirElPlan = false;
+        indisponibleAlBorrar = false;
         fallarAlBorrar = false;
         reintentoDelSdk = false;
         respuestaPerdida = false;

@@ -2,11 +2,14 @@ package tech.cameia.cuentas.infrastructure.persistence.repository;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -47,6 +50,43 @@ public interface AccountJpaRepository extends JpaRepository<AccountEntity, UUID>
             LIMIT :limit
             """, nativeQuery = true)
     List<UnannouncedProjection> findUnannounced(@Param("limit") int limit);
+
+    /**
+     * Borra la fila del usuario solo si su estado sigue siendo {@code PENDING_VERIFICATION}.
+     *
+     * <p>La condición de estado va en el mismo {@code DELETE}: si alguien activó la cuenta entre la decisión y el borrado, la
+     * sentencia no toca ninguna fila.</p>
+     *
+     * @param firebaseUid identificador del usuario en Firebase Auth
+     * @return filas borradas: 1 o 0
+     */
+    @Modifying
+    @Query("delete from AccountEntity a where a.firebaseUid = :firebaseUid "
+            + "and a.estado = tech.cameia.cuentas.domain.model.AccountStatus.PENDING_VERIFICATION")
+    int deletePendingByFirebaseUid(@Param("firebaseUid") String firebaseUid);
+
+    /**
+     * Lista los usuarios de las cuentas sin verificar creadas antes de un instante, la más antigua primero.
+     *
+     * <p>Usa el índice parcial de cuentas pendientes por fecha de creación.</p>
+     *
+     * @param limite instante, exclusivo
+     * @param cantidad máximo de filas
+     * @return los {@code firebaseUid}
+     */
+    @Query("select a.firebaseUid from AccountEntity a "
+            + "where a.estado = tech.cameia.cuentas.domain.model.AccountStatus.PENDING_VERIFICATION "
+            + "and a.fechaCreacion < :limite order by a.fechaCreacion asc, a.id asc")
+    List<String> findPendingFirebaseUids(@Param("limite") Instant limite, Limit cantidad);
+
+    /**
+     * Devuelve cuáles de los usuarios indicados tienen fila, en cualquier estado.
+     *
+     * @param uids identificadores a comprobar (nunca vacío: una lista vacía no genera una consulta válida)
+     * @return los {@code firebaseUid} que existen
+     */
+    @Query("select a.firebaseUid from AccountEntity a where a.firebaseUid in :uids")
+    List<String> findExistingFirebaseUids(@Param("uids") Collection<String> uids);
 
     /** Proyección de la consulta de cuentas sin evento. */
     interface UnannouncedProjection {

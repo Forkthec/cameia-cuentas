@@ -1,6 +1,7 @@
 package tech.cameia.cuentas.infrastructure.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.Resource;
@@ -17,6 +18,7 @@ import tech.cameia.cuentas.domain.policy.PasswordPolicy;
  * declara aquí.</p>
  */
 @Configuration
+@EnableConfigurationProperties(PurgeProperties.class)
 public class DomainPolicyConfiguration {
 
     /**

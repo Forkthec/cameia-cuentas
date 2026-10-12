@@ -7,7 +7,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.LocalDate;
 import java.util.UUID;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tech.cameia.cuentas.domain.exception.AccountDisabledException;
+import tech.cameia.cuentas.domain.exception.AccountNotFoundException;
+import tech.cameia.cuentas.domain.exception.ErrorCode;
 
 /**
  * Prueba del agregado descrito en {@code specs/CM-14-RegistroUsuario/spec.md}
@@ -83,18 +87,23 @@ class AccountTest {
     }
 
     @Test
-    void unaCuentaBloqueadaNoSeActivaAlVerificarElCorreo() {
-        Account bloqueada = reconstruirCon(AccountStatus.DISABLED);
+    @DisplayName("Una cuenta deshabilitada no se activa al verificar el correo")
+    void activate_shouldThrowAccountDisabled_whenDisabled() {
+        Account deshabilitada = reconstruirCon(AccountStatus.DISABLED);
 
-        assertThatThrownBy(bloqueada::activate).isInstanceOf(IllegalStateException.class);
-        assertThat(bloqueada.getStatus()).isEqualTo(AccountStatus.DISABLED);
+        assertThatThrownBy(deshabilitada::activate)
+                .isInstanceOf(AccountDisabledException.class)
+                .extracting(error -> ((AccountDisabledException) error).getErrorCode())
+                .isEqualTo(ErrorCode.ACCOUNT_DISABLED);
+        assertThat(deshabilitada.getStatus()).isEqualTo(AccountStatus.DISABLED);
     }
 
     @Test
-    void unaCuentaAnonimizadaNoSeActivaAlVerificarElCorreo() {
+    @DisplayName("Una cuenta anonimizada responde como si no existiera al verificar el correo")
+    void activate_shouldThrowAccountNotFound_whenAnonymized() {
         Account anonimizada = reconstruirCon(AccountStatus.ANONYMIZED);
 
-        assertThatThrownBy(anonimizada::activate).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(anonimizada::activate).isInstanceOf(AccountNotFoundException.class);
         assertThat(anonimizada.getStatus()).isEqualTo(AccountStatus.ANONYMIZED);
     }
 

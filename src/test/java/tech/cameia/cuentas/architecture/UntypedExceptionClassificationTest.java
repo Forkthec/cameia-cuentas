@@ -44,9 +44,6 @@ class UntypedExceptionClassificationTest {
     /** Lo que nadie puede prever: un rechazo de Firebase que no es indisponibilidad ni correo inválido. */
     private static final String UNEXPECTED_FAILURE = "fallo imprevisto";
 
-    /** Previsible, con su corrección asignada a otra tarea y anotada en docs/errores.md. */
-    private static final String PENDING_CM_179 = "pendiente de CM-179 (activación)";
-
     private static final String MODEL_PACKAGE = "tech.cameia.cuentas.domain.model.";
     private static final String CONFIGURATION_PACKAGE = "tech.cameia.cuentas.infrastructure.config.";
     private static final String CLIENT_PACKAGE = "tech.cameia.cuentas.infrastructure.client.";
@@ -55,10 +52,11 @@ class UntypedExceptionClassificationTest {
 
     private static final Map<String, String> CLASSIFICATION = Map.ofEntries(
             Map.entry("tech.cameia.cuentas.application.service.AccountRecordingService#recordNewAccount", DEFENSIVE_INVARIANT),
+            Map.entry("tech.cameia.cuentas.application.service.PendingAccountDeletionService#deletePending", DEFENSIVE_INVARIANT),
             Map.entry(EVENT_PACKAGE + "AccountCreated#<init>", DEFENSIVE_INVARIANT),
+            Map.entry(EVENT_PACKAGE + "AccountDeleted#<init>", DEFENSIVE_INVARIANT),
             Map.entry(EVENT_PACKAGE + "CorrelationId#<init>", DEFENSIVE_INVARIANT),
             Map.entry(EVENT_PACKAGE + "OutboundEvent#<init>", DEFENSIVE_INVARIANT),
-            Map.entry(MODEL_PACKAGE + "Account#activate", PENDING_CM_179),
             Map.entry(MODEL_PACKAGE + "Account#exigirTexto", DEFENSIVE_INVARIANT),
             Map.entry(MODEL_PACKAGE + "Account#register", DEFENSIVE_INVARIANT),
             Map.entry(MODEL_PACKAGE + "BirthDate#<init>", DEFENSIVE_INVARIANT),
@@ -75,8 +73,8 @@ class UntypedExceptionClassificationTest {
             Map.entry(CONFIGURATION_PACKAGE + "FirebaseConfiguration#firebaseApp", STARTUP),
             Map.entry(CONFIGURATION_PACKAGE + "FirebaseConfiguration#rejectEmulatorInDeployment", STARTUP),
             Map.entry(CONFIGURATION_PACKAGE + "BrokerSettingsGuard#<init>", STARTUP),
-            Map.entry(CLIENT_PACKAGE + "FirebaseUserDirectoryAdapter#unavailableOrRejection", UNEXPECTED_FAILURE),
-            Map.entry(CLIENT_PACKAGE + "FirebaseUserDirectoryAdapter#isEmailVerified", PENDING_CM_179));
+            Map.entry(CONFIGURATION_PACKAGE + "AccountEventsMessagingConfiguration#disabledEventPublisher", STARTUP),
+            Map.entry(CLIENT_PACKAGE + "FirebaseUserDirectoryAdapter#unavailableOrRejection", UNEXPECTED_FAILURE));
 
     @Test
     @DisplayName("Todo método que lanza una excepción sin código está clasificado con su motivo")

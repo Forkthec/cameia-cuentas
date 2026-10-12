@@ -8,7 +8,7 @@ package tech.cameia.cuentas.domain.exception;
 public class EmailNotVerifiedException extends BusinessException {
 
     private static final String MENSAJE =
-            "Primero debes verificar tu correo con el enlace que te enviamos";
+            "Tu correo aún no está verificado.";
 
     /** Crea la excepción con el mensaje que ve la persona. */
     public EmailNotVerifiedException() {

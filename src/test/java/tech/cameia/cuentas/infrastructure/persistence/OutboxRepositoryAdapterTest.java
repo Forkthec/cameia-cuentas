@@ -21,6 +21,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import tech.cameia.cuentas.domain.event.AccountCreated;
+import tech.cameia.cuentas.domain.event.AccountDeleted;
 import tech.cameia.cuentas.domain.event.CorrelationId;
 import tech.cameia.cuentas.domain.event.OutboundEvent;
 import tech.cameia.cuentas.domain.model.BirthDate;
@@ -63,6 +64,11 @@ class OutboxRepositoryAdapterTest {
                 new BirthDate(LocalDate.of(2008, 3, 15)), createdAt, new CorrelationId("req-1"));
     }
 
+    private static AccountDeleted deletion(String eventId, String uid) {
+        return new AccountDeleted(UUID.fromString(eventId), uid, Instant.parse("2026-10-10T08:00:00.000Z"),
+                new CorrelationId("req-1"));
+    }
+
     private static AccountCreated event(String eventId, String uid) {
         return event(eventId, uid, Instant.parse("2026-10-09T15:04:05.123Z"));
     }
@@ -90,6 +96,48 @@ class OutboxRepositoryAdapterTest {
         assertThat(((Number) row.get("intentos")).intValue()).isZero();
         assertThat(row.get("fecha_publicacion")).isNull();
         assertThat(((Timestamp) row.get("fecha_creacion")).toInstant()).isEqualTo(Instant.parse("2026-10-09T15:04:05.123Z"));
+    }
+
+    @Test
+    @DisplayName("Guarda el evento de cuenta eliminada pendiente, con su carga exacta")
+    void appendAccountDeleted_shouldStorePendingEvent_whenNew() throws Exception {
+        boolean stored = outbox.appendAccountDeleted(deletion("11111111-1111-4111-8111-111111111111", UID));
+
+        assertThat(stored).isTrue();
+        Map<String, Object> row = jdbc.queryForMap("""
+                SELECT tipo, version, agregado_id, carga::text AS carga, id_correlacion, intentos, fecha_publicacion
+                  FROM microcuentas.evento_saliente WHERE id = '11111111-1111-4111-8111-111111111111'
+                """);
+        assertThat(JSON.readTree((String) row.get("carga"))).isEqualTo(JSON.readTree(
+                "{\"usuarioId\":\"" + UID + "\",\"eliminadaEn\":\"2026-10-10T08:00:00.000Z\"}"));
+        assertThat(row.get("tipo")).isEqualTo("cuenta.eliminada");
+        assertThat(((Number) row.get("version")).intValue()).isEqualTo(1);
+        assertThat(row.get("agregado_id")).isEqualTo(UID);
+        assertThat(row.get("id_correlacion")).isEqualTo("req-1");
+        assertThat(((Number) row.get("intentos")).intValue()).isZero();
+        assertThat(row.get("fecha_publicacion")).isNull();
+    }
+
+    @Test
+    @DisplayName("Devuelve false y no duplica la fila cuando la cuenta ya tiene su evento de eliminación")
+    void appendAccountDeleted_shouldReturnFalse_whenAlreadyStored() {
+        outbox.appendAccountDeleted(deletion("11111111-1111-4111-8111-111111111111", UID));
+
+        boolean second = outbox.appendAccountDeleted(deletion("22222222-2222-4222-8222-222222222222", UID));
+
+        assertThat(second).isFalse();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM microcuentas.evento_saliente", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Una cuenta puede tener a la vez su evento de creación y el de eliminación")
+    void appendAccountDeleted_shouldCoexistWithCreation_whenSameAccount() {
+        outbox.appendAccountCreated(event("11111111-1111-4111-8111-111111111111", UID));
+
+        boolean stored = outbox.appendAccountDeleted(deletion("22222222-2222-4222-8222-222222222222", UID));
+
+        assertThat(stored).isTrue();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM microcuentas.evento_saliente", Integer.class)).isEqualTo(2);
     }
 
     @Test

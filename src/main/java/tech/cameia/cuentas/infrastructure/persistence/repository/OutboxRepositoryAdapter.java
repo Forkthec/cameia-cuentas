@@ -10,9 +10,11 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import tech.cameia.cuentas.domain.event.AccountCreated;
+import tech.cameia.cuentas.domain.event.AccountDeleted;
 import tech.cameia.cuentas.domain.event.OutboundEvent;
 import tech.cameia.cuentas.domain.port.OutboxRepository;
 import tech.cameia.cuentas.infrastructure.messaging.payload.AccountCreatedPayloadV1;
+import tech.cameia.cuentas.infrastructure.messaging.payload.AccountDeletedPayloadV1;
 import tech.cameia.cuentas.infrastructure.persistence.entity.OutboxEventEntity;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -52,6 +54,21 @@ public class OutboxRepositoryAdapter implements OutboxRepository {
         String payload = JSON.writeValueAsString(AccountCreatedPayloadV1.from(event));
         return repository.insertIfAbsent(event.eventId(), AccountCreated.TYPE, (short) AccountCreated.VERSION,
                 event.firebaseUid(), payload, event.correlationId().value(), event.createdAt()) == 1;
+    }
+
+    /**
+     * Serializa y guarda el evento de cuenta eliminada si la cuenta no tiene uno.
+     *
+     * @param event evento a guardar
+     * @return {@code true} si se guardó; {@code false} si la cuenta ya tenía su evento de eliminación
+     * @throws tools.jackson.core.JacksonException si la carga no se pudo serializar (defensivo: solo contiene texto)
+     */
+    @Override
+    @Transactional
+    public boolean appendAccountDeleted(AccountDeleted event) {
+        String payload = JSON.writeValueAsString(AccountDeletedPayloadV1.from(event));
+        return repository.insertIfAbsent(event.eventId(), AccountDeleted.TYPE, (short) AccountDeleted.VERSION,
+                event.firebaseUid(), payload, event.correlationId().value(), event.deletedAt()) == 1;
     }
 
     /** {@inheritDoc} */

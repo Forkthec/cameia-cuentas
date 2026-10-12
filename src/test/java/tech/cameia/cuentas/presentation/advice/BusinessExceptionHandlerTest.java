@@ -45,6 +45,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import tech.cameia.cuentas.domain.exception.AccountConflictException;
+import tech.cameia.cuentas.domain.exception.AccountDisabledException;
 import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.model.EmailAddress;
@@ -190,6 +192,28 @@ class BusinessExceptionHandlerTest {
         } finally {
             RequestContextHolder.resetRequestAttributes();
         }
+    }
+
+    @Test
+    @DisplayName("Una cuenta deshabilitada responde 403 con su código, título y mensaje")
+    void cuentaDeshabilitada_shouldReturn403_whenAccountIsDisabled() {
+        ProblemDetail problema = manejador.cuentaDeshabilitada(new AccountDisabledException());
+
+        assertThat(problema.getStatus()).isEqualTo(403);
+        assertThat(problema.getTitle()).isEqualTo("Cuenta deshabilitada");
+        assertThat(problema.getDetail()).isEqualTo("Esta cuenta está deshabilitada.");
+        assertThat(problema.getProperties()).containsEntry("code", "ACCOUNT_DISABLED").containsKey("requestId");
+    }
+
+    @Test
+    @DisplayName("Un conflicto de cuenta responde 409 con su código, título y mensaje")
+    void conflictoDeCuenta_shouldReturn409_whenAccountChangedMeanwhile() {
+        ProblemDetail problema = manejador.conflictoDeCuenta(new AccountConflictException());
+
+        assertThat(problema.getStatus()).isEqualTo(409);
+        assertThat(problema.getTitle()).isEqualTo("Conflicto de cuenta");
+        assertThat(problema.getDetail()).isEqualTo("La cuenta se está actualizando. Inténtalo de nuevo.");
+        assertThat(problema.getProperties()).containsEntry("code", "ACCOUNT_CONFLICT").containsKey("requestId");
     }
 
     @Test

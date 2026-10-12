@@ -94,6 +94,18 @@
     {
       "key": "idOtra",
       "value": ""
+    },
+    {
+      "key": "actEmail",
+      "value": ""
+    },
+    {
+      "key": "actUid",
+      "value": ""
+    },
+    {
+      "key": "actId",
+      "value": ""
     }
   ],
   "item": [
@@ -1452,7 +1464,7 @@
                   "pm.test('ACCOUNT_NOT_FOUND con su mensaje', () => {",
                   "    const cuerpo = pm.response.json();",
                   "    pm.expect(cuerpo.code).to.eql('ACCOUNT_NOT_FOUND');",
-                  "    pm.expect(cuerpo.detail).to.eql('No encontramos una cuenta para este usuario');",
+                  "    pm.expect(cuerpo.detail).to.eql('No encontramos una cuenta para este usuario.');",
                   "});",
                   "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
                 ]
@@ -1493,7 +1505,7 @@
                   "pm.test('IDENTITY_REQUIRED con su mensaje', () => {",
                   "    const cuerpo = pm.response.json();",
                   "    pm.expect(cuerpo.code).to.eql('IDENTITY_REQUIRED');",
-                  "    pm.expect(cuerpo.detail).to.eql('La petición no incluye los datos que exige esta ruta');",
+                  "    pm.expect(cuerpo.detail).to.eql('La petición no incluye los datos que exige esta ruta.');",
                   "});",
                   "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
                 ]
@@ -1685,6 +1697,822 @@
                   "    const operacion = pm.response.json().paths['/api/v1/users/me'].get;",
                   "    pm.expect(operacion).to.be.an('object');",
                   "    ['200', '400', '404', '406', '500'].forEach((estado) => pm.expect(operacion.responses).to.have.property(estado));",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v3/api-docs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v3",
+                "api-docs"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Activación",
+      "description": "POST /api/v1/users/me/verification: la cuenta se activa solo cuando el Gateway afirma la verificación con X-User-Email-Verified: true. Las peticiones corren en este orden: primero los rechazos con la cuenta aún pendiente, después la activación y la repetición. Los 403 ACCOUNT_DISABLED y los 409 ACCOUNT_CONFLICT no se pueden provocar por HTTP sin tocar la base y quedan en las pruebas automáticas. A-11 exige API_DOCUMENTATION_ENABLED=true.",
+      "item": [
+        {
+          "name": "A-00 · 201 registro de la cuenta que se activará",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('actEmail', 'activacion+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('actUid', pm.response.json().firebaseUid);",
+                  "pm.collectionVariables.set('actId', pm.response.json().id);",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{actEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "A-03 · 403 encabezado en false",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 403', () => pm.response.to.have.status(403));",
+                  "pm.test('EMAIL_NOT_VERIFIED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('EMAIL_NOT_VERIFIED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"Tu correo aún no está verificado.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "false"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-04 · 403 sin encabezado de verificación",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 403', () => pm.response.to.have.status(403));",
+                  "pm.test('EMAIL_NOT_VERIFIED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('EMAIL_NOT_VERIFIED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"Tu correo aún no está verificado.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-05 · 403 encabezado abc (nunca 500)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 403', () => pm.response.to.have.status(403));",
+                  "pm.test('EMAIL_NOT_VERIFIED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('EMAIL_NOT_VERIFIED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"Tu correo aún no está verificado.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "abc"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-06 · 403 cuerpo que afirma verificación sin encabezado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 403', () => pm.response.to.have.status(403));",
+                  "pm.test('EMAIL_NOT_VERIFIED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('EMAIL_NOT_VERIFIED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"Tu correo aún no está verificado.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"emailVerified\": true, \"status\": \"ACTIVE\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "A-06b · 403 cuerpo que no es JSON sin encabezado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 403', () => pm.response.to.have.status(403));",
+                  "pm.test('EMAIL_NOT_VERIFIED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('EMAIL_NOT_VERIFIED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"Tu correo aún no está verificado.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "no es json",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "A-12 · 403 identidad de otra cuenta sin la verificación del Gateway",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 403', () => pm.response.to.have.status(403));",
+                  "pm.test('EMAIL_NOT_VERIFIED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('EMAIL_NOT_VERIFIED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"Tu correo aún no está verificado.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-12b · 200 la cuenta sigue pendiente tras los rechazos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado PENDING_VERIFICATION', () => pm.expect(pm.response.json().status).to.eql('PENDING_VERIFICATION'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-07 · 400 sin X-User-Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('IDENTITY_REQUIRED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('IDENTITY_REQUIRED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"La petición no incluye los datos que exige esta ruta.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Email-Verified",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-08 · 400 X-User-Id en blanco",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('IDENTITY_REQUIRED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('IDENTITY_REQUIRED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"La petición no incluye los datos que exige esta ruta.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "   "
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-09 · 400 X-User-Id de 129 caracteres",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('IDENTITY_REQUIRED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('IDENTITY_REQUIRED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"La petición no incluye los datos que exige esta ruta.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-10 · 404 X-User-Id sin cuenta (forma de inyección SQL)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 404', () => pm.response.to.have.status(404));",
+                  "pm.test('ACCOUNT_NOT_FOUND con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('ACCOUNT_NOT_FOUND');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"No encontramos una cuenta para este usuario.\");",
+                  "});",
+                  "pm.test('Sin eco del valor', () => pm.expect(pm.response.text()).to.not.include(\"' OR '1'='1\"));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "' OR '1'='1"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-10b · 404 X-User-Id con 128 «ñ»",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 404', () => pm.response.to.have.status(404));",
+                  "pm.test('ACCOUNT_NOT_FOUND con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('ACCOUNT_NOT_FOUND');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"No encontramos una cuenta para este usuario.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "ññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññ"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-01 · 200 activación",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Cuenta ACTIVE con su id', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.status).to.eql('ACTIVE');",
+                  "    pm.expect(cuerpo.id).to.eql(pm.collectionVariables.get('actId'));",
+                  "    pm.expect(Object.keys(cuerpo).sort()).to.eql(['id', 'status']);",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-02 · 200 activación repetida",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Mismo resultado: ACTIVE', () => {",
+                  "    pm.expect(pm.response.json().status).to.eql('ACTIVE');",
+                  "    pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('actId'));",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-02b · 200 la cuenta quedó ACTIVE",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado ACTIVE', () => pm.expect(pm.response.json().status).to.eql('ACTIVE'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-02c · 200 cuenta activa con el encabezado en false",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Sigue ACTIVE: el encabezado solo cuenta para la cuenta pendiente', () => pm.expect(pm.response.json().status).to.eql('ACTIVE'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "false"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-11 · 200 OpenAPI publica POST /api/v1/users/me/verification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Publica la operación con sus respuestas', () => {",
+                  "    const operacion = pm.response.json().paths['/api/v1/users/me/verification'].post;",
+                  "    pm.expect(operacion).to.be.an('object');",
+                  "    ['200', '400', '403', '404', '409', '500'].forEach((estado) => pm.expect(operacion.responses).to.have.property(estado));",
                   "});",
                   "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
                 ]

@@ -38,12 +38,12 @@ class CurrentAccountController {
 
     private static final String EJEMPLO_400 = """
             {"type":"about:blank","title":"Petición incompleta","status":400,
-             "detail":"La petición no incluye los datos que exige esta ruta","instance":"/api/v1/users/me",
+             "detail":"La petición no incluye los datos que exige esta ruta.","instance":"/api/v1/users/me",
              "code":"IDENTITY_REQUIRED","requestId":"3f1c9a52-7d0e-4b57-9a38-52c1e4d8a601"}""";
 
     private static final String EJEMPLO_404 = """
             {"type":"about:blank","title":"Cuenta no encontrada","status":404,
-             "detail":"No encontramos una cuenta para este usuario","instance":"/api/v1/users/me",
+             "detail":"No encontramos una cuenta para este usuario.","instance":"/api/v1/users/me",
              "code":"ACCOUNT_NOT_FOUND","requestId":"3f1c9a52-7d0e-4b57-9a38-52c1e4d8a601"}""";
 
     private static final String EJEMPLO_406 = """

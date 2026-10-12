@@ -589,6 +589,21 @@ class RegisterUserServiceTest {
     private static class RepositorioEnMemoria implements AccountRepository {
 
         @Override
+        public boolean deletePendingByFirebaseUid(String firebaseUid) {
+            return false;
+        }
+
+        @Override
+        public List<String> findPendingVerificationCreatedBefore(java.time.Instant limit, int max) {
+            return List.of();
+        }
+
+        @Override
+        public java.util.Set<String> findExistingFirebaseUids(java.util.Collection<String> firebaseUids) {
+            return java.util.Set.of();
+        }
+
+        @Override
         public List<UnannouncedAccount> findUnannounced(int limit) {
             return List.of();
         }

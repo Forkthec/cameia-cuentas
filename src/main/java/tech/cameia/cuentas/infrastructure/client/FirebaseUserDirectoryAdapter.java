@@ -2,6 +2,8 @@ package tech.cameia.cuentas.infrastructure.client;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -11,7 +13,10 @@ import com.google.firebase.ErrorCode;
 import com.google.firebase.IncomingHttpResponse;
 import com.google.firebase.auth.AuthErrorCode;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.ExportedUserRecord;
 import com.google.firebase.auth.FirebaseAuthException;
+import com.google.firebase.auth.ListUsersPage;
+import com.google.firebase.auth.UserInfo;
 import com.google.firebase.auth.UserRecord;
 
 import org.slf4j.Logger;
@@ -22,6 +27,7 @@ import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.InvalidEmailException;
 import tech.cameia.cuentas.domain.model.DirectoryUser;
+import tech.cameia.cuentas.domain.model.UserVerificationStatus;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.RawPassword;
 import tech.cameia.cuentas.domain.port.FirebaseUserDirectory;
@@ -46,6 +52,9 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
 
     /** Nombre del custom claim que transporta el plan del usuario. */
     private static final String PLAN_CLAIM = "plan";
+
+    /** Usuarios que Firebase devuelve por página al recorrer el directorio (el máximo que admite). */
+    private static final int LIST_PAGE_SIZE = 1000;
 
     /** Valor del plan gratuito. */
     private static final String FREE_PLAN = "FREE";
@@ -287,18 +296,69 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
     }
 
     /**
-     * Consulta si el usuario ya verificó su correo.
+     * Lista las credenciales de correo y contraseña sin verificar creadas antes de un instante.
      *
-     * @param firebaseUid identificador del usuario
-     * @return {@code true} si el correo está verificado
-     * @throws IllegalStateException si el usuario no existe o Firebase no responde
+     * <p>Recorre {@code listUsers} por páginas de 1000 usuarios hasta agotar el directorio o reunir {@code max}.</p>
+     *
+     * @param limit instante, exclusivo
+     * @param max cantidad máxima de usuarios
+     * @return los identificadores que cumplen las condiciones
+     * @throws DependencyUnavailableException si Firebase no respondió o falló de su lado
+     * @throws IllegalStateException si Firebase rechazó el listado por otra razón (defecto de configuración)
      */
     @Override
-    public boolean isEmailVerified(String firebaseUid) {
+    public List<String> findUnverifiedPasswordUsersCreatedBefore(Instant limit, int max) {
+        List<String> found = new ArrayList<>();
         try {
-            return firebaseAuth.getUser(firebaseUid).isEmailVerified();
+            String pageToken = null;
+            do {
+                ListUsersPage page = firebaseAuth.listUsers(pageToken, LIST_PAGE_SIZE);
+                for (ExportedUserRecord user : page.getValues()) {
+                    if (isUnverifiedPasswordUserCreatedBefore(user, limit)) {
+                        found.add(user.getUid());
+                        if (found.size() == max) {
+                            return found;
+                        }
+                    }
+                }
+                pageToken = page.getNextPageToken();
+            } while (pageToken != null && !pageToken.isEmpty());
         } catch (FirebaseAuthException error) {
-            throw new IllegalStateException("Firebase no pudo confirmar el estado del correo", error);
+            throw unavailableOrRejection(error, "Firebase rechazó el listado de usuarios");
+        }
+        return found;
+    }
+
+    private static boolean isUnverifiedPasswordUserCreatedBefore(ExportedUserRecord user, Instant limit) {
+        UserInfo[] providers = user.getProviderData();
+        return providers != null && providers.length == 1 && "password".equals(providers[0].getProviderId())
+                && !user.isEmailVerified()
+                && isKnownAndOlderThan(user.getUserMetadata().getCreationTimestamp(), limit);
+    }
+
+    /** Firebase devuelve 0 cuando no informa la fecha de creación: esa edad desconocida no autoriza un borrado. */
+    private static boolean isKnownAndOlderThan(long creationMillis, Instant limit) {
+        return creationMillis > 0 && creationMillis < limit.toEpochMilli();
+    }
+
+    /**
+     * Consulta el estado del correo de un usuario.
+     *
+     * @param firebaseUid identificador del usuario
+     * @return si el correo está verificado, no lo está o el usuario ya no existe
+     * @throws DependencyUnavailableException si Firebase no respondió o falló de su lado
+     * @throws IllegalStateException si Firebase rechazó la consulta por otra razón (defecto de configuración)
+     */
+    @Override
+    public UserVerificationStatus verificationStatus(String firebaseUid) {
+        try {
+            return firebaseAuth.getUser(firebaseUid).isEmailVerified()
+                    ? UserVerificationStatus.VERIFIED : UserVerificationStatus.NOT_VERIFIED;
+        } catch (FirebaseAuthException error) {
+            if (AuthErrorCode.USER_NOT_FOUND.equals(error.getAuthErrorCode())) {
+                return UserVerificationStatus.NOT_FOUND;
+            }
+            throw unavailableOrRejection(error, "Firebase rechazó la consulta del estado del correo");
         }
     }
 }

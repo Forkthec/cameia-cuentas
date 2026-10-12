@@ -9,7 +9,7 @@ package tech.cameia.cuentas.domain.exception;
  */
 public class AccountNotFoundException extends BusinessException {
 
-    private static final String MENSAJE = "No encontramos una cuenta para este usuario";
+    private static final String MENSAJE = "No encontramos una cuenta para este usuario.";
 
     /** Crea la excepción con el mensaje que ve la persona. */
     public AccountNotFoundException() {

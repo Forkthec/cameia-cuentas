@@ -56,7 +56,7 @@ class GetCurrentAccountServiceTest {
     void find_shouldThrowNotFound_whenNoAccount() {
         assertThatThrownBy(() -> service.find("uid-sin-cuenta"))
                 .isInstanceOf(AccountNotFoundException.class)
-                .hasMessage("No encontramos una cuenta para este usuario");
+                .hasMessage("No encontramos una cuenta para este usuario.");
     }
 
     @Test
@@ -85,7 +85,7 @@ class GetCurrentAccountServiceTest {
     void find_shouldRejectIdentity_whenBlank(String firebaseUid) {
         assertThatThrownBy(() -> service.find(firebaseUid))
                 .isInstanceOf(IdentityRequiredException.class)
-                .hasMessage("La petición no incluye los datos que exige esta ruta")
+                .hasMessage("La petición no incluye los datos que exige esta ruta.")
                 .extracting(error -> ((IdentityRequiredException) error).getErrorCode())
                 .isEqualTo(ErrorCode.IDENTITY_REQUIRED);
         verifyNoInteractions(repository);

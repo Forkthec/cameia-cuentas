@@ -3,6 +3,9 @@ package tech.cameia.cuentas.domain.model;
 import java.util.Optional;
 import java.util.UUID;
 
+import tech.cameia.cuentas.domain.exception.AccountDisabledException;
+import tech.cameia.cuentas.domain.exception.AccountNotFoundException;
+
 /**
  * Cuenta local de una persona registrada en la plataforma.
  *
@@ -25,9 +28,10 @@ public class Account {
     private final PhoneNumber phoneNumber;
     private final Pronoun pronoun;
     private AccountStatus status;
+    private final Long version;
 
     private Account(UUID id, String firebaseUid, String firstName, String lastName,
-            BirthDate birthDate, PhoneNumber phoneNumber, Pronoun pronoun, AccountStatus status) {
+            BirthDate birthDate, PhoneNumber phoneNumber, Pronoun pronoun, AccountStatus status, Long version) {
         this.id = id;
         this.firebaseUid = firebaseUid;
         this.firstName = firstName;
@@ -36,6 +40,7 @@ public class Account {
         this.phoneNumber = phoneNumber;
         this.pronoun = pronoun;
         this.status = status;
+        this.version = version;
     }
 
     /**
@@ -65,7 +70,8 @@ public class Account {
                 birthDate,
                 phoneNumber,
                 pronoun,
-                AccountStatus.PENDING_VERIFICATION);
+                AccountStatus.PENDING_VERIFICATION,
+                null);
     }
 
     /**
@@ -86,7 +92,29 @@ public class Account {
      */
     public static Account rebuild(UUID id, String firebaseUid, String firstName, String lastName,
             BirthDate birthDate, PhoneNumber phoneNumber, Pronoun pronoun, AccountStatus status) {
-        return new Account(id, firebaseUid, firstName, lastName, birthDate, phoneNumber, pronoun, status);
+        return new Account(id, firebaseUid, firstName, lastName, birthDate, phoneNumber, pronoun, status, null);
+    }
+
+    /**
+     * Reconstruye una cuenta ya guardada recordando la versión de la fila que se leyó.
+     *
+     * <p>Quien guarda la cuenta compara esa versión con la de la fila: si otra escritura la cambió entre la lectura y el
+     * guardado, el guardado se rechaza en lugar de pisar el cambio ajeno.</p>
+     *
+     * @param id identificador de la cuenta
+     * @param firebaseUid identificador del usuario en Firebase Auth
+     * @param firstName nombres
+     * @param lastName apellidos
+     * @param birthDate fecha de nacimiento, o {@code null} si la cuenta es anterior a que el registro la exigiera
+     * @param phoneNumber celular, o {@code null}
+     * @param pronoun pronombres, o {@code null}
+     * @param status estado almacenado
+     * @param version versión de la fila en el momento de leerla
+     * @return cuenta con el estado y la versión que tenía en la base de datos
+     */
+    public static Account rebuild(UUID id, String firebaseUid, String firstName, String lastName,
+            BirthDate birthDate, PhoneNumber phoneNumber, Pronoun pronoun, AccountStatus status, Long version) {
+        return new Account(id, firebaseUid, firstName, lastName, birthDate, phoneNumber, pronoun, status, version);
     }
 
     /**
@@ -95,16 +123,21 @@ public class Account {
      * <p>Es idempotente: activar una cuenta que ya está activa no cambia nada ni falla, de
      * modo que el frontend puede reintentar la operación sin efectos raros.</p>
      *
-     * @throws IllegalStateException si la cuenta está bloqueada o anonimizada; verificar
-     *                               un correo no revierte ninguna de esas dos decisiones
+     * @throws AccountDisabledException si la cuenta está deshabilitada; verificar un correo
+     *                                  no revierte esa decisión
+     * @throws AccountNotFoundException si la cuenta fue anonimizada; se responde igual que si
+     *                                  no existiera, para no revelar que existió
      */
     public void activate() {
         if (status == AccountStatus.ACTIVE) {
             return;
         }
-        if (status != AccountStatus.PENDING_VERIFICATION) {
-            throw new IllegalStateException(
-                    "Una cuenta en estado " + status + " no se activa al verificar el correo");
+        if (status == AccountStatus.DISABLED) {
+            throw new AccountDisabledException();
+        }
+        if (status == AccountStatus.ANONYMIZED) {
+            // No se revela que la cuenta existió: se responde igual que si no hubiera cuenta
+            throw new AccountNotFoundException();
         }
         status = AccountStatus.ACTIVE;
     }
@@ -156,6 +189,11 @@ public class Account {
     /** @return estado actual de la cuenta */
     public AccountStatus getStatus() {
         return status;
+    }
+
+    /** @return versión de la fila al leerla; vacía en una cuenta que aún no se guardó */
+    public Optional<Long> getVersion() {
+        return Optional.ofNullable(version);
     }
 
     private static String exigirTexto(String valor, String mensaje) {

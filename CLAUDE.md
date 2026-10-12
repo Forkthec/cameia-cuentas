@@ -8,7 +8,7 @@ CAMEIA ofrece práctica y simulación de entrevistas virtuales para preparar ent
 - Gestiona planes, suscripciones, transacciones y su idempotencia.
 - Se integra con Wompi para pagos, una vez aprobado el contrato de integración.
 - Se integra con Firebase Admin SDK para consultar usuarios, actualizar sus datos y permisos, y bloquear cuentas cuando corresponda.
-- Publica cambios mediante contratos de eventos aprobados: hoy `cuenta.creada` versión 1 ([docs/eventos/cuenta-creada-v1.md](docs/eventos/cuenta-creada-v1.md)), con tabla de salida y relevo ([ADR 0003](docs/adr/0003-eventos-con-outbox.md)).
+- Publica cambios mediante contratos de eventos aprobados: hoy `cuenta.creada` versión 1 ([docs/eventos/cuenta-creada-v1.md](docs/eventos/cuenta-creada-v1.md)) y `cuenta.eliminada` versión 1 ([docs/eventos/cuenta-eliminada-v1.md](docs/eventos/cuenta-eliminada-v1.md)), con tabla de salida y relevo ([ADR 0003](docs/adr/0003-eventos-con-outbox.md)).
 - Mantiene persistencia propia, sin claves foráneas hacia otros microservicios.
 
 Las contraseñas y credenciales de autenticación permanecen en Firebase y nunca se almacenan aquí. El servicio no implementa la lógica de entrevistas ni registra el consumo de IA.
@@ -69,7 +69,7 @@ El servicio solo debe aceptar peticiones autenticadas del API Gateway, con dos c
 | `X-User-Roles` | Sí | Roles del usuario |
 | `X-Request-Id` | Sí | Identificador de la petición |
 | `X-User-Plan` | No | Plan del usuario; no respalda ningún derecho ni cuota hasta que exista la spec de planes |
-| `X-User-Email-Verified` | No | Si el correo está verificado |
+| `X-User-Email-Verified` | No | `true` si el correo está verificado. La activación solo toma el texto exacto `true`, y solo cuenta para la cuenta pendiente: la activa responde 200, la deshabilitada 403 y la anonimizada 404 sin mirarlo |
 
 No se confía en un encabezado enviado directamente por un cliente externo, y no se agregan campos derivados del JWT sin justificar su necesidad y documentar el contrato.
 
@@ -91,7 +91,7 @@ Una ruta nueva no se suma a esta lista sin una spec que lo justifique.
 
 ## 5. Datos
 
-Base PostgreSQL propia, esquema `microcuentas`, migraciones Flyway en `src/main/resources/db/migration` (`V1__esquema_inicial_cuenta.sql`, `V2__ajustar_version_inicial_cuenta.sql`, `V3__restringir_pronombres.sql`, `V4__relajar_minimo_telefono_e164.sql` y `V5__evento_saliente.sql`).
+Base PostgreSQL propia, esquema `microcuentas`, migraciones Flyway en `src/main/resources/db/migration` (`V1__esquema_inicial_cuenta.sql`, `V2__ajustar_version_inicial_cuenta.sql`, `V3__restringir_pronombres.sql`, `V4__relajar_minimo_telefono_e164.sql`, `V5__evento_saliente.sql`, `V6__indice_cuenta_pendiente_fecha_creacion.sql` y `V7__evento_cuenta_eliminada.sql`).
 
 Flyway corre al arrancar la aplicación y anota cada migración aplicada en `microcuentas.flyway_schema_history`: reiniciar o
 recrear el contenedor no vuelve a aplicar nada ni toca las filas, y una migración nueva se aplica una sola vez, dentro de una
@@ -121,7 +121,7 @@ Tabla `microcuentas.evento_saliente` (tabla de salida de eventos, [ADR 0003](doc
 | Columna | Tipo | Regla |
 |---|---|---|
 | `id` | `uuid` | Clave primaria; es el `message_id` del mensaje |
-| `tipo` | `varchar(64)` | Hoy solo `cuenta.creada` (`ck_evento_saliente_tipo`) |
+| `tipo` | `varchar(64)` | `cuenta.creada` o `cuenta.eliminada` (`ck_evento_saliente_tipo`) |
 | `version` | `smallint` | Versión del contrato; ≥ 1 |
 | `agregado_id` | `varchar(128)` | `firebaseUid` de la cuenta; no vacío; único junto con `tipo` (`uq_evento_saliente_tipo_agregado`) |
 | `carga` | `jsonb` | Cuerpo del evento; nulo solo cuando ya se publicó (`ck_evento_saliente_carga_pendiente`) |
@@ -136,7 +136,7 @@ La tabla `cuenta` no guarda correo ni contraseña: son de Firebase. `evento_sali
 
 - No registrar JWT, secretos, contraseñas, tokens de Firebase ni información de pago.
 - Los secretos de Firebase y de Wompi viven solo en el gestor de secretos o en variables de entorno aprobadas, nunca en Git.
-- **Emulador de Firebase Auth.** `FIREBASE_AUTH_EMULATOR_HOST` es solo para desarrollo local: con ella el Admin SDK acepta tokens sin firma. La aplicación no arranca si esa variable existe, aunque esté vacía, junto a `K_SERVICE` o al perfil `prod`. No se define en workflows ni en despliegues. Ver [specs/CM-191-EmuladorFirebaseAuth/spec.md](specs/CM-191-EmuladorFirebaseAuth/spec.md).
+- **Emulador de Firebase Auth.** `FIREBASE_AUTH_EMULATOR_HOST` es solo para desarrollo local: con ella el Admin SDK acepta tokens sin firma. La aplicación no arranca si esa variable existe, aunque esté vacía, junto a `K_SERVICE`, `CLOUD_RUN_JOB` o al perfil `prod`. No se define en workflows ni en despliegues. Ver [specs/CM-191-EmuladorFirebaseAuth/spec.md](specs/CM-191-EmuladorFirebaseAuth/spec.md).
 - La autenticidad de las peticiones del Gateway la garantizan IAM y el token OIDC (capa 1); no se firma el payload en la aplicación.
 - **Wompi.** Se verifican la firma SHA-256 y la idempotencia de cada webhook antes de cambiar una suscripción o un entitlement. El webhook no llega directo a Cuentas: apunta al Gateway (`POST /webhooks/wompi`), que lo reenvía íntegro por red privada con token OIDC. Wompi se autentica con su checksum, no con un JWT de Firebase.
 - La autorización se aplica por endpoint; un rol no equivale a un permiso de negocio.
@@ -169,13 +169,31 @@ No abre puerto HTTP; sale con código `0` y deja la línea `Relevo de eventos de
 `SPRING_PROFILES_ACTIVE=prod,account-events-relay` que dispara Cloud Scheduler cada 5 minutos. El broker local es el servicio
 `rabbitmq` de `docker-compose.yml` (AMQP en el puerto 5673 y consola en `http://localhost:15673`).
 
+Para levantar la aplicación sin broker, `EVENTS_ENABLED=false` pone un publicador inerte: los eventos quedan pendientes en la tabla de
+salida y se publican cuando se vuelva a encender. Con el perfil `prod` no se admite y la aplicación no arranca.
+
+**Purga de cuentas sin verificar (modo tarea).** Revisa las cuentas `PENDING_VERIFICATION` de más de 168 horas: activa las que ya
+verificaron su correo y borra el resto con su credencial de Firebase y su evento `cuenta.eliminada`; al final borra las credenciales
+huérfanas (sin cuenta local, sin verificar, de más de 168 horas y con único proveedor `password`). Con la base y el emulador locales
+y el `.env` local:
+
+```text
+java -jar target\cuentas-0.0.1-SNAPSHOT.jar --spring.profiles.active=local,purge-job
+```
+
+No abre puerto HTTP; ejecuta la purga una vez y deja la línea `Purga de cuentas sin verificar: revisadas=...`. Sale con `0` aunque
+haya cuentas fallidas (la siguiente ejecución las reintenta y un aviso lo deja escrito) y con un código distinto de `0` si no pudo
+empezar o si Firebase no responde. El tope por ejecución es `PURGE_MAX_ACCOUNTS_PER_RUN` (de 1 a 1000; por defecto 1000). En Cloud
+Run es un Job con `SPRING_PROFILES_ACTIVE=prod,purge-job` que dispara Cloud Scheduler a las 03:00 `America/Bogota`, con las mismas
+variables que el servicio (incluidas `SPRING_RABBITMQ_*`, que exige el perfil `prod`).
+
 ## 9. Contribución
 
 Rama, commit, tipos, título de PR, revisión y merge: rige [CONTRIBUTING.md](CONTRIBUTING.md). Lo que este repositorio añade:
 
 - El título del PR lleva `[IA-ASISTIDO]` al final cuando hubo IA; el commit no lo lleva. Un commit asistido por IA lleva el trailer `Co-Authored-By` con el modelo.
 - Una IA puede abrir un PR; nunca lo fusiona. El control humano lo marca la persona que revisa.
-- Un PR cubre una pieza reconocible y no pasa de 1000 líneas entre agregadas y eliminadas.
+- Un PR por tarea de Jira (CM), sin tope de líneas: una rama, un PR hacia `develop` y un commit por capacidad (migración, dominio, API, pruebas, Postman y documentación) en orden de lectura, cada uno compila. Se parte en dos solo si la tarea trae dos piezas que se despliegan por separado o depende de otra sin fusionar.
 - Antes del código hay una spec aprobada en `specs/CM-NNN-Descripcion/` (`spec.md`, `plan.md` y `tasks.md`); el flujo está en la sección 12 de [docs/estandar-backend.md](docs/estandar-backend.md).
 - Las decisiones con peso humano se registran en [docs/bitacora-ia/](docs/bitacora-ia/README.md).
 
@@ -188,3 +206,4 @@ Las specs nuevas viven en `specs/CM-NNN-Descripcion/` con `Descripcion` en Pasca
 | Contrato de integración con Wompi | Product Owner | La integración de pagos y los webhooks |
 | Broker de staging con AMQPS y credenciales en el gestor de secretos | DevOps (por tarea de Product Owner) | La publicación de `cuenta.creada` en staging |
 | Cloud Run Job `account-events-relay` y Cloud Scheduler cada 5 minutos | DevOps (por tarea de Product Owner) | El reintento y la carga inicial de eventos en staging |
+| Cloud Run Job de la purga (`purge-job`) y Cloud Scheduler diario a las 03:00 `America/Bogota` | DevOps (por tarea de Product Owner) | La purga de cuentas sin verificar en staging |
