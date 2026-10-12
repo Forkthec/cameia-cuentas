@@ -51,6 +51,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     private volatile boolean reintentoDelSdk;
     private volatile boolean respuestaPerdida;
     private volatile String uidRechazado;
+    private volatile String uidIndisponible;
 
     @Override
     public synchronized void createUser(String firebaseUid, EmailAddress email, RawPassword password) {
@@ -135,6 +136,9 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         if (fallarAlConsultar) {
             throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
         }
+        if (firebaseUid.equals(uidIndisponible)) {
+            throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
+        }
         if (firebaseUid.equals(uidRechazado)) {
             throw new IllegalStateException("Firebase rechazó la consulta del estado del correo");
         }
@@ -142,6 +146,15 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
             return UserVerificationStatus.VERIFIED;
         }
         return correosPorUid.containsKey(firebaseUid) ? UserVerificationStatus.NOT_VERIFIED : UserVerificationStatus.NOT_FOUND;
+    }
+
+    /**
+     * Hace que la consulta del estado del correo de un usuario falle como si Firebase no estuviera disponible.
+     *
+     * @param firebaseUid identificador del usuario cuya consulta no responde
+     */
+    public void quedarIndisponibleAlConsultarA(String firebaseUid) {
+        this.uidIndisponible = firebaseUid;
     }
 
     /**

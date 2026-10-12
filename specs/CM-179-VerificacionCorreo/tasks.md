@@ -336,7 +336,9 @@ Resultado: `FirebaseUserDirectoryAdapterTest` 39/39 y `UntypedExceptionClassific
 - **Pruebas** (`FirebaseUserDirectoryAdapterTest`, con la forma en que la clase ya simula `FirebaseAuthException`): `verificationStatus_shouldReturnVerified_whenEmailVerified`, `…NotVerified…`, `…NotFound_whenUserDoesNotExist`, `verificationStatus_shouldThrowDependencyUnavailable_whenFirebaseIsDown` (código `UNAVAILABLE`), `verificationStatus_shouldThrowIllegalState_whenRejectedForOtherReason`. Quitar las de `isEmailVerified`.
 - **Verificación:** `./mvnw.cmd -q -B "-Dtest=FirebaseUserDirectoryAdapterTest,UntypedExceptionClassificationTest" test`. Commit 7 (T-2.4 y T-2.5).
 
-## [ ] T-2.6 · Propiedades del tope y resumen — ≤ 15 min
+## [x] T-2.6 · Propiedades del tope y resumen — ≤ 15 min
+
+Resultado: `PurgePropertiesTest` 9/9 en verde (0, -1, 1001 y 100000 impiden el arranque; 1, 2, 999 y 1000 arrancan; el valor se enlaza). Desviación respecto de la tarjeta: `LayeredArchitectureTest` prohíbe que `application` importe `infrastructure`, así que el servicio de la purga no recibe `PurgeProperties` sino el entero por `@Value("${cuentas.purge.max-accounts-per-run}")`; `PurgeProperties` sigue validando el rango al arrancar con la misma propiedad.
 
 - **Cubre:** REQ-VC-28, 29. **Crear:** `infrastructure/config/PurgeProperties.java`, `domain/model/PurgeSummary.java`, prueba `infrastructure/config/PurgePropertiesTest.java` (copiar `AccountEventsPropertiesTest`). **Modificar:** `infrastructure/config/DomainPolicyConfiguration.java` (`@EnableConfigurationProperties(PurgeProperties.class)`), `src/main/resources/application.properties` (`cuentas.purge.max-accounts-per-run=${PURGE_MAX_ACCOUNTS_PER_RUN:1000}`).
   ```java
@@ -352,7 +354,9 @@ Resultado: `FirebaseUserDirectoryAdapterTest` 39/39 y `UntypedExceptionClassific
 - **Pruebas:** 0 y 1001 hacen fallar el arranque; 1 y 1000 arrancan.
 - **Verificación:** `./mvnw.cmd -q -B "-Dtest=PurgePropertiesTest" test`.
 
-## [ ] T-2.7 · Servicio de purga — ≤ 30 min
+## [x] T-2.7 · Servicio de purga — ≤ 30 min
+
+Resultado: `PurgeUnverifiedAccountsServiceTest` 12/12 (las 10 de la tarjeta, más el tope exacto y el texto del resumen), `PurgeEndToEndTest` 4/4 con Docker, `LayeredArchitectureTest` y `UntypedExceptionClassificationTest` en verde. Trampa: el `switch` con flechas sobre el enumerado genera una `MatchException` que el test de clasificación detecta; se reemplazó por condicionales. Registro, purga y nuevo registro con el mismo correo dan 201. Log: `ejecucion/evidencia/CM-179/t27-purge-e2e.log`.
 
 - **Cubre:** REQ-VC-20 a 26, 28, 29, 31. **Crear:** `application/service/PurgeUnverifiedAccountsService.java`, `PurgeUnverifiedAccountsServiceTest.java` (sin Spring: `InMemoryAccountRepository`, `InMemoryOutboxRepository`, `InMemoryFirebaseUserDirectory`, `PendingAccountDeletionService` real sobre esos dobles, `Clock.fixed(Instant.parse("2026-10-10T08:00:00Z"), ZoneOffset.UTC)`).
 - **Esqueleto** (constructores como `AccountRecordingService`; métodos de ≤ 20 líneas; el resultado de cada cuenta es un `enum` privado `Outcome { DELETED, ACTIVATED, FAILED }`):
