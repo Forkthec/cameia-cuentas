@@ -12,7 +12,9 @@ Estado: sin ejecutar; spec aprobada por Paula el 11-oct-2026 y `LISTA PARA EJECU
 - Commits: `CM-179 | <tipo>(cuentas): <resultado>`, **sin** `[IA-ASISTIDO]`, con el trailer `Co-Authored-By` del modelo. El orden y el texto de cada commit están en `plan.md` §1.
 - Definición de terminado de cada tarjeta: sus pruebas en verde, `LayeredArchitectureTest` y `UntypedExceptionClassificationTest` en verde.
 
-## [ ] T-0 · Preparar la rama y sembrar archivos compartidos — ≤ 30 min
+## [x] T-0 · Preparar la rama y sembrar archivos compartidos — ≤ 30 min
+
+Resultado: rebase sobre `621a846` sin conflictos; SHA previo en `ejecucion/evidencia/CM-179/rama-antes-del-rebase.txt`. Línea base `clean verify`: 933 pruebas, 1 error de entorno (`AccountCreatedEventEndToEndTest.relayPending_shouldPublish_whenBrokerWasDownDuringRegistration`, `AmqpTimeoutException` en `cleanState` al conectar con el RabbitMQ de Testcontainers); la clase sola, repetida, pasa 15/15 (`linea-base-reintento-evento.log`). Paula autorizó seguir. `ErrorCodeDocumentationTest` pasó con las filas sembradas.
 
 1. `git fetch`; anotar en `ejecucion/evidencia/CM-179/rama-antes-del-rebase.txt` (carpeta de la raíz `cameia`) el SHA y el árbol de la punta (`git rev-parse HEAD HEAD^{tree}`). Confirmar que la rama no tiene remoto (`git ls-remote --heads origin CM-179-verificacion-correo-cuentas` vacío). `git rebase origin/develop`. Si hay conflictos en archivos que no sean de `specs/CM-179-*`, **detenerse**.
 2. `docs/errores.md`: en la tabla de códigos, agregar las filas `ACCOUNT_DISABLED` (403, activación, —, «Esta cuenta está deshabilitada.», `AccountDisabledException`, `AccountActivationControllerTest`) y `ACCOUNT_CONFLICT` (409, activación, —, «La cuenta se está actualizando. Inténtalo de nuevo.», `AccountConflictException`, `ActivateAccountServiceTest`). Cambiar el mensaje de `EMAIL_NOT_VERIFIED` a «Tu correo aún no está verificado.», el de `ACCOUNT_NOT_FOUND` a «No encontramos una cuenta para este usuario.» y el de `IDENTITY_REQUIRED` a «La petición no incluye los datos que exige esta ruta.». En la fila de `ACCOUNT_NOT_FOUND`, el origen pasa a «sin cuenta, o cuenta anonimizada (en la activación y en la consulta)». Borrar de la sección de deuda las cuatro filas que dicen «La tarea de verificación de correo» (líneas 86 a 89 de `develop`).
@@ -22,7 +24,9 @@ Estado: sin ejecutar; spec aprobada por Paula el 11-oct-2026 y `LISTA PARA EJECU
 
 # Pieza 1 — activación
 
-## [ ] T-1.1 · Excepciones, códigos, textos y `Account.activate()` — ≤ 30 min
+## [x] T-1.1 · Excepciones, códigos, textos y `Account.activate()` — ≤ 30 min
+
+Resultado: `AccountTest`, `ErrorCodeTest`, `ErrorCodeDocumentationTest`, `UntypedExceptionClassificationTest` y `LayeredArchitectureTest` en verde. Trampa: `ErrorCodeTest` fijaba el vocabulario de causas; se agregaron `DISABLED` y `CONFLICT` (la spec ya los declara).
 
 - **Cubre:** REQ-VC-01, 04, 05, 06, 07, 08 (textos). **Crear:** `domain/exception/AccountDisabledException.java`, `domain/exception/AccountConflictException.java`. **Modificar:** `domain/exception/ErrorCode.java`, `EmailNotVerifiedException.java`, `AccountNotFoundException.java`, `IdentityRequiredException.java`, `domain/model/Account.java` (método `activate`, líneas 92-110), `presentation/advice/BusinessExceptionHandler.java` (solo el texto de la línea 264), `domain/model/AccountTest.java`, `architecture/UntypedExceptionClassificationTest.java`.
 - **`ErrorCode`**, después de `EMAIL_NOT_VERIFIED`:
@@ -72,7 +76,9 @@ Estado: sin ejecutar; spec aprobada por Paula el 11-oct-2026 y `LISTA PARA EJECU
 - **Trampa:** `ErrorCodeTest` puede fijar el orden o la cantidad de códigos; si falla, leer su aserción y ajustar solo lo que pide el código nuevo.
 - **Verificación:** `./mvnw.cmd -q -B "-Dtest=AccountTest,ErrorCodeTest,ErrorCodeDocumentationTest,UntypedExceptionClassificationTest" test` en verde.
 
-## [ ] T-1.2 · El adaptador traduce el conflicto de versión — ≤ 20 min
+## [x] T-1.2 · El adaptador traduce el conflicto de versión — ≤ 20 min
+
+Resultado: `AccountRepositoryAdapterConflictTest` 2/2 en verde.
 
 - **Cubre:** REQ-VC-08. **Modificar:** `infrastructure/persistence/repository/AccountRepositoryAdapter.java` (método `save`, líneas 39-49). **Crear:** `src/test/java/tech/cameia/cuentas/infrastructure/persistence/AccountRepositoryAdapterConflictTest.java` (Mockito, sin Spring ni base).
 - **Cambio** (la última línea de `save`):
@@ -88,7 +94,9 @@ Estado: sin ejecutar; spec aprobada por Paula el 11-oct-2026 y `LISTA PARA EJECU
 - **Pruebas:** `save_shouldThrowAccountConflict_whenVersionChanged` (el `AccountJpaRepository` simulado lanza `new ObjectOptimisticLockingFailureException(AccountEntity.class, "id")` en `save`) y `save_shouldPropagateOtherFailures_whenNotAVersionConflict` (lanza `DataIntegrityViolationException` → sale la misma).
 - **Verificación:** `./mvnw.cmd -q -B "-Dtest=AccountRepositoryAdapterConflictTest" test`.
 
-## [ ] T-1.3 · Servicio de activación — ≤ 30 min
+## [x] T-1.3 · Servicio de activación — ≤ 30 min
+
+Resultado: `ActivateAccountServiceTest` 18/18 en verde.
 
 - **Cubre:** REQ-VC-01 a 10. **Modificar:** `application/command/ActivateAccountCommand.java`, `application/service/ActivateAccountService.java`, `application/service/ActivateAccountServiceTest.java`.
 - **Comando:** `public record ActivateAccountCommand(String firebaseUid, boolean emailVerified)`. Javadoc de `emailVerified`: «`true` solo cuando el Gateway afirmó la verificación del correo; la ausencia del encabezado o cualquier otro valor llegan como `false`».
@@ -141,7 +149,9 @@ Estado: sin ejecutar; spec aprobada por Paula el 11-oct-2026 y `LISTA PARA EJECU
 - **Trampa:** sin `@Transactional`, la lectura y el guardado no comparten sesión: el adaptador vuelve a leer antes de guardar (código actual); no cambiar eso.
 - **Verificación:** `./mvnw.cmd -q -B "-Dtest=ActivateAccountServiceTest" test`.
 
-## [ ] T-1.4 · Controlador, manejador y OpenAPI — ≤ 30 min
+## [x] T-1.4 · Controlador, manejador y OpenAPI — ≤ 30 min
+
+Resultado: `AccountActivationControllerTest` 16, `BusinessExceptionHandlerTest` 37, `CurrentAccountControllerTest` 8 y `GetCurrentAccountServiceTest` en verde. Se actualizaron además los ejemplos OpenAPI de `CurrentAccountController` y las aserciones con texto sin punto.
 
 - **Cubre:** REQ-VC-01, 05, 07, 08, 11. **Modificar:** `presentation/controller/AccountActivationController.java`, `presentation/advice/BusinessExceptionHandler.java`, `AccountActivationControllerTest.java`, `BusinessExceptionHandlerTest.java`.
 - **Controlador** (antes → después):

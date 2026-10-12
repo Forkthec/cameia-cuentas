@@ -3,23 +3,24 @@ package tech.cameia.cuentas.application.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import tech.cameia.cuentas.application.command.ActivateAccountCommand;
+import tech.cameia.cuentas.domain.exception.AccountConflictException;
+import tech.cameia.cuentas.domain.exception.AccountDisabledException;
 import tech.cameia.cuentas.domain.exception.AccountNotFoundException;
 import tech.cameia.cuentas.domain.exception.EmailNotVerifiedException;
+import tech.cameia.cuentas.domain.exception.IdentityRequiredException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.port.AccountRepository;
-import tech.cameia.cuentas.domain.port.FirebaseUserDirectory;
 
 /**
  * Activa una cuenta cuando su correo queda verificado.
  *
- * <p>La prueba de que el correo está verificado la da Firebase, nunca el navegador. El
- * Gateway puede adelantar ese dato en un encabezado, pero si no llega o dice que no, el
- * servicio lo consulta al directorio antes de rechazar: así la operación funciona aunque
- * el Gateway todavía no propague el encabezado.</p>
+ * <p>La verificación sale solo del encabezado que escribe el Gateway a partir del token ya
+ * validado: el servicio no consulta a Firebase ni confía en el navegador. No es transaccional
+ * porque el conflicto de versión ocurre al confirmar la escritura y así el servicio puede
+ * releer la cuenta para decidir qué responder.</p>
  */
 @Service
 public class ActivateAccountService {
@@ -27,67 +28,65 @@ public class ActivateAccountService {
     private static final Logger logger = LoggerFactory.getLogger(ActivateAccountService.class);
 
     private final AccountRepository repositorio;
-    private final FirebaseUserDirectory directorio;
 
     /**
      * Crea el caso de uso.
      *
      * @param repositorio repositorio de cuentas locales
-     * @param directorio directorio de usuarios que certifica la verificación
      */
-    public ActivateAccountService(AccountRepository repositorio, FirebaseUserDirectory directorio) {
+    public ActivateAccountService(AccountRepository repositorio) {
         this.repositorio = repositorio;
-        this.directorio = directorio;
     }
 
     /**
      * Activa la cuenta del usuario indicado.
      *
-     * <p>Es idempotente: si la cuenta ya está activa, devuelve su estado sin tocar nada.</p>
+     * <p>Es idempotente: si la cuenta ya está activa, devuelve su estado sin escribir nada.</p>
      *
      * @param command identificador del usuario y lo que el Gateway afirma sobre su correo
      * @return la cuenta, ya activa
-     * @throws AccountNotFoundException si ese usuario no tiene cuenta local
-     * @throws EmailNotVerifiedException si el correo sigue sin verificarse
-     * @throws IllegalStateException si la cuenta está bloqueada o anonimizada
+     * @throws IdentityRequiredException si el identificador está ausente, en blanco o es más largo que
+     *                                   el de Firebase
+     * @throws AccountNotFoundException si ese usuario no tiene cuenta local, o la cuenta fue anonimizada
+     * @throws EmailNotVerifiedException si el Gateway no afirmó que el correo está verificado
+     * @throws AccountDisabledException si la cuenta está deshabilitada
+     * @throws AccountConflictException si otra petición cambió la cuenta y sigue sin estar activa
      */
-    @Transactional
     public Account activate(ActivateAccountCommand command) {
-        Account cuenta = repositorio.findByFirebaseUid(command.firebaseUid())
-                .orElseThrow(AccountNotFoundException::new);
-
-        if (!estaVerificado(command)) {
-            throw new EmailNotVerifiedException();
+        String firebaseUid = command.firebaseUid();
+        if (firebaseUid == null || firebaseUid.isBlank()
+                || firebaseUid.length() > GetCurrentAccountService.MAX_FIREBASE_UID_LENGTH) {
+            throw new IdentityRequiredException(); // misma regla que la consulta de la cuenta
         }
-
+        Account cuenta = repositorio.findByFirebaseUid(firebaseUid).orElseThrow(AccountNotFoundException::new);
+        if (!command.emailVerified()) {
+            throw new EmailNotVerifiedException(); // la verificación sale solo del token
+        }
         if (cuenta.getStatus() == AccountStatus.ACTIVE) {
-            return cuenta;
+            return cuenta; // idempotente: no se escribe
         }
-
-        // Cualquier otro estado lo decide el agregado: una cuenta bloqueada o anonimizada
-        // no se reactiva por verificar un correo, y salir en silencio aquí haría creer al
-        // frontend que quedó activa.
-        cuenta.activate();
-        Account activada = repositorio.save(cuenta);
-        logger.info("Cuenta activada tras verificar el correo del usuario {}", command.firebaseUid());
-        return activada;
+        cuenta.activate(); // deshabilitada y anonimizada lanzan su excepción
+        try {
+            Account activada = repositorio.save(cuenta);
+            logger.info("Cuenta activada tras verificar el correo del usuario {}", firebaseUid);
+            return activada;
+        } catch (AccountConflictException conflicto) {
+            return rereadAfterConflict(firebaseUid);
+        }
     }
 
     /**
-     * Determina si el correo está verificado.
+     * Resuelve un conflicto de versión: la otra petición casi siempre ya activó la cuenta.
      *
-     * <p>Confía en el encabezado solo cuando afirma que sí: un {@code true} solo puede
-     * venir del Gateway, que ya validó el token. Cualquier otro caso se consulta a
-     * Firebase, porque la ausencia del encabezado no prueba que el correo no esté
-     * verificado.</p>
-     *
-     * @param command datos recibidos del Gateway
-     * @return {@code true} si el correo está verificado
+     * @param firebaseUid identificador del usuario
+     * @return la cuenta si ya está activa
+     * @throws AccountConflictException si la cuenta sigue sin estar activa y conviene reintentar
      */
-    private boolean estaVerificado(ActivateAccountCommand command) {
-        if (Boolean.TRUE.equals(command.emailVerifiedByGateway())) {
-            return true;
+    private Account rereadAfterConflict(String firebaseUid) {
+        Account actual = repositorio.findByFirebaseUid(firebaseUid).orElseThrow(AccountNotFoundException::new);
+        if (actual.getStatus() == AccountStatus.ACTIVE) {
+            return actual;
         }
-        return directorio.isEmailVerified(command.firebaseUid());
+        throw new AccountConflictException();
     }
 }

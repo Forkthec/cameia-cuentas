@@ -3,6 +3,9 @@ package tech.cameia.cuentas.domain.model;
 import java.util.Optional;
 import java.util.UUID;
 
+import tech.cameia.cuentas.domain.exception.AccountDisabledException;
+import tech.cameia.cuentas.domain.exception.AccountNotFoundException;
+
 /**
  * Cuenta local de una persona registrada en la plataforma.
  *
@@ -95,16 +98,21 @@ public class Account {
      * <p>Es idempotente: activar una cuenta que ya está activa no cambia nada ni falla, de
      * modo que el frontend puede reintentar la operación sin efectos raros.</p>
      *
-     * @throws IllegalStateException si la cuenta está bloqueada o anonimizada; verificar
-     *                               un correo no revierte ninguna de esas dos decisiones
+     * @throws AccountDisabledException si la cuenta está deshabilitada; verificar un correo
+     *                                  no revierte esa decisión
+     * @throws AccountNotFoundException si la cuenta fue anonimizada; se responde igual que si
+     *                                  no existiera, para no revelar que existió
      */
     public void activate() {
         if (status == AccountStatus.ACTIVE) {
             return;
         }
-        if (status != AccountStatus.PENDING_VERIFICATION) {
-            throw new IllegalStateException(
-                    "Una cuenta en estado " + status + " no se activa al verificar el correo");
+        if (status == AccountStatus.DISABLED) {
+            throw new AccountDisabledException();
+        }
+        if (status == AccountStatus.ANONYMIZED) {
+            // No se revela que la cuenta existió: se responde igual que si no hubiera cuenta
+            throw new AccountNotFoundException();
         }
         status = AccountStatus.ACTIVE;
     }

@@ -5,11 +5,8 @@ package tech.cameia.cuentas.application.command;
  *
  * @param firebaseUid identificador del usuario, tomado del encabezado {@code X-User-Id}
  *                    que emite el Gateway a partir del token ya validado
- * @param emailVerifiedByGateway lo que el Gateway afirma sobre el claim
- *                               {@code email_verified}, o {@code null} si todavía no
- *                               propaga ese encabezado. Solo se cree cuando dice
- *                               {@code true}; en cualquier otro caso el servicio consulta
- *                               a Firebase
+ * @param emailVerified {@code true} solo cuando el Gateway afirmó la verificación del correo; la
+ *                      ausencia del encabezado o cualquier otro valor llegan como {@code false}
  */
-public record ActivateAccountCommand(String firebaseUid, Boolean emailVerifiedByGateway) {
+public record ActivateAccountCommand(String firebaseUid, boolean emailVerified) {
 }

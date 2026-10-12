@@ -102,6 +102,12 @@ public enum ErrorCode {
     /** El correo aún no está verificado. */
     EMAIL_NOT_VERIFIED,
 
+    /** La cuenta está deshabilitada y no se puede activar. */
+    ACCOUNT_DISABLED,
+
+    /** Otra petición cambió la cuenta al mismo tiempo; la persona puede reintentar. */
+    ACCOUNT_CONFLICT,
+
     /** Firebase no está disponible; la persona puede reintentar. */
     DEPENDENCY_UNAVAILABLE,
 

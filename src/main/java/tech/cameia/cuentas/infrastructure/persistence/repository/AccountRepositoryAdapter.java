@@ -3,7 +3,10 @@ package tech.cameia.cuentas.infrastructure.persistence.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
+
+import tech.cameia.cuentas.domain.exception.AccountConflictException;
 
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.BirthDate;
@@ -44,6 +47,7 @@ public class AccountRepositoryAdapter implements AccountRepository {
      *
      * @param account cuenta a persistir
      * @return la cuenta tal como quedó almacenada
+     * @throws AccountConflictException si otra escritura cambió la fila al mismo tiempo
      */
     @Override
     public Account save(Account account) {
@@ -54,7 +58,12 @@ public class AccountRepositoryAdapter implements AccountRepository {
                 })
                 .orElseGet(() -> mapeador.toEntity(account));
 
-        return mapeador.toDomain(repositorio.save(entidad));
+        try {
+            return mapeador.toDomain(repositorio.save(entidad));
+        } catch (ObjectOptimisticLockingFailureException conflicto) {
+            // Otra escritura cambió la fila entre su lectura y este guardado; el dominio no conoce JPA
+            throw new AccountConflictException();
+        }
     }
 
     /**

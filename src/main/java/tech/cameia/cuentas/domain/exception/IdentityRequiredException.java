@@ -9,7 +9,7 @@ package tech.cameia.cuentas.domain.exception;
  */
 public class IdentityRequiredException extends BusinessException {
 
-    private static final String MESSAGE = "La petición no incluye los datos que exige esta ruta";
+    private static final String MESSAGE = "La petición no incluye los datos que exige esta ruta.";
 
     /** Crea la excepción con el mensaje del encabezado ausente. */
     public IdentityRequiredException() {
