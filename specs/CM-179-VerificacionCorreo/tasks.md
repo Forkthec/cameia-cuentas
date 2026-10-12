@@ -1,41 +1,61 @@
 # Tareas — CM-179-VerificacionCorreo (cameia-cuentas)
 
-Estado: sin ejecutar; spec y plan pendientes de aprobación de Paula. Este archivo tiene las tarjetas del **bloque 1** (PR 1: activación), del **bloque 2** (PR 2: purga) y del **bloque 4** (PR 4: modo de tarea); las del bloque 3 están en `cameia-gateway/specs/CM-179-VerificacionCorreo/tasks.md`. Se marca `[x]` solo con la salida real de las pruebas.
+Estado: sin ejecutar; spec aprobada por Paula el 11-oct-2026 y `LISTA PARA EJECUTAR` (sección 21 de la spec). Tarjetas de las piezas 1 (activación), 2 (purga) y 4 (modo tarea), más Postman y cierre. Las de la pieza 3 están en `cameia-gateway/specs/CM-179-VerificacionCorreo/tasks.md`. Se marca `[x]` solo con la salida real de las pruebas.
 
-## Reglas para todas las tarjetas (el modelo que ejecuta no lee la spec ni el plan)
+## Reglas para todas las tarjetas (quien ejecuta no lee la spec ni el plan)
 
-- Ruta base del código: `src/main/java/tech/cameia/cuentas/`; pruebas: `src/test/java/tech/cameia/cuentas/`. Identificadores en inglés; Javadoc, comentarios, mensajes y logs en español; **sin** `CM-NNN` ni rutas a otros archivos en comentarios; sin abreviaturas; en una clase existente se mantiene su estilo (nombres de pruebas en español camelCase).
-- Prohibido: agregar dependencias, tocar migraciones, registrar contraseñas, correos o tokens, cambiar un texto que la tarjeta no nombre, refactorizar fuera de la tarjeta.
-- Todo código de error nuevo, o cuyo estado o texto cambia, se agrega o actualiza en `docs/errores.md` en el mismo PR, con las columnas `Código | HTTP | Endpoints | Campo | Mensaje | Origen | Prueba` (una fila por código; «Endpoints» lista cada método y ruta que lo emite). Si `docs/errores.md` aún no existe en `develop`, el PR lo dice y la pieza B de CM-283 lo recoge (su verificación V-12 compara el catálogo con el código).
-- Comandos: `./mvnw.cmd -q -B -Dtest=<Clase> test`; `./mvnw.cmd -B test`; `./mvnw.cmd -B clean verify` al cerrar. Las pruebas con Testcontainers se omiten sin Docker: decirlo.
-- **Detenerse y reportar** si: la tarjeta contradice el código real (CM-36 y CM-251 cambiaron el manejador y el servicio de registro), falta un dato, una prueba existente se rompe sin causa clara, o hace falta algo no listado.
-- Definición de terminado: pruebas nuevas en verde, suite completa en verde, `LayeredArchitectureTest` en verde, diff dentro de lo estimado.
-- Rama `CM-179-verificacion-correo-cuentas` desde `develop`. Commit: `CM-179 | <tipo>(cuentas): <resultado> [IA-ASISTIDO]`.
+- Base: `origin/develop` `621a846`. Código en `src/main/java/tech/cameia/cuentas/`; pruebas en `src/test/java/tech/cameia/cuentas/`. Si una ruta, línea o nombre de esta tarjeta no coincide con el código, **detenerse y reportar**.
+- Identificadores en inglés. Javadoc, comentarios, mensajes, `@DisplayName` y logs en español. **Pruebas nuevas:** `metodo_shouldX_whenY` en inglés más `@DisplayName` en español; las pruebas existentes en español no se renombran salvo que la tarjeta lo diga. Sin `CM-NNN` ni rutas a otros archivos en comentarios; sin abreviaturas.
+- Prohibido: agregar dependencias; editar `V1` a `V5`; registrar correos, nombres, contraseñas, tokens o el mensaje de una excepción de Firebase; cambiar un texto que la tarjeta no nombre; refactorizar fuera de la tarjeta; tocar `.github/**`.
+- Todo código de error nuevo o con texto cambiado se refleja en `docs/errores.md` (columnas `Código | HTTP | Endpoints | Campo | Mensaje | Origen | Prueba`) en el mismo commit; `ErrorCodeDocumentationTest` lo exige.
+- Comandos: por tarjeta, `./mvnw.cmd -q -B "-Dtest=<Clase>" test`. Al final (T-5.2), una sola vez, `./mvnw.cmd -B clean verify`. Las pruebas con Testcontainers necesitan Docker: si no hay, decirlo; nunca darlas por pasadas.
+- Commits: `CM-179 | <tipo>(cuentas): <resultado>`, **sin** `[IA-ASISTIDO]`, con el trailer `Co-Authored-By` del modelo. El orden y el texto de cada commit están en `plan.md` §1.
+- Definición de terminado de cada tarjeta: sus pruebas en verde, `LayeredArchitectureTest` y `UntypedExceptionClassificationTest` en verde.
 
-## [ ] T-1.1 · Excepciones y códigos — ≤ 30 min, ≈ 110 líneas
+## [ ] T-0 · Preparar la rama y sembrar archivos compartidos — ≤ 30 min
 
-- **Cubre:** REQ-VC-05, 06, 07, 08. **Crear:** `domain/exception/AccountDisabledException.java`, `AccountConflictException.java`, `InvalidIdentityException.java`. **Modificar:** `domain/exception/ErrorCode.java` (agregar `ACCOUNT_DISABLED`, `ACCOUNT_CONFLICT` e `IDENTITY_INVALID_VALUE`, cada una con su Javadoc), `domain/exception/EmailNotVerifiedException.java`, `domain/model/Account.java` (método `activate`, líneas 100-105), `AccountTest`.
-- **Excepciones** (molde de `AccountNotFoundException`: constructor sin parámetros, constante `MENSAJE`, Javadoc):
+1. `git fetch`; anotar en `ejecucion/evidencia/CM-179/rama-antes-del-rebase.txt` (carpeta de la raíz `cameia`) el SHA y el árbol de la punta (`git rev-parse HEAD HEAD^{tree}`). Confirmar que la rama no tiene remoto (`git ls-remote --heads origin CM-179-verificacion-correo-cuentas` vacío). `git rebase origin/develop`. Si hay conflictos en archivos que no sean de `specs/CM-179-*`, **detenerse**.
+2. `docs/errores.md`: en la tabla de códigos, agregar las filas `ACCOUNT_DISABLED` (403, activación, —, «Esta cuenta está deshabilitada.», `AccountDisabledException`, `AccountActivationControllerTest`) y `ACCOUNT_CONFLICT` (409, activación, —, «La cuenta se está actualizando. Inténtalo de nuevo.», `AccountConflictException`, `ActivateAccountServiceTest`). Cambiar el mensaje de `EMAIL_NOT_VERIFIED` a «Tu correo aún no está verificado.», el de `ACCOUNT_NOT_FOUND` a «No encontramos una cuenta para este usuario.» y el de `IDENTITY_REQUIRED` a «La petición no incluye los datos que exige esta ruta.». En la fila de `ACCOUNT_NOT_FOUND`, el origen pasa a «sin cuenta, o cuenta anonimizada (en la activación y en la consulta)». Borrar de la sección de deuda las cuatro filas que dicen «La tarea de verificación de correo» (líneas 86 a 89 de `develop`).
+3. `postman/cameia-cuentas.postman_collection.json`: agregar la carpeta vacía `Activación` después de `Mi cuenta` (la llenará T-5.1), y en `postman/README.md` su fila de la tabla con «(se completa en esta rama)».
+4. **Línea base** (spec, sección 19), antes de cualquier cambio de código: `./mvnw.cmd -B -ntp clean verify` con Docker encendido → BUILD SUCCESS y 0 fallos (933 pruebas sobre `621a846`). Guardar la salida en `ejecucion/evidencia/CM-179/linea-base-cuentas.log`. Si no está en verde, detenerse y reportar.
+5. **Verificación:** `./mvnw.cmd -q -B "-Dtest=ErrorCodeDocumentationTest" test`. **Falla** porque los dos códigos no existen aún en `ErrorCode`: anotarlo y seguir; T-1.1 lo pone en verde. Commit 2 de `plan.md`.
+
+# Pieza 1 — activación
+
+## [ ] T-1.1 · Excepciones, códigos, textos y `Account.activate()` — ≤ 30 min
+
+- **Cubre:** REQ-VC-01, 04, 05, 06, 07, 08 (textos). **Crear:** `domain/exception/AccountDisabledException.java`, `domain/exception/AccountConflictException.java`. **Modificar:** `domain/exception/ErrorCode.java`, `EmailNotVerifiedException.java`, `AccountNotFoundException.java`, `IdentityRequiredException.java`, `domain/model/Account.java` (método `activate`, líneas 92-110), `presentation/advice/BusinessExceptionHandler.java` (solo el texto de la línea 264), `domain/model/AccountTest.java`, `architecture/UntypedExceptionClassificationTest.java`.
+- **`ErrorCode`**, después de `EMAIL_NOT_VERIFIED`:
   ```java
+  /** La cuenta está deshabilitada y no se puede activar. */
+  ACCOUNT_DISABLED,
+
+  /** Otra petición cambió la cuenta al mismo tiempo; la persona puede reintentar. */
+  ACCOUNT_CONFLICT,
+  ```
+- **Excepciones** (molde de `AccountNotFoundException`: constante `MENSAJE`, constructor sin parámetros, Javadoc de clase y de constructor):
+  ```java
+  /** Señala que se intentó activar una cuenta deshabilitada: verificar un correo no revierte esa decisión. */
   public class AccountDisabledException extends BusinessException {
       private static final String MENSAJE = "Esta cuenta está deshabilitada.";
+      /** Crea la excepción con el mensaje que ve la persona. */
       public AccountDisabledException() { super(ErrorCode.ACCOUNT_DISABLED, MENSAJE); }
   }
+
+  /** Señala que otra petición cambió la cuenta mientras esta intentaba guardarla. */
   public class AccountConflictException extends BusinessException {
       private static final String MENSAJE = "La cuenta se está actualizando. Inténtalo de nuevo.";
+      /** Crea la excepción con el mensaje que ve la persona. */
       public AccountConflictException() { super(ErrorCode.ACCOUNT_CONFLICT, MENSAJE); }
   }
-  public class InvalidIdentityException extends BusinessException {
-      private static final String MENSAJE = "La identidad de la petición no es válida.";
-      public InvalidIdentityException() { super(ErrorCode.IDENTITY_INVALID_VALUE, MENSAJE); }
-  }
   ```
-- **`EmailNotVerifiedException`:** `MENSAJE` pasa a `"Tu correo aún no está verificado."`.
+- **Textos** (antes → después): `EmailNotVerifiedException.MENSAJE` «Primero debes verificar tu correo con el enlace que te enviamos» → «Tu correo aún no está verificado.»; `AccountNotFoundException.MENSAJE` «No encontramos una cuenta para este usuario» → «No encontramos una cuenta para este usuario.»; `IdentityRequiredException.MESSAGE` y el literal de `BusinessExceptionHandler.peticionIncompleta` (línea 264) «La petición no incluye los datos que exige esta ruta» → «La petición no incluye los datos que exige esta ruta.».
 - **`Account.activate()`** (antes → después):
   ```java
   // antes
   if (status != AccountStatus.PENDING_VERIFICATION) {
-      throw new IllegalStateException("Una cuenta en estado " + status + " no se activa al verificar el correo");
+      throw new IllegalStateException(
+              "Una cuenta en estado " + status + " no se activa al verificar el correo");
   }
   // después
   if (status == AccountStatus.DISABLED) {
@@ -46,178 +66,236 @@ Estado: sin ejecutar; spec y plan pendientes de aprobación de Paula. Este archi
       throw new AccountNotFoundException();
   }
   ```
-  El Javadoc cambia: `@throws AccountDisabledException` y `@throws AccountNotFoundException`. `ACTIVE` sigue saliendo antes con `return` (idempotente).
-- **Pruebas** (`AccountTest`, estilo de la clase): activar `DISABLED` lanza `AccountDisabledException` con `getErrorCode()` `ACCOUNT_DISABLED` y el estado sigue `DISABLED`; activar `ANONYMIZED` lanza `AccountNotFoundException` y el estado sigue `ANONYMIZED`; activar `ACTIVE` no cambia nada; activar `PENDING_VERIFICATION` da `ACTIVE`. Reemplazar la prueba existente que esperaba `IllegalStateException`.
-- **Verificación:** `./mvnw.cmd -q -B -Dtest=AccountTest test` en verde; `LayeredArchitectureTest` en verde.
+  El Javadoc cambia `@throws IllegalStateException …` por `@throws AccountDisabledException si la cuenta está deshabilitada` y `@throws AccountNotFoundException si la cuenta fue anonimizada`. `ACTIVE` sigue saliendo antes con `return`.
+- **`UntypedExceptionClassificationTest`:** quitar la entrada `MODEL_PACKAGE + "Account#activate"` (línea 61). La de `isEmailVerified` (línea 79) se queda hasta T-2.5.
+- **Pruebas** (`AccountTest`): reemplazar `unaCuentaBloqueadaNoSeActivaAlVerificarElCorreo` (línea 86) por `activate_shouldThrowAccountDisabled_whenDisabled` (`@DisplayName("Una cuenta deshabilitada no se activa al verificar el correo")`; `getErrorCode()` es `ACCOUNT_DISABLED` y el estado sigue `DISABLED`) y `unaCuentaAnonimizadaNoSeActivaAlVerificarElCorreo` (línea 94) por `activate_shouldThrowAccountNotFound_whenAnonymized` (el estado sigue `ANONYMIZED`). Las dos pruebas de activación existentes siguen igual.
+- **Trampa:** `ErrorCodeTest` puede fijar el orden o la cantidad de códigos; si falla, leer su aserción y ajustar solo lo que pide el código nuevo.
+- **Verificación:** `./mvnw.cmd -q -B "-Dtest=AccountTest,ErrorCodeTest,ErrorCodeDocumentationTest,UntypedExceptionClassificationTest" test` en verde.
 
-## [ ] T-1.2 · El adaptador traduce el conflicto de versión — ≤ 20 min, ≈ 40 líneas
+## [ ] T-1.2 · El adaptador traduce el conflicto de versión — ≤ 20 min
 
-- **Cubre:** REQ-VC-08. **Modificar:** `infrastructure/persistence/repository/AccountRepositoryAdapter.java` (método `save`, líneas 45-55) y `AccountRepositoryAdapterTest`.
-- **Cambio:** envolver el guardado:
+- **Cubre:** REQ-VC-08. **Modificar:** `infrastructure/persistence/repository/AccountRepositoryAdapter.java` (método `save`, líneas 39-49). **Crear:** `src/test/java/tech/cameia/cuentas/infrastructure/persistence/AccountRepositoryAdapterConflictTest.java` (Mockito, sin Spring ni base).
+- **Cambio** (la última línea de `save`):
   ```java
   try {
       return mapeador.toDomain(repositorio.save(entidad));
   } catch (ObjectOptimisticLockingFailureException conflicto) {
-      // Otra escritura cambió la fila entre su lectura y este guardado: el dominio no conoce JPA
+      // Otra escritura cambió la fila entre su lectura y este guardado; el dominio no conoce JPA
       throw new AccountConflictException();
   }
   ```
-  (`org.springframework.orm.ObjectOptimisticLockingFailureException`). Actualizar el Javadoc con `@throws AccountConflictException`.
-- **Prueba** (`AccountRepositoryAdapterTest`; si la clase usa base real, esta prueba puede usar un `AccountJpaRepository` simulado con Mockito en una clase nueva `AccountRepositoryAdapterConflictTest`): el repositorio JPA lanza `ObjectOptimisticLockingFailureException` en `save` → el adaptador lanza `AccountConflictException`; cualquier otra excepción no se traduce.
-- **Verificación:** `./mvnw.cmd -q -B -Dtest='AccountRepositoryAdapterTest,AccountRepositoryAdapterConflictTest' test` en verde.
+  (`org.springframework.orm.ObjectOptimisticLockingFailureException`). Javadoc: `@throws AccountConflictException si otra escritura cambió la fila al mismo tiempo`.
+- **Pruebas:** `save_shouldThrowAccountConflict_whenVersionChanged` (el `AccountJpaRepository` simulado lanza `new ObjectOptimisticLockingFailureException(AccountEntity.class, "id")` en `save`) y `save_shouldPropagateOtherFailures_whenNotAVersionConflict` (lanza `DataIntegrityViolationException` → sale la misma).
+- **Verificación:** `./mvnw.cmd -q -B "-Dtest=AccountRepositoryAdapterConflictTest" test`.
 
-## [ ] T-1.3 · Servicio de activación — ≤ 30 min, ≈ 100 líneas
+## [ ] T-1.3 · Servicio de activación — ≤ 30 min
 
-- **Cubre:** REQ-VC-01 a 10. **Modificar:** `application/command/ActivateAccountCommand.java`, `application/service/ActivateAccountService.java`, `ActivateAccountServiceTest`.
-- **Comando:** `record ActivateAccountCommand(String firebaseUid, boolean emailVerified)`; Javadoc: «`emailVerified` es `true` solo cuando el Gateway afirmó la verificación; la ausencia o cualquier otro valor llegan como `false`».
-- **Servicio** (se elimina la dependencia de `FirebaseUserDirectory`, el método `estaVerificado` y `@Transactional`; el constructor queda `ActivateAccountService(AccountRepository repositorio)`):
+- **Cubre:** REQ-VC-01 a 10. **Modificar:** `application/command/ActivateAccountCommand.java`, `application/service/ActivateAccountService.java`, `application/service/ActivateAccountServiceTest.java`.
+- **Comando:** `public record ActivateAccountCommand(String firebaseUid, boolean emailVerified)`. Javadoc de `emailVerified`: «`true` solo cuando el Gateway afirmó la verificación del correo; la ausencia del encabezado o cualquier otro valor llegan como `false`».
+- **Servicio:** se eliminan el campo `directorio`, el método `estaVerificado`, `@Transactional` y su import. Constructor `ActivateAccountService(AccountRepository repositorio)`. Javadoc de la clase: la verificación sale solo del encabezado del Gateway; no es transaccional porque el conflicto de versión ocurre al confirmar y así el servicio puede releer.
   ```java
-  private static final int MAX_IDENTITY_LENGTH = 128;
-
   public Account activate(ActivateAccountCommand command) {
-      String firebaseUid = exigirIdentidad(command.firebaseUid());
+      String firebaseUid = command.firebaseUid();
+      if (firebaseUid == null || firebaseUid.isBlank()
+              || firebaseUid.length() > GetCurrentAccountService.MAX_FIREBASE_UID_LENGTH) {
+          throw new IdentityRequiredException();   // misma regla que la consulta de la cuenta
+      }
       Account cuenta = repositorio.findByFirebaseUid(firebaseUid).orElseThrow(AccountNotFoundException::new);
-
       if (!command.emailVerified()) {
-          throw new EmailNotVerifiedException();   // el estado de verificación sale solo del token
+          throw new EmailNotVerifiedException();   // la verificación sale solo del token
       }
       if (cuenta.getStatus() == AccountStatus.ACTIVE) {
           return cuenta;                            // idempotente: no se escribe
       }
-      cuenta.activate();                            // DISABLED y ANONYMIZED lo rechazan con su excepción
+      cuenta.activate();                            // deshabilitada y anonimizada lanzan su excepción
       try {
           Account activada = repositorio.save(cuenta);
           logger.info("Cuenta activada tras verificar el correo del usuario {}", firebaseUid);
           return activada;
       } catch (AccountConflictException conflicto) {
-          return releerTrasConflicto(firebaseUid);
+          return rereadAfterConflict(firebaseUid);
       }
   }
 
-  private Account releerTrasConflicto(String firebaseUid) {
+  /** La otra petición casi siempre ya la activó; si no, se pide reintentar. */
+  private Account rereadAfterConflict(String firebaseUid) {
       Account actual = repositorio.findByFirebaseUid(firebaseUid).orElseThrow(AccountNotFoundException::new);
       if (actual.getStatus() == AccountStatus.ACTIVE) {
-          return actual;                            // la otra petición ya la activó
+          return actual;
       }
       throw new AccountConflictException();
   }
-
-  private String exigirIdentidad(String firebaseUid) {
-      if (firebaseUid == null || firebaseUid.isBlank()
-              || firebaseUid.codePointCount(0, firebaseUid.length()) > MAX_IDENTITY_LENGTH) {
-          throw new InvalidIdentityException();
-      }
-      return firebaseUid;
-  }
   ```
-  Actualizar el Javadoc de la clase (ya no consulta a Firebase; por qué no es transaccional) y de `activate` (`@throws` de cada excepción).
-- **Pruebas** (`ActivateAccountServiceTest`; el repositorio en memoria de la clase gana `int lecturas` y un modo para lanzar `AccountConflictException` en el primer `save`; el doble de Firebase deja de usarse en esta clase):
-  1. `activaLaCuentaCuandoElTokenDiceQueElCorreoEstaVerificado` (existente, con `new ActivateAccountCommand(UID, true)`).
-  2. `sinElEncabezadoNoActivaNiConsultaAFirebase`: `new ActivateAccountCommand(UID, false)` con la cuenta pendiente → `EmailNotVerifiedException` y la cuenta sigue `PENDING_VERIFICATION` (reemplaza `consultaAFirebaseCuandoElGatewayNoPropagaElEncabezado`).
-  3. `unEncabezadoEnFalsoNoSeContrastaConFirebase`: reemplaza `noSeFiaDeUnEncabezadoEnFalsoSiFirebaseDiceQueSiEstaVerificado`; `false` → `EmailNotVerifiedException` aunque Firebase diga que sí (el servicio ya no recibe el directorio: la prueba comprueba el rechazo y el constructor de una sola dependencia).
-  4. `activarDosVecesNoVuelveAGuardar` (existente).
-  5. `fallaCuandoElUsuarioNoTieneCuentaLocal` (existente, `AccountNotFoundException`).
-  6. `unaCuentaBloqueadaDaSuExcepcion`: `DISABLED` con `true` → `AccountDisabledException` (reemplaza la expectativa `IllegalStateException`).
-  7. `unaCuentaAnonimizadaSeTrataComoSinCuenta`: `ANONYMIZED` con `true` → `AccountNotFoundException` con el mismo mensaje que `fallaCuandoElUsuarioNoTieneCuentaLocal`.
-  8. `laIdentidadVaciaOMuyLargaSeRechazaSinConsultarLaBase` (`@ParameterizedTest`): `""`, `"   "` y 129 caracteres → `InvalidIdentityException` y `lecturas` en 0; 128 caracteres pasa (la cuenta no existe: `AccountNotFoundException`, lo que prueba que superó la validación).
-  9. `siPierdeLaCarreraYLaOtraPeticionYaActivoDevuelveLaCuenta`: primer `save` lanza `AccountConflictException`; la relectura devuelve la cuenta `ACTIVE` → resultado `ACTIVE`; variante: la relectura devuelve `PENDING_VERIFICATION` → `AccountConflictException`.
-  10. `elRechazoNoRegistraElCorreoNiDatosPersonales` (con `OutputCaptureExtension`): tras un rechazo, la salida no contiene `ana@` ni el nombre `Ana`.
-- **Trampa:** sin `@Transactional`, `Account` leída y guardada ya no comparten sesión: el adaptador vuelve a leer antes de guardar (código actual), no cambiar eso.
-- **Verificación:** `./mvnw.cmd -B -Dtest=ActivateAccountServiceTest test` en verde.
+  `GetCurrentAccountService.MAX_FIREBASE_UID_LENGTH` es package-private y está en el mismo paquete. `@throws` de cada excepción en el Javadoc de `activate`. Una cuenta `ANONYMIZED` ya lanza `AccountNotFoundException` dentro de `activate()`; con `true` y estado `ANONYMIZED`, el orden anterior da 404, que es lo pedido.
+- **Pruebas** (la clase conserva su `RepositorioEnMemoria`, que gana `int lecturas` y `void failFirstSaveWithConflict(Account relectura)`; el doble de Firebase deja de usarse y se quita su import):
+  1. `activaLaCuentaCuandoElGatewayConfirmaElCorreoVerificado` (existente) con `new ActivateAccountCommand(UID, true)`.
+  2. Reemplaza `consultaAFirebaseCuandoElGatewayNoPropagaElEncabezado` y `noSeFiaDeUnEncabezadoEnFalsoSiFirebaseDiceQueSiEstaVerificado`: `activate_shouldRejectWithoutCallingFirebase_whenHeaderIsNotTrue` (`false` → `EmailNotVerifiedException`, la cuenta sigue `PENDING_VERIFICATION`; el constructor ya no recibe el directorio, lo que prueba que no lo consulta).
+  3. `rechazaCuandoElCorreoSigueSinVerificarse` (existente) con `false`.
+  4. `activarDosVecesNoFallaNiVuelveAGuardar` y `activate_shouldActivate_whenBirthDateIsUnknown` (existentes) con `true`.
+  5. `fallaCuandoElUsuarioNoTieneCuentaLocal` (existente).
+  6. `unaCuentaBloqueadaNoSeActivaAlVerificarElCorreo` (existente, línea 109): ahora espera `AccountDisabledException`.
+  7. `activate_shouldAnswerLikeMissingAccount_whenAnonymized`: `ANONYMIZED` con `true` → `AccountNotFoundException` con el mismo `getMessage()` que la prueba 5.
+  8. `activate_shouldRejectIdentityWithoutReadingDatabase_whenBlankOrTooLong` (`@ParameterizedTest @ValueSource`): `""`, `"   "`, `"\t"` y `"a".repeat(129)` → `IdentityRequiredException` y `lecturas == 0`. Aparte, `@ParameterizedTest` con `"a".repeat(127)`, `"a".repeat(128)` y `"ñ".repeat(128)` → `AccountNotFoundException` (pasó la validación).
+  9. `activate_shouldReturnActiveAccount_whenLosingTheRaceToAnotherActivation`: el primer `save` lanza `AccountConflictException` y la relectura devuelve la cuenta `ACTIVE` → resultado `ACTIVE`. `activate_shouldThrowConflict_whenRereadIsStillPending`: la relectura devuelve `PENDING_VERIFICATION` → `AccountConflictException`.
+  10. `activate_shouldNotLogPersonalData_whenRejected` (`@ExtendWith(OutputCaptureExtension.class)`): cuenta con nombre `Ana`, rechazo por `false` → la salida no contiene `Ana` ni `@`.
+- **Trampa:** sin `@Transactional`, la lectura y el guardado no comparten sesión: el adaptador vuelve a leer antes de guardar (código actual); no cambiar eso.
+- **Verificación:** `./mvnw.cmd -q -B "-Dtest=ActivateAccountServiceTest" test`.
 
-## [ ] T-1.4 · Controlador y manejador — ≤ 30 min, ≈ 90 líneas
+## [ ] T-1.4 · Controlador, manejador y OpenAPI — ≤ 30 min
 
-- **Cubre:** REQ-VC-01, 05 a 08, 11. **Modificar:** `presentation/controller/AccountActivationController.java`, `presentation/advice/BusinessExceptionHandler.java`, `domain/exception/ErrorCode.java` si falta algo, `AccountActivationControllerTest`, `BusinessExceptionHandlerTest`.
+- **Cubre:** REQ-VC-01, 05, 07, 08, 11. **Modificar:** `presentation/controller/AccountActivationController.java`, `presentation/advice/BusinessExceptionHandler.java`, `AccountActivationControllerTest.java`, `BusinessExceptionHandlerTest.java`.
 - **Controlador** (antes → después):
   ```java
   // antes
-  @RequestHeader(value = "X-User-Email-Verified", required = false) Boolean correoVerificado) {
-      Account cuenta = servicio.activate(new ActivateAccountCommand(firebaseUid, correoVerificado));
+  @RequestHeader(value = "X-User-Email-Verified", required = false) Boolean emailVerified) {
+      Account cuenta = servicio.activate(new ActivateAccountCommand(firebaseUid, emailVerified));
   // después
-  @RequestHeader(value = "X-User-Email-Verified", required = false) String correoVerificado) {
-      // Solo el valor exacto «true» que firma el Gateway cuenta como verificado; cualquier otro valor es «no verificado»
-      boolean verificado = "true".equals(correoVerificado);
-      Account cuenta = servicio.activate(new ActivateAccountCommand(firebaseUid, verificado));
+  @RequestHeader(value = "X-User-Email-Verified", required = false) String emailVerified) {
+      // Solo el texto exacto «true» que escribe el Gateway cuenta; cualquier otro valor es «no verificado»
+      Account cuenta = servicio.activate(new ActivateAccountCommand(firebaseUid, "true".equals(emailVerified)));
   ```
-  `X-User-Id` sigue como `@RequestHeader("X-User-Id") String firebaseUid` (ausente → `ServletRequestBindingException` → 400 `IDENTITY_REQUIRED` por el manejador de CM-36 1A). **OpenAPI:** `@Operation(summary = "Activa la cuenta tras verificar el correo", description = "…")` y `@ApiResponses`: `200` (cuenta activa, incluida la repetición), `400` (`IDENTITY_REQUIRED`, `IDENTITY_INVALID_VALUE`), `403` (`EMAIL_NOT_VERIFIED`, `ACCOUNT_DISABLED`), `404` (`ACCOUNT_NOT_FOUND`), `409` (`ACCOUNT_CONFLICT`), `500` (`INTERNAL_ERROR`); `@Parameter` de cada encabezado (descripción: «lo pone el Gateway; no lo envía el navegador»; `X-User-Email-Verified`: «solo `true` activa»).
-- **Manejador** (molde de `correoSinVerificar`): tres métodos, uno por excepción: `AccountDisabledException` → 403, título «Cuenta deshabilitada»; `AccountConflictException` → 409, título «Conflicto de cuenta»; `InvalidIdentityException` → 400, título «Identidad no válida». Todos con `error.getErrorCode()` y `error.getMessage()`.
-- **Pruebas del controlador** (MockMvc standalone con el manejador real): `true` → 200 y `$.status` `ACTIVE`; encabezado `false`, ausente, vacío, `abc` y `TRUE` → el servicio recibe `emailVerified=false` (`ArgumentCaptor`) y, con el servicio simulado lanzando `EmailNotVerifiedException`, 403 y `$.code` `EMAIL_NOT_VERIFIED`; cuerpo `{"emailVerified":true}` con encabezado ausente → sigue sin verificar; `X-User-Id` ausente → 400 `IDENTITY_REQUIRED`; `DISABLED` → 403 `ACCOUNT_DISABLED` con el mensaje; conflicto → 409 `ACCOUNT_CONFLICT`; identidad inválida → 400 `IDENTITY_INVALID_VALUE`. **Manejador:** una prueba por excepción nueva en `BusinessExceptionHandlerTest` (estado, `code`, título y mensaje).
-- **Verificación:** `./mvnw.cmd -B -Dtest='AccountActivationControllerTest,BusinessExceptionHandlerTest' test` en verde.
-
-## [ ] T-1.5 · Punta a punta con base real — ≤ 30 min, ≈ 130 líneas
-
-- **Cubre:** REQ-VC-02, 03, 05, 06, 08, 09. **Modificar:** `AccountRegistrationEndToEndTest` (copiar la forma de `registraLaCuentaYLuegoLaActivaAlVerificarElCorreo`, línea 62, y de `sinVerificarElCorreo…`, línea 106). Ayuda: `activar(String uid, String verificado)` que arma los encabezados `X-User-Id` y, si no es `null`, `X-User-Email-Verified`.
-- **Pruebas nuevas:** (1) `activarCambiaElEstadoYLaFechaDeActualizacion`: leer `fecha_actualizacion` y `version` tras el registro; activar; `estado` = `ACTIVE`, `fecha_actualizacion` posterior y `version` +1. (2) `activarDeNuevoNoCambiaNada` (CA-1.2.4): segunda activación → 200 y `fecha_actualizacion` y `version` iguales a los de la primera. (3) `unaCuentaBloqueadaDa403`: `UPDATE ... SET estado = 'DISABLED'` → 403 y el cuerpo contiene `ACCOUNT_DISABLED`. (4) `unaCuentaAnonimizadaDa404ComoSiNoExistiera`: `UPDATE ... SET estado = 'ANONYMIZED', fecha_eliminacion = now()` (la restricción `ck_cuenta_anonimizacion` exige ambas) → 404 con el mismo cuerpo que un `X-User-Id` sin cuenta. (5) `elEncabezadoEnFalsoOInvalidoDa403` con `false`, vacío y `abc`; la cuenta sigue `PENDING_VERIFICATION`. (6) `laActivacionNoNecesitaAFirebase`: `directorio.fallarAlConsultar()` (de CM-251; si no existe, un `fallarAlBorrar()` basta: el punto es que activar con `true` no llama al directorio) → 200. (7) `dosActivacionesSimultaneasTerminanBien`: dos hilos con una barrera `CountDownLatch`, repetido 10 veces con cuentas distintas: ambos 200; `estado` `ACTIVE`; `version` aumentó una sola vez; ninguno 500.
-- **Verificación:** con Docker, `./mvnw.cmd -B -Dtest=AccountRegistrationEndToEndTest test` en verde (tres veces seguidas para (7)); sin Docker, decirlo.
-
-## [ ] T-1.6 · Cobertura y revisión — ≤ 20 min
-
-`./mvnw.cmd -B clean verify`; cobertura de `ActivateAccountService`, `Account`, `AccountRepositoryAdapter`, `AccountActivationController`, `BusinessExceptionHandler` y las tres excepciones (≥ 90 % de líneas y ramas, cada rama sin cubrir justificada). `/simplify`, `/code-review high`, **`/security-review`** (autenticación e identidad). Autochequeo: ¿algún mensaje de librería llega al cliente? ¿algún log con correo? ¿algún comentario con `CM-NNN`?
-
-## [ ] T-1.7 · Entrega — ≤ 30 min
-
-Verificar OpenAPI a mano (`/v3/api-docs` con `API_DOCUMENTATION_ENABLED=true`; adjuntar el fragmento de la ruta). Aviso a Frontend: la activación exige el token verificado (un `false` o la ausencia dan 403); códigos nuevos 400, 403 y 409; cambia el texto del 403. PR: `CM-179 | fix(cuentas): activación estricta con el token, sin 500 por estado de cuenta y segura ante concurrencia [IA-ASISTIDO]`, plantilla completa, atributos de calidad (seguridad, fiabilidad, compatibilidad de contrato, observabilidad), qué es mecánico (constructores y pruebas) y qué importa revisar (`ActivateAccountService`, `Account.activate`, el adaptador). Tarjeta de Jira a «En revisión» solo al abrir el PR.
-
----
-
-# Bloque 2 — purga diaria (PR 2)
-
-Rama `CM-179-purga-cuentas-sin-verificar` desde `develop` **con el bloque 1 fusionado**. Las reglas generales del principio de este archivo aplican. Además: el servicio de purga **nunca** registra correos, nombres ni el mensaje de una excepción de Firebase (puede traer datos): solo el `firebaseUid` y el nombre de la clase de la excepción.
-
-## [ ] T-2.1 · Tipos del dominio y puertos — ≤ 30 min, ≈ 90 líneas
-
-- **Cubre:** REQ-VC-22, 23, 25, 26. **Crear:** `domain/model/UserVerificationStatus.java`, `domain/model/PurgeSummary.java`. **Modificar:** `domain/port/FirebaseUserDirectory.java`, `domain/port/AccountRepository.java`.
-- **Antes de empezar:** `git grep -n "isEmailVerified" -- src/main` debe mostrar solo el puerto y su adaptador. Si hay otro llamador, detenerse y reportar.
-- **Esqueletos:**
+  Javadoc de la clase: quitar «el Gateway todavía no lo emite» y «se consulta a Firebase»; decir que la verificación sale solo de ese encabezado y que su ausencia es «no verificado». **OpenAPI** con el estilo de `CurrentAccountController` (mismo repo): `@Operation(summary = "Activa la cuenta tras verificar el correo")`, `@ApiResponses` con 200 (incluida la repetición), 400 `IDENTITY_REQUIRED`, 403 `EMAIL_NOT_VERIFIED` y `ACCOUNT_DISABLED`, 404 `ACCOUNT_NOT_FOUND`, 409 `ACCOUNT_CONFLICT`, 500 `INTERNAL_ERROR`, cada una con su ejemplo `application/problem+json`; `@Parameter` de cada encabezado («Lo pone el Gateway a partir del token; el navegador no lo envía»; para la verificación, «solo `true` activa la cuenta»).
+- **Manejador** (molde de `correoSinVerificar`, línea 185):
   ```java
-  /**
-   * Estado del correo de un usuario según el directorio de credenciales.
-   *
-   * <p>{@code NOT_FOUND} no es un error: la credencial pudo borrarse en una ejecución
-   * anterior que no alcanzó a borrar la fila local.</p>
-   */
-  public enum UserVerificationStatus { VERIFIED, NOT_VERIFIED, NOT_FOUND }
+  /** Cuenta deshabilitada. @return {@code 403 Forbidden} */
+  @ExceptionHandler(AccountDisabledException.class)
+  ProblemDetail cuentaDeshabilitada(AccountDisabledException error) {
+      return rechazo(HttpStatus.FORBIDDEN, "Cuenta deshabilitada", error.getMessage(), error.getErrorCode());
+  }
 
-  /**
-   * Resultado de una ejecución de la purga de cuentas sin verificar.
-   *
-   * @param reviewed cuentas candidatas revisadas en esta ejecución
-   * @param deleted cuentas eliminadas (credencial y fila, o solo la fila)
-   * @param activated cuentas que el directorio ya tenía verificadas y se activaron
-   * @param failed cuentas que no se pudieron procesar; se reintentan en la siguiente ejecución
-   * @param candidatesLeft {@code true} si quedaron candidatas por encima del tope
-   */
-  public record PurgeSummary(int reviewed, int deleted, int activated, int failed, boolean candidatesLeft) {
-      /** @return un resumen sin candidatas */
-      public static PurgeSummary empty() { return new PurgeSummary(0, 0, 0, 0, false); }
+  /** Otra petición cambió la cuenta al mismo tiempo. @return {@code 409 Conflict} */
+  @ExceptionHandler(AccountConflictException.class)
+  ProblemDetail conflictoDeCuenta(AccountConflictException error) {
+      return rechazo(HttpStatus.CONFLICT, "Conflicto de cuenta", error.getMessage(), error.getErrorCode());
   }
   ```
-- **`FirebaseUserDirectory`:** quitar `boolean isEmailVerified(String)`; agregar `UserVerificationStatus verificationStatus(String firebaseUid)` con Javadoc («@throws IllegalStateException si el directorio no responde o rechaza la consulta por otra causa»). En `deleteUser`, agregar al Javadoc: «Si el usuario ya no existe, no hace nada: borrar es idempotente».
-- **`AccountRepository`:**
+- **Pruebas del controlador** (el estilo de la clase existente; métodos nuevos en inglés):
+  - `laActivacionDevuelveLaCuentaActiva` (existente): sigue en verde.
+  - `funcionaSinElEncabezadoDeVerificacionDelGateway` (existente, línea 54) cambia de comportamiento: se reemplaza por `activate_shouldPassNotVerified_whenHeaderIsNotTrue` y `activate_shouldPassNotVerified_whenHeaderIsMissing` (`@ParameterizedTest` con encabezado ausente, `""`, `false`, `TRUE`, `" true"` y `abc`): el servicio recibe `emailVerified=false` (`ArgumentCaptor`); con el servicio simulado lanzando `EmailNotVerifiedException` → 403, `$.code` `EMAIL_NOT_VERIFIED`, `$.detail` «Tu correo aún no está verificado.» y `Content-Type` con `charset=UTF-8`. Con `abc`, nunca 500.
+  - `activate_shouldIgnoreBody_whenItClaimsVerification` (`@ParameterizedTest`): cuerpos `{"emailVerified":true}`, `{"status":"ACTIVE"}` y el texto `no es json`, sin encabezado → el servicio recibe `false`; nunca 400 ni 500.
+  - `activate_shouldReturn403AccountDisabled_whenAccountIsDisabled`, `activate_shouldReturn409AccountConflict_whenConflictPersists` y `activate_shouldReturn400IdentityRequired_whenIdentityIsBlank` (servicio simulado lanzando cada excepción), con su `code`, título y mensaje literal.
+  - `sinIdentidadDelGatewayLaPeticionNoLlegaAlCasoDeUso` (existente): ahora su `detail` lleva punto final; actualizar la aserción del texto si la tiene.
+- **Manejador:** en `BusinessExceptionHandlerTest`, una prueba por excepción nueva (estado, `code`, `title`, `detail`) y actualizar las aserciones de texto de `EMAIL_NOT_VERIFIED`, `ACCOUNT_NOT_FOUND` e `IDENTITY_REQUIRED` si las tiene. Buscar también con `git grep -n "No encontramos una cuenta para este usuario\"\|exige esta ruta\"\|Primero debes verificar" -- src/test` y actualizar cada aserción que compare el texto sin punto (por ejemplo, en `CurrentAccountControllerTest` y `CurrentAccountEndToEndTest`).
+- **Verificación:** `./mvnw.cmd -q -B "-Dtest=AccountActivationControllerTest,BusinessExceptionHandlerTest,CurrentAccountControllerTest" test`. Commit 3 de `plan.md` (T-1.1 a T-1.4).
+
+## [ ] T-1.5 · Activación de punta a punta con base real — ≤ 30 min
+
+- **Cubre:** REQ-VC-02, 03, 05, 06, 08, 09; FIA-02. **Modificar:** `AccountRegistrationEndToEndTest.java` (copiar la forma de `registraLaCuentaYLuegoLaActivaAlVerificarElCorreo`, línea 69). Ayudante privado `ResponseEntity<String> activar(String uid, String verificado)` que pone `X-User-Id` y, si `verificado` no es `null`, `X-User-Email-Verified`.
+- **Pruebas nuevas:**
+  1. `activate_shouldChangeStatusAndUpdateDate_whenPending`: leer `fecha_actualizacion` y `version` tras registrar; activar con `"true"` → 200; `estado` `ACTIVE`, `fecha_actualizacion` posterior, `version` + 1.
+  2. `activate_shouldNotWrite_whenAlreadyActive` (CA-1.2.4): segunda activación → 200 con el mismo cuerpo; `fecha_actualizacion` y `version` iguales a los de la primera. Repetir 20 veces: ninguna cambia nada (FIA-02).
+  3. `activate_shouldReturn403_whenAccountIsDisabled`: `UPDATE microcuentas.cuenta SET estado = 'DISABLED' WHERE firebase_uid = ?` → 403 y el cuerpo contiene `ACCOUNT_DISABLED`; `estado` sigue `DISABLED`.
+  4. `activate_shouldAnswerLikeMissingAccount_whenAnonymized`: `UPDATE … SET estado = 'ANONYMIZED', fecha_eliminacion = now()` (`ck_cuenta_anonimizacion` exige ambas) → 404 con el mismo `code` y `detail` que un `X-User-Id` sin cuenta.
+  5. `activate_shouldReturn403AndKeepPending_whenHeaderIsNotTrue` con `"false"`, `""` y `"abc"`: 403 `EMAIL_NOT_VERIFIED`; la cuenta sigue `PENDING_VERIFICATION`.
+  6. `activate_shouldNotNeedFirebase_whenHeaderIsTrue`: `directorio.fallarAlConsultar()` → 200.
+  7. `activate_shouldSucceedOnce_whenTwoRequestsRace`: dos hilos con `CountDownLatch`, 10 rondas con cuentas distintas: ambas 200; `estado` `ACTIVE`; `version` aumentó exactamente 1; ninguna 500.
+- **Verificación:** con Docker, `./mvnw.cmd -q -B "-Dtest=AccountRegistrationEndToEndTest" test` tres veces seguidas (por la 7). Sin Docker, decirlo. Commit 4 de `plan.md`. **Pedir aquí la revisión independiente temprana** (plan §1).
+
+# Pieza 2 — purga y evento
+
+## [ ] T-2.1 · Migraciones — ≤ 30 min
+
+- **Cubre:** REQ-VC-27, 32. **Crear:** `src/main/resources/db/migration/V6__indice_cuenta_pendiente_fecha_creacion.sql` y `V7__evento_cuenta_eliminada.sql` (si `develop` ya tiene `V6`, usar los dos siguientes libres y decirlo). **Modificar:** `infrastructure/persistence/CuentaSchemaMigrationTest.java`, `infrastructure/persistence/EventoSalienteSchemaMigrationTest.java`.
+- **Contenido exacto:**
+  ```sql
+  -- V6: índice parcial para la purga diaria: solo las cuentas sin verificar, por antigüedad.
+  CREATE INDEX ix_cuenta_pendiente_fecha_creacion
+      ON microcuentas.cuenta (fecha_creacion)
+      WHERE estado = 'PENDING_VERIFICATION';
+  ```
+  ```sql
+  -- V7: la tabla de salida admite el evento de cuenta eliminada que publica la purga.
+  ALTER TABLE microcuentas.evento_saliente
+      DROP CONSTRAINT ck_evento_saliente_tipo,
+      ADD CONSTRAINT ck_evento_saliente_tipo CHECK (tipo IN ('cuenta.creada', 'cuenta.eliminada'));
+  ```
+- **Pruebas:** en `CuentaSchemaMigrationTest`, `select indexdef from pg_indexes where indexname = 'ix_cuenta_pendiente_fecha_creacion'` contiene `WHERE` y `PENDING_VERIFICATION`. En `EventoSalienteSchemaMigrationTest`, `insert_shouldAccept_whenTypeIsAccountDeleted` (insertar `'cuenta.eliminada'` pasa); `insert_shouldFail_whenTypeIsUnknown` (existente, con `cuenta.borrada`) sigue en verde.
+- **Verificación:** con Docker, `./mvnw.cmd -q -B "-Dtest=CuentaSchemaMigrationTest,EventoSalienteSchemaMigrationTest,MigracionEventoSalienteConDatosTest" test`. Commit 5.
+
+## [ ] T-2.2 · Evento `cuenta.eliminada` y su contrato — ≤ 30 min
+
+- **Cubre:** REQ-VC-27; IOP-01. **Crear:** `domain/event/AccountDeleted.java`, `infrastructure/messaging/payload/AccountDeletedPayloadV1.java`, `docs/eventos/cuenta-eliminada-v1.md`, `docs/eventos/cuenta-eliminada-v1.schema.json`, `src/test/java/tech/cameia/cuentas/domain/event/AccountDeletedTest.java`, `src/test/java/tech/cameia/cuentas/infrastructure/messaging/payload/AccountDeletedPayloadV1Test.java`. **Modificar:** `domain/port/OutboxRepository.java`, `infrastructure/persistence/repository/OutboxRepositoryAdapter.java`, el doble `src/test/java/tech/cameia/cuentas/infrastructure/persistence/InMemoryOutboxRepository.java`.
+- **Molde:** `AccountCreated` y `AccountCreatedPayloadV1` (mismo paquete, mismo estilo):
+  ```java
+  public record AccountDeleted(UUID eventId, String firebaseUid, Instant deletedAt, CorrelationId correlationId) {
+      public static final String TYPE = "cuenta.eliminada";
+      public static final int VERSION = 1;
+      public AccountDeleted { /* requireNonNull de cada componente; deletedAt truncado a milisegundos */ }
+  }
+
+  public record AccountDeletedPayloadV1(@JsonProperty("usuarioId") String userId,
+          @JsonProperty("eliminadaEn") String deletedAt) {
+      public static AccountDeletedPayloadV1 from(AccountDeleted event) { /* mismo INSTANT_FORMAT que AccountCreatedPayloadV1 */ }
+  }
+  ```
+  `OutboxRepository`: `boolean appendAccountDeleted(AccountDeleted event)`, con Javadoc gemelo de `appendAccountCreated`. El adaptador la implementa con `insertIfAbsent(event.eventId(), AccountDeleted.TYPE, (short) AccountDeleted.VERSION, event.firebaseUid(), payload, event.correlationId().value(), event.deletedAt())`; revisar el orden real de los parámetros en `OutboxEventJpaRepository.insertIfAbsent` (línea 43) y el acceso real al valor de `CorrelationId`. El doble gana una lista `appendedDeletions()`.
+- **Contrato** `docs/eventos/cuenta-eliminada-v1.md`, con el mismo índice que `cuenta-creada-v1.md`: exchange `cuentas.events`, clave `cuenta.eliminada`, `message_id` = `eventId`, campos `usuarioId` (texto, el `firebaseUid`, 1 a 128) y `eliminadaEn` (instante UTC `yyyy-MM-dd'T'HH:mm:ss.SSS'Z'`); productor: la purga de cuentas sin verificar; consumidor conocido: Perfil (cola `perfil.cuenta-eliminada`, borra la fecha de nacimiento de su réplica). El esquema JSON exige los dos campos con `additionalProperties: false`, como el de `cuenta.creada`.
+- **Pruebas:** `AccountDeletedTest` (nulos rechazados; instante truncado a milisegundos). `AccountDeletedPayloadV1Test`, copiando `AccountCreatedPayloadV1Test`: la carga serializada valida contra `docs/eventos/cuenta-eliminada-v1.schema.json` y es exactamente `{"usuarioId":"uid-1","eliminadaEn":"2026-10-10T08:00:00.000Z"}` para `Instant.parse("2026-10-10T08:00:00.123456Z")` truncado. En `OutboxRepositoryAdapterTest` (Testcontainers): `appendAccountDeleted_shouldStorePendingEvent_whenNew` y `appendAccountDeleted_shouldReturnFalse_whenAlreadyStored`.
+- **Verificación:** `./mvnw.cmd -q -B "-Dtest=AccountDeletedTest,AccountDeletedPayloadV1Test,OutboxRepositoryAdapterTest" test` (la última con Docker).
+
+## [ ] T-2.3 · Transacción de borrado de la fila y su evento — ≤ 30 min
+
+- **Cubre:** REQ-VC-22, 25, 27; FIA-01; IOP-04. **Modificar:** `domain/port/AccountRepository.java`, `infrastructure/persistence/repository/AccountJpaRepository.java`, `AccountRepositoryAdapter.java`, el doble `InMemoryAccountRepository`. **Crear:** `application/service/PendingAccountDeletionService.java`, `PendingAccountDeletionServiceTest.java` (sin Spring) y `PendingAccountDeletionTransactionTest.java` (Testcontainers, copiando `AccountRecordingTransactionTest`).
+- **Puerto:** `boolean deletePendingByFirebaseUid(String firebaseUid)`: «Borra la cuenta del usuario solo si sigue sin verificar. @return `true` si borró una fila; `false` si no existía o ya no estaba pendiente».
+- **JPA:**
+  ```java
+  @Modifying
+  @Query("delete from AccountEntity a where a.firebaseUid = :firebaseUid "
+          + "and a.estado = tech.cameia.cuentas.domain.model.AccountStatus.PENDING_VERIFICATION")
+  int deletePendingByFirebaseUid(@Param("firebaseUid") String firebaseUid);
+  ```
+  El adaptador devuelve `filas == 1` y **no** lleva `@Transactional`: la transacción la abre el servicio.
+- **Servicio** (molde de `AccountRecordingService`: reloj por constructor, `@Autowired` en el de producción):
   ```java
   /**
-   * Busca las cuentas que siguen sin verificar y se crearon antes del instante dado.
+   * Borra la cuenta pendiente y guarda su evento cuenta.eliminada en una sola transacción.
    *
-   * @param limit instante límite, exclusivo: una cuenta creada exactamente en él no entra
-   * @param max cantidad máxima de resultados
-   * @return los identificadores de Firebase, de la cuenta más antigua a la más nueva
+   * <p>O desaparecen la fila y aparece el evento, o no cambia nada: el evento nunca anuncia un borrado que no ocurrió.</p>
    */
-  List<String> findPendingVerificationCreatedBefore(Instant limit, int max);
-
-  /**
-   * Borra la cuenta del usuario solo si sigue sin verificar.
-   *
-   * @param firebaseUid identificador del usuario en Firebase Auth
-   * @return {@code true} si borró una fila; {@code false} si no existía o ya no estaba pendiente
-   */
-  boolean deletePendingByFirebaseUid(String firebaseUid);
+  @Service
+  public class PendingAccountDeletionService {
+      @Transactional
+      public boolean deletePending(String firebaseUid) {
+          if (!accounts.deletePendingByFirebaseUid(firebaseUid)) {
+              return false;
+          }
+          UUID eventId = UUID.randomUUID();
+          AccountDeleted event = new AccountDeleted(eventId, firebaseUid, clock.instant(),
+                  CorrelationId.fromRequestIdOrElse(null, eventId));
+          if (!outbox.appendAccountDeleted(event)) {
+              throw new IllegalStateException("La cuenta ya tiene su evento de cuenta eliminada");
+          }
+          return true;
+      }
+  }
   ```
-- **Verificación:** `./mvnw.cmd -B -q compile` falla en el adaptador de Firebase, el de la base y el doble en memoria: es lo esperado; se corrigen en T-2.2 a T-2.4. No hacer commit hasta T-2.4.
+  Agregar `PendingAccountDeletionService#deletePending` a `UntypedExceptionClassificationTest` con el motivo `DEFENSIVE_INVARIANT` (imposible con una fila recién borrada; la transacción se deshace).
+- **Pruebas:** sin Spring: `deletePending_shouldRecordEvent_whenRowDeleted` (un evento con `TYPE` y el uid) y `deletePending_shouldNotRecordEvent_whenNothingDeleted`. Con base real: `deletePending_shouldKeepRow_whenEventInsertFails` (copiar cómo `AccountRecordingTransactionTest` provoca el fallo del `INSERT`, línea 46: un evento previo con el mismo `tipo` y `agregado_id`) y `deletePending_shouldNotDelete_whenAccountIsActive`.
+- **Verificación:** `./mvnw.cmd -q -B "-Dtest=PendingAccountDeletionServiceTest,PendingAccountDeletionTransactionTest,UntypedExceptionClassificationTest" test`. Commit 6 (T-2.2 y T-2.3).
 
-## [ ] T-2.2 · Adaptador de Firebase — ≤ 30 min, ≈ 90 líneas
+## [ ] T-2.4 · Lectura de candidatas — ≤ 20 min
 
-- **Cubre:** REQ-VC-22, 23. **Modificar:** `infrastructure/client/FirebaseUserDirectoryAdapter.java` (métodos `isEmailVerified` → `verificationStatus`, y `deleteUser`), `FirebaseUserDirectoryAdapterTest`, y el doble `src/test/java/tech/cameia/cuentas/infrastructure/client/InMemoryFirebaseUserDirectory.java`.
+- **Cubre:** REQ-VC-21, 29, 32. **Modificar:** `AccountRepository`, `AccountJpaRepository`, `AccountRepositoryAdapter`, `InMemoryAccountRepository`, `src/test/java/tech/cameia/cuentas/infrastructure/persistence/AccountRepositoryAdapterTest.java`.
+- **Puerto:** `List<String> findPendingVerificationCreatedBefore(Instant limit, int max)`: «@param limit instante, exclusivo: una cuenta creada exactamente en él no entra; @return los `firebaseUid`, de la más antigua a la más nueva».
+- **JPA** (JPQL, con el nombre completo del enumerado):
+  ```java
+  @Query("select a.firebaseUid from AccountEntity a "
+          + "where a.estado = tech.cameia.cuentas.domain.model.AccountStatus.PENDING_VERIFICATION "
+          + "and a.fechaCreacion < :limite order by a.fechaCreacion asc, a.id asc")
+  List<String> findPendingFirebaseUids(@Param("limite") Instant limite, Limit cantidad);
+  ```
+  Si `Limit` no compila con la versión de Spring Data del repo, usar `Pageable` con `PageRequest.of(0, max)`.
+- **Pruebas** (Testcontainers): insertar por SQL cinco filas con `fecha_creacion = fecha_actualizacion` fijas (`ck_cuenta_fecha_actualizacion` exige `fecha_actualizacion >= fecha_creacion`): pendiente de 169 h, pendiente de 168 h exactas, pendiente de 10 h, `ACTIVE` de 300 h, `DISABLED` de 300 h; con `limite = now − 168 h` calculado en la prueba → solo la de 169 h. Con tres pendientes viejas y `max = 2` → las dos más antiguas, en orden.
+- **Verificación:** con Docker, `./mvnw.cmd -q -B "-Dtest=AccountRepositoryAdapterTest" test`.
+
+## [ ] T-2.5 · Consulta tipada a Firebase — ≤ 20 min
+
+- **Cubre:** REQ-VC-22, 26. **Antes:** `git grep -n "isEmailVerified" -- src/main` debe mostrar solo el puerto y su adaptador (T-1.3 quitó el otro uso). Si hay otro, detenerse. **Crear:** `domain/model/UserVerificationStatus.java`. **Modificar:** `FirebaseUserDirectory`, `FirebaseUserDirectoryAdapter` (líneas 266-280), `InMemoryFirebaseUserDirectory` (línea 131), `FirebaseUserDirectoryAdapterTest`, `UntypedExceptionClassificationTest` (quitar la entrada de `isEmailVerified`, línea 79).
 - **Código:**
+  ```java
+  /** Estado del correo de un usuario según el directorio. {@code NOT_FOUND} no es un error: la credencial pudo borrarse antes. */
+  public enum UserVerificationStatus { VERIFIED, NOT_VERIFIED, NOT_FOUND }
+  ```
   ```java
   @Override
   public UserVerificationStatus verificationStatus(String firebaseUid) {
@@ -225,178 +303,172 @@ Rama `CM-179-purga-cuentas-sin-verificar` desde `develop` **con el bloque 1 fusi
           return firebaseAuth.getUser(firebaseUid).isEmailVerified()
                   ? UserVerificationStatus.VERIFIED : UserVerificationStatus.NOT_VERIFIED;
       } catch (FirebaseAuthException error) {
-          if (error.getAuthErrorCode() == AuthErrorCode.USER_NOT_FOUND) {
-              return UserVerificationStatus.NOT_FOUND;   // la credencial ya no existe
+          if (AuthErrorCode.USER_NOT_FOUND.equals(error.getAuthErrorCode())) {
+              return UserVerificationStatus.NOT_FOUND;
           }
-          throw new IllegalStateException("Firebase no pudo confirmar el estado del correo", error);
+          throw unavailableOrRejection(error, "Firebase rechazó la consulta del estado del correo");
       }
   }
   ```
-  En `deleteUser`, dentro del `catch`: si el código es `USER_NOT_FOUND`, registrar en `INFO` «La credencial del usuario {} ya no existía» y volver sin lanzar; si no, lanzar como hoy.
-- **Doble en memoria:** un mapa `uid → VERIFIED|NOT_VERIFIED`, un método de prueba `markVerified(String uid)`, una bandera para fallar en un uid concreto (`failOn(String uid)`) y la lista ordenada de llamadas (`calls()`), para comprobar el orden en T-2.5. `deleteUser` de un uid inexistente no lanza.
-- **Pruebas (`FirebaseUserDirectoryAdapterTest`, con `FirebaseAuth` simulado como hoy):** `usuarioVerificadoDevuelveVerified`, `usuarioSinVerificarDevuelveNotVerified`, `usuarioInexistenteDevuelveNotFound` (simular `FirebaseAuthException` con `AuthErrorCode.USER_NOT_FOUND`), `otroErrorDeFirebaseLanzaIllegalState` (`AuthErrorCode.INVALID_ID_TOKEN` u otro), `borrarUnUsuarioInexistenteNoLanza`, `borrarConOtroErrorLanzaIllegalState`.
-- **Trampa:** `FirebaseAuthException` no tiene constructor público sencillo en todas las versiones: copiar cómo la construyen las pruebas existentes del adaptador; si no hay ejemplo, simularla con Mockito (`mock(FirebaseAuthException.class)` y `when(e.getAuthErrorCode())`).
-- **Verificación:** `./mvnw.cmd -q -B -Dtest=FirebaseUserDirectoryAdapterTest test`.
+  Javadoc del puerto: `@throws DependencyUnavailableException si el directorio no respondió o falló de su lado`. El doble devuelve `VERIFIED` si `marcarCorreoVerificado` se llamó para ese uid, `NOT_FOUND` si no existe, `NOT_VERIFIED` en otro caso, y respeta `fallarAlConsultar()` lanzando `DependencyUnavailableException`. Agregar al doble `void rejectLookupOf(String uid)` (lanza `IllegalStateException` solo para ese uid).
+- **Pruebas** (`FirebaseUserDirectoryAdapterTest`, con la forma en que la clase ya simula `FirebaseAuthException`): `verificationStatus_shouldReturnVerified_whenEmailVerified`, `…NotVerified…`, `…NotFound_whenUserDoesNotExist`, `verificationStatus_shouldThrowDependencyUnavailable_whenFirebaseIsDown` (código `UNAVAILABLE`), `verificationStatus_shouldThrowIllegalState_whenRejectedForOtherReason`. Quitar las de `isEmailVerified`.
+- **Verificación:** `./mvnw.cmd -q -B "-Dtest=FirebaseUserDirectoryAdapterTest,UntypedExceptionClassificationTest" test`. Commit 7 (T-2.4 y T-2.5).
 
-## [ ] T-2.3 · Adaptador de la base y migración del índice — ≤ 30 min, ≈ 130 líneas
+## [ ] T-2.6 · Propiedades del tope y resumen — ≤ 15 min
 
-- **Cubre:** REQ-VC-21, 26, 29; T5. **Crear:** `src/main/resources/db/migration/V<n>__indice_cuenta_pendiente_fecha_creacion.sql` (`<n>` = siguiente número libre: `ls src/main/resources/db/migration`). **Modificar:** `AccountJpaRepository`, `AccountRepositoryAdapter`, `AccountRepositoryAdapterTest`, `CuentaSchemaMigrationTest`.
-- **Migración (contenido exacto):**
-  ```sql
-  -- Índice parcial para la purga diaria: solo las cuentas sin verificar, ordenadas por antigüedad.
-  CREATE INDEX ix_cuenta_pendiente_fecha_creacion
-      ON microcuentas.cuenta (fecha_creacion)
-      WHERE estado = 'PENDING_VERIFICATION';
-  ```
-- **`AccountJpaRepository`:**
+- **Cubre:** REQ-VC-28, 29. **Crear:** `infrastructure/config/PurgeProperties.java`, `domain/model/PurgeSummary.java`, prueba `infrastructure/config/PurgePropertiesTest.java` (copiar `AccountEventsPropertiesTest`). **Modificar:** `infrastructure/config/DomainPolicyConfiguration.java` (`@EnableConfigurationProperties(PurgeProperties.class)`), `src/main/resources/application.properties` (`cuentas.purge.max-accounts-per-run=${PURGE_MAX_ACCOUNTS_PER_RUN:1000}`).
   ```java
-  @Query("select a.firebaseUid from AccountEntity a "
-          + "where a.estado = tech.cameia.cuentas.domain.model.AccountStatus.PENDING_VERIFICATION "
-          + "and a.fechaCreacion < :limite order by a.fechaCreacion asc")
-  List<String> findPendingFirebaseUids(@Param("limite") Instant limite, Limit cantidad);
+  /** Configuración de la purga de cuentas sin verificar. @param maxAccountsPerRun cuentas como máximo por ejecución */
+  @Validated
+  @ConfigurationProperties("cuentas.purge")
+  public record PurgeProperties(@Min(1) @Max(1000) int maxAccountsPerRun) { }
 
-  @Modifying
-  @Query("delete from AccountEntity a where a.firebaseUid = :firebaseUid "
-          + "and a.estado = tech.cameia.cuentas.domain.model.AccountStatus.PENDING_VERIFICATION")
-  int deletePendingByFirebaseUid(@Param("firebaseUid") String firebaseUid);
+  /** Resultado de una ejecución. */
+  public record PurgeSummary(int reviewed, int deleted, int activated, int failed, int orphanCredentialsDeleted,
+          boolean candidatesLeft) { }
   ```
-- **Adaptador:** `findPendingVerificationCreatedBefore` llama con `Limit.of(max)`; `deletePendingByFirebaseUid` lleva `@Transactional` y devuelve `filas == 1`.
-- **Trampas:** (1) sin `@Transactional` el `@Modifying` lanza `TransactionRequiredException`; (2) `Limit` es de Spring Data 3.2 o posterior: si no compila, usar `PageRequest.of(0, max)` y devolver `List<String>`; (3) en JPQL el enumerado va con su nombre completo de clase.
-- **Pruebas (Testcontainers, como las existentes):** insertar por SQL cinco filas con `fecha_creacion` fija: `PENDING` de 169 h, `PENDING` de 168 h exactas, `PENDING` de 10 h, `ACTIVE` de 300 h y `DISABLED` de 300 h, con `limite = now − 168 h` calculado en la prueba → devuelve solo la de 169 h; con tres pendientes viejas y `max = 2` → las dos más antiguas en orden; `deletePendingByFirebaseUid` de una pendiente → `true` y la fila no está; de una `ACTIVE` → `false` y la fila sigue. En `CuentaSchemaMigrationTest`: `select indexdef from pg_indexes where indexname = 'ix_cuenta_pendiente_fecha_creacion'` contiene `WHERE` y `PENDING_VERIFICATION`.
-- **Trampa de las filas de prueba:** `ck_cuenta_anonimizacion` exige `fecha_eliminacion` solo con `ANONYMIZED`, y `ck_cuenta_fecha_actualizacion` exige `fecha_actualizacion >= fecha_creacion`: fijar ambas fechas iguales en el `INSERT`.
-- **Verificación:** con Docker, `./mvnw.cmd -B -Dtest='AccountRepositoryAdapterTest,CuentaSchemaMigrationTest' test`; sin Docker, decirlo.
+- **Pruebas:** 0 y 1001 hacen fallar el arranque; 1 y 1000 arrancan.
+- **Verificación:** `./mvnw.cmd -q -B "-Dtest=PurgePropertiesTest" test`.
 
-## [ ] T-2.4 · Reloj y propiedad del tope — ≤ 15 min, ≈ 20 líneas
+## [ ] T-2.7 · Servicio de purga — ≤ 30 min
 
-- **Modificar:** `infrastructure/config/DomainPolicyConfiguration.java` (bean `Clock clock()` que devuelve `Clock.systemUTC()`, con Javadoc «Reloj de la aplicación, siempre en UTC; las pruebas lo reemplazan por uno fijo») y `src/main/resources/application.properties` (`cuentas.purge.max-accounts-per-run=${PURGE_MAX_ACCOUNTS_PER_RUN:1000}`).
-- **No cambiar** `AgePolicy` (sigue con su constructor sin argumentos).
-- **Verificación:** `./mvnw.cmd -B test` compila y la suite existente sigue en verde. Commit de T-2.1 a T-2.4: `CM-179 | feat(cuentas): consulta tipada a Firebase y lectura de cuentas sin verificar [IA-ASISTIDO]`.
-
-## [ ] T-2.5 · Servicio de purga — ≤ 30 min, ≈ 150 líneas
-
-- **Cubre:** REQ-VC-20 a 26, 28. **Crear:** `application/service/PurgeUnverifiedAccountsService.java`, `src/test/java/tech/cameia/cuentas/application/service/PurgeUnverifiedAccountsServiceTest.java`.
-- **Esqueleto:**
+- **Cubre:** REQ-VC-20 a 26, 28, 29, 31. **Crear:** `application/service/PurgeUnverifiedAccountsService.java`, `PurgeUnverifiedAccountsServiceTest.java` (sin Spring: `InMemoryAccountRepository`, `InMemoryOutboxRepository`, `InMemoryFirebaseUserDirectory`, `PendingAccountDeletionService` real sobre esos dobles, `Clock.fixed(Instant.parse("2026-10-10T08:00:00Z"), ZoneOffset.UTC)`).
+- **Esqueleto** (constructores como `AccountRecordingService`; métodos de ≤ 20 líneas; el resultado de cada cuenta es un `enum` privado `Outcome { DELETED, ACTIVATED, FAILED }`):
   ```java
   /**
    * Elimina las cuentas que no verificaron su correo en 168 horas.
    *
-   * <p>Se ejecuta una vez por invocación; la hora la decide quien la dispara. Cada cuenta se
-   * procesa por separado: un fallo se cuenta, se registra y no detiene a las demás, que la
-   * siguiente ejecución vuelve a encontrar. Antes de borrar se consulta el directorio: si la
-   * persona ya verificó su correo, la cuenta se activa en lugar de borrarse.</p>
+   * <p>Se ejecuta una vez por invocación; la hora la decide quien la dispara. Antes de borrar consulta el directorio: si la
+   * persona ya verificó, la cuenta se activa. Si no, se borra la credencial y después la fila, que lleva su evento. Cada cuenta
+   * es independiente: un rechazo se cuenta y no detiene a las demás. Si el directorio no está disponible, se detiene y
+   * lanza, para que la tarea termine con error y se reintente.</p>
    */
   @Service
   public class PurgeUnverifiedAccountsService {
       static final Duration MAX_AGE = Duration.ofHours(168);
-      // constructor: AccountRepository, FirebaseUserDirectory, Clock,
-      //              @Value("${cuentas.purge.max-accounts-per-run}") int maxAccounts
 
-      /** @return resumen de la ejecución */
       public PurgeSummary purge() {
           Instant limite = clock.instant().minus(MAX_AGE);
-          List<String> candidatas = repositorio.findPendingVerificationCreatedBefore(limite, maxAccounts + 1);
-          boolean quedan = candidatas.size() > maxAccounts;
-          // procesar candidatas.subList(0, min(size, maxAccounts)), acumulando contadores
-          // registrar el resumen y devolverlo
+          List<String> candidatas = accounts.findPendingVerificationCreatedBefore(limite, max + 1);
+          // procesar las primeras min(size, max); acumular contadores;
+          // ante DependencyUnavailableException: registrar el resumen parcial y relanzar
+          // al final: registrar el resumen en INFO (texto exacto de REQ-VC-28) y devolverlo
       }
-
-      // procesar(uid): devuelve el resultado de una cuenta (DELETED, ACTIVATED o FAILED)
-      //   VERIFIED     -> buscar la cuenta, activate(), save
-      //   NOT_VERIFIED -> directorio.deleteUser(uid); borrarFila(uid)
-      //   NOT_FOUND    -> borrarFila(uid)
-      //   borrarFila devuelve FAILED si deletePendingByFirebaseUid da false
-      //   cualquier RuntimeException -> WARN «No se pudo purgar la cuenta del usuario {}: {}»
-      //                                 con uid y error.getClass().getSimpleName(); FAILED
+      // procesar(uid):
+      //   VERIFIED     -> buscar la cuenta, activate(), save -> ACTIVATED
+      //   NOT_VERIFIED -> directory.deleteUser(uid); deletion.deletePending(uid)
+      //                   false -> logger.error("Cuenta activa sin credencial tras la purga, uid {}", uid) -> FAILED
+      //   NOT_FOUND    -> deletion.deletePending(uid) ? DELETED : FAILED (WARN)
+      //   DependencyUnavailableException -> se propaga (no se captura aquí)
+      //   otra RuntimeException -> WARN «No se pudo purgar la cuenta del usuario {}: {}» con uid y
+      //                            error.getClass().getSimpleName(); FAILED
   }
   ```
-  Métodos de ≤ 20 líneas; el resultado por cuenta puede ser un `enum` privado. El resumen se registra en `INFO`: «Purga de cuentas sin verificar: revisadas={}, eliminadas={}, activadas={}, fallidas={}, quedan candidatas={}».
-- **Pruebas (sin Spring; repositorio en memoria escrito en la prueba + `InMemoryFirebaseUserDirectory`; `Clock.fixed(Instant.parse("2026-10-10T08:00:00Z"), ZoneOffset.UTC)`):**
-  1. `pideLasCandidatasConElLimiteDe168Horas`: el repositorio recibe `2026-10-03T08:00:00Z` y `max + 1`.
-  2. `borraPrimeroLaCredencialYDespuesLaFila`: `NOT_VERIFIED` → orden de llamadas `deleteUser(uid)` antes del borrado de la fila; `deleted=1`.
-  3. `activaEnLugarDeBorrarSiYaEstaVerificada`: `VERIFIED` → la cuenta queda `ACTIVE`, no hay borrados, `activated=1`.
-  4. `siLaCredencialNoExisteBorraSoloLaFila`: `NOT_FOUND` → sin `deleteUser`, fila borrada.
-  5. `unFalloNoDetieneALasDemas`: tres candidatas, Firebase falla en la segunda → `deleted=2`, `failed=1`.
-  6. `siNoSeBorraLaFilaCuentaComoFallida`: el repositorio devuelve `false` → `failed=1`; segunda ejecución con el doble ya sin ese uid (`NOT_FOUND`) y la fila presente → `deleted=1`.
-  7. `sinCandidatasDevuelveCeros`: resumen `PurgeSummary.empty()` y el doble de Firebase sin llamadas.
-  8. `respetaElTope`: `max = 3`, cuatro candidatas → `reviewed=3`, `candidatesLeft=true`; tres candidatas → `candidatesLeft=false`.
-  9. `elLogNoContieneDatosPersonales` (`@ExtendWith(OutputCaptureExtension.class)`): con una cuenta cuyo nombre es `Ana` y un fallo de Firebase con mensaje `ana@correo.co`, la salida no contiene `@` ni `Ana`.
-- **Verificación:** `./mvnw.cmd -q -B -Dtest=PurgeUnverifiedAccountsServiceTest test`; `LayeredArchitectureTest` en verde (el servicio no importa Firebase ni JPA).
+  La conciliación de huérfanas (T-2.8) se llama al final de `purge()` y por ahora devuelve 0.
+- **Pruebas:**
+  1. `purge_shouldAskForCandidatesOlderThan168Hours_whenRun`: el doble recibe `2026-10-03T08:00:00Z` y `max + 1`.
+  2. `purge_shouldDeleteCredentialBeforeRowAndRecordEvent_whenNotVerified`: orden `deleteUser` → borrado de fila; un `AccountDeleted` con el uid; `deleted=1`.
+  3. `purge_shouldActivateInsteadOfDeleting_whenAlreadyVerified`: `ACTIVE`, sin borrados ni evento, `activated=1`.
+  4. `purge_shouldDeleteOnlyRow_whenCredentialIsGone`: sin `deleteUser`; fila borrada y evento.
+  5. `purge_shouldContinue_whenOneAccountIsRejected`: tres candidatas, `rejectLookupOf` la segunda → `deleted=2`, `failed=1`.
+  6. `purge_shouldLogErrorAndSkipEvent_whenRowWasActivatedMeanwhile`: el doble de la base devuelve `false` al borrar tras `deleteUser` → `failed=1`, ningún evento, la salida contiene «Cuenta activa sin credencial tras la purga».
+  7. `purge_shouldReturnZeros_whenNoCandidates`: todo en 0 y el directorio sin consultas.
+  8. `purge_shouldRespectLimit_whenMoreCandidatesThanMax`: `max = 3`, cuatro candidatas → `reviewed=3`, `candidatesLeft=true`; con tres → `false`.
+  9. `purge_shouldNotLogPersonalData_whenFailing` (`OutputCaptureExtension`): cuenta de `Ana`, fallo con mensaje `ana@correo.co` → la salida no contiene `@` ni `Ana`.
+  10. `purge_shouldStopAndRethrow_whenDirectoryIsUnavailable`: `fallarAlConsultar()` en la segunda de tres → lanza `DependencyUnavailableException`; la primera quedó procesada; la tercera intacta.
+- **Verificación:** `./mvnw.cmd -q -B "-Dtest=PurgeUnverifiedAccountsServiceTest" test`; `LayeredArchitectureTest` en verde (el servicio no importa Firebase ni JPA).
+- **Punta a punta** (misma tarjeta, otra clase): crear `src/test/java/tech/cameia/cuentas/PurgeEndToEndTest.java` copiando la configuración de `AccountRegistrationEndToEndTest`. (1) Registrar `purga@correo.co` (201); envejecer la fila: `update microcuentas.cuenta set fecha_creacion = now() - interval '169 hours', fecha_actualizacion = now() - interval '169 hours' where firebase_uid = ?`; llamar a `purge()` del bean → `deleted=1`; la fila no está; `evento_saliente` tiene una fila `cuenta.eliminada` pendiente con ese `agregado_id`; registrar de nuevo el mismo correo → **201**. (2) Dos `purge()` seguidas → la segunda `reviewed=0`. (3) Una cuenta vieja que el doble marca verificada → `ACTIVE` en la base, sin evento. Con Docker: `./mvnw.cmd -q -B "-Dtest=PurgeEndToEndTest" test`. Commit 8.
 
-## [ ] T-2.6 · Punta a punta de la purga — ≤ 30 min, ≈ 100 líneas
+## [ ] T-2.8 · Conciliación de credenciales huérfanas — ≤ 30 min
 
-- **Cubre:** REQ-VC-27, idempotencia. **Crear:** `src/test/java/tech/cameia/cuentas/PurgeEndToEndTest.java`, copiando la configuración de `AccountRegistrationEndToEndTest` (Testcontainers con `@ServiceConnection`, `FirebaseTestConfiguration`, puerto aleatorio).
-- **Pruebas:** (1) registrar `purga@correo.co` por HTTP (201); envejecer su fila con `JdbcTemplate`: `update microcuentas.cuenta set fecha_creacion = now() - interval '169 hours', fecha_actualizacion = now() - interval '169 hours' where firebase_uid = ?`; llamar a `purge()` del bean → `deleted=1`; registrar de nuevo el mismo correo → **201** con otro `firebaseUid`. (2) Llamar a `purge()` dos veces seguidas con una cuenta vieja → la segunda devuelve `reviewed=0`. (3) Una cuenta vieja que el doble de Firebase marca verificada → queda `ACTIVE` en la base.
-- **Verificación:** con Docker, `./mvnw.cmd -B -Dtest=PurgeEndToEndTest test`; sin Docker, decirlo.
+Opción C de la pregunta 18, elegida por Paula el 11-oct-2026: solo credenciales sin fila, con el correo sin verificar, de más de 168 h y con único proveedor `password`.
 
-## [ ] T-2.7 · Cobertura, revisión y entrega — ≤ 30 min
+- **Cubre:** REQ-VC-33. **Modificar:** `FirebaseUserDirectory` + adaptador + doble; `AccountRepository` + JPA + adaptador + doble; `PurgeUnverifiedAccountsService` y su prueba; `PurgeEndToEndTest`.
+- **Puertos:** `List<String> findUnverifiedPasswordUsersCreatedBefore(Instant limit, int max)`: recorre `firebaseAuth.listUsers(pageToken, 1000)` hasta agotar o reunir `max`; incluye un usuario si `getProviderData()` tiene un único proveedor con `getProviderId()` igual a `"password"`, `!isEmailVerified()` y `getUserMetadata().getCreationTimestamp() < limit.toEpochMilli()`. `Set<String> findExistingFirebaseUids(Collection<String> firebaseUids)`: JPQL `select a.firebaseUid from AccountEntity a where a.firebaseUid in :uids`.
+- **Servicio:** al final de `purge()`, si no se detuvo antes: candidatas huérfanas = las de la consulta a Firebase que no están en `findExistingFirebaseUids`; por cada una, `deleteUser` → `orphanCredentialsDeleted++`; un rechazo es `failed` y `WARN`; la indisponibilidad se propaga como en T-2.7. **No hay evento** (nunca hubo `cuenta.creada`).
+- **Pruebas:** huérfana sin verificar de 169 h → borrada; huérfana verificada → se conserva; huérfana de 10 h → se conserva; credencial con fila → se conserva; credencial de Google (proveedor `google.com`) → se conserva. En E2E, `directorio.crearSinCuentaLocal("huerfana@correo.co", <instante de hace 169 h>)` → borrada tras `purge()`.
+- **Verificación:** las de T-2.7. Commit 9.
 
-`./mvnw.cmd -B clean verify`; cobertura de `PurgeUnverifiedAccountsService`, los dos adaptadores, `PurgeSummary` y `UserVerificationStatus` (≥ 90 % de líneas y ramas; cada rama sin cubrir con su razón). `/simplify`, `/code-review high`, `/security-review` (borrado de datos personales). Autochequeo: ¿algún log con correo, nombre o mensaje de Firebase? ¿algún `@Transactional` que abarque la ejecución entera? PR: `CM-179 | feat(cuentas): purga diaria de cuentas sin verificar a las 168 horas [IA-ASISTIDO]`; atributos: privacidad, fiabilidad, rendimiento (índice parcial), observabilidad (resumen). Qué importa revisar: el servicio y el borrado condicionado; qué es mecánico: los dobles y la migración. Aviso a DevOps: ninguno nuevo (el Job ya está pedido).
+# Pieza 4 — modo tarea
 
----
+## [ ] T-4.1 · Perfil y ejecutor — ≤ 20 min
 
-# Bloque 4 — modo de tarea para el Cloud Run Job (PR 4)
-
-Rama `CM-179-modo-tarea-purga` desde `develop` **con el bloque 2 fusionado**.
-
-## [ ] T-4.1 · Perfil y ejecutor — ≤ 30 min, ≈ 90 líneas
-
-- **Cubre:** REQ-VC-40, 42. **Crear:** `src/main/resources/application-purge-job.properties` y `infrastructure/config/PurgeJobRunner.java`; prueba `src/test/java/tech/cameia/cuentas/infrastructure/config/PurgeJobRunnerTest.java`.
-- **Propiedades (contenido exacto):**
+- **Cubre:** REQ-VC-50, 52. **Crear:** `src/main/resources/application-purge-job.properties`, `infrastructure/config/PurgeJobRunner.java`, `src/test/java/tech/cameia/cuentas/infrastructure/config/PurgeJobRunnerTest.java` (sin Spring; molde `AccountEventsRelayJobRunnerTest`).
+- **Propiedades (exacto):**
   ```properties
-  # Modo tarea: ejecuta la purga de cuentas sin verificar una vez y termina. Sin servidor web.
+  # Tarea de una sola ejecucion (Cloud Run Job): purga de cuentas sin verificar. No abre puerto HTTP.
   spring.main.web-application-type=none
   ```
-- **Ejecutor:**
+- **Ejecutor** (molde de `AccountEventsRelayJobRunner`):
   ```java
   /**
-   * Ejecuta la purga de cuentas sin verificar una sola vez al arrancar en modo tarea.
+   * Ejecuta una vez la purga de cuentas sin verificar.
    *
-   * <p>Solo existe con el perfil {@code purge-job}, que usa el Cloud Run Job disparado a diario.
-   * La aplicación no abre ningún puerto en ese modo y termina al acabar la purga.</p>
+   * <p>Solo existe con el perfil {@code purge-job}, que usa el Cloud Run Job que dispara Cloud Scheduler a diario. Si la
+   * purga lanza (por ejemplo, el directorio de usuarios no responde), la excepción sale y el proceso termina con un código
+   * distinto de 0 para que el Job se reintente.</p>
    */
   @Component
-  @Profile("purge-job")
-  class PurgeJobRunner implements ApplicationRunner {
-      // constructor con PurgeUnverifiedAccountsService
+  @Profile(PurgeJobRunner.PROFILE)
+  public class PurgeJobRunner implements ApplicationRunner {
+      public static final String PROFILE = "purge-job";
       @Override
-      public void run(ApplicationArguments argumentos) {
-          PurgeSummary resumen = servicio.purge();
+      public void run(ApplicationArguments arguments) {
+          PurgeSummary resumen = service.purge();
           if (resumen.failed() > 0 || resumen.candidatesLeft()) {
-              logger.warn("La purga terminó con cuentas pendientes: fallidas={}, quedan candidatas={}",
+              logger.warn("La purga terminó con cuentas pendientes [fallidas={}, quedanCandidatas={}]",
                       resumen.failed(), resumen.candidatesLeft());
           }
       }
   }
   ```
-  El resumen completo ya lo registra el servicio en `INFO`; aquí no se repite.
-- **Pruebas (sin Spring, servicio simulado):** `ejecutaLaPurgaUnaSolaVez` (`verify(servicio, times(1)).purge()`); `avisaSiQuedanFallidas` (resumen con `failed=2`, salida capturada contiene «fallidas=2»); `noAvisaSiTodoSalioBien`.
-- **Verificación:** `./mvnw.cmd -q -B -Dtest=PurgeJobRunnerTest test`.
+- **Pruebas:** `run_shouldPurgeOnce_whenStarted`; `run_shouldWarn_whenSomeAccountsFailed` (salida con `fallidas=2`); `run_shouldNotWarn_whenAllSucceeded`; `run_shouldPropagate_whenPurgeThrows`.
+- **Verificación:** `./mvnw.cmd -q -B "-Dtest=PurgeJobRunnerTest" test`.
 
-## [ ] T-4.2 · Salida del proceso y prueba del perfil — ≤ 30 min, ≈ 90 líneas
+## [ ] T-4.2 · Salida del proceso — ≤ 15 min
 
-- **Cubre:** REQ-VC-41, 42. **Modificar:** `CuentasApplication.java`. **Crear:** `src/test/java/tech/cameia/cuentas/PurgeJobProfileTest.java`.
-- **`main`:**
+- **Cubre:** REQ-VC-51. **Modificar:** `CuentasApplication.exitWhenOneShotJob` (la condición) y su Javadoc; `CuentasApplicationTest`.
   ```java
-  public static void main(String[] args) {
-      ConfigurableApplicationContext contexto = SpringApplication.run(CuentasApplication.class, args);
-      // En modo tarea el proceso termina al acabar la purga y devuelve el código al Job.
-      if (contexto.getEnvironment().acceptsProfiles(Profiles.of("purge-job"))) {
-          System.exit(SpringApplication.exit(contexto));
-      }
-  }
+  if (context.getEnvironment().acceptsProfiles(
+          Profiles.of(AccountEventsRelayJobRunner.PROFILE + " | " + PurgeJobRunner.PROFILE))) {
   ```
-  Mantener la indentación con tabulador que tiene hoy el archivo.
-- **Pruebas (`@SpringBootTest(webEnvironment = NONE)`, `@ActiveProfiles({"test", "purge-job"})` o el perfil de pruebas que usen las existentes, Testcontainers y `FirebaseTestConfiguration`; el servicio de purga como `@MockitoBean`):** (1) el contexto tiene un bean `PurgeJobRunner` y `purge()` se llamó una vez; (2) el contexto no es `WebServerApplicationContext`. Otra clase o método con `@SpringBootTest` sin `purge-job`: el contexto **no** tiene `PurgeJobRunner` (puede ir en `CuentasApplicationTests` como una afirmación más). (3) Con el servicio simulado lanzando `IllegalStateException`, `new SpringApplicationBuilder(CuentasApplication.class).profiles(...).run()` lanza (el arranque falla, que en el Job es salida distinta de 0).
-- **Trampa:** no llamar a `CuentasApplication.main` en las pruebas (ejecutaría `System.exit`).
-- **Verificación:** con Docker, `./mvnw.cmd -B -Dtest='PurgeJobProfileTest,CuentasApplicationTests' test`.
+  Mantener la indentación con tabuladores del archivo.
+- **Pruebas** (copiar `exitWhenOneShotJob_shouldExitWithZeroAndCloseContext_whenRelayProfileIsActive`): `…_whenPurgeProfileIsActive`. La prueba con solo `local` sigue igual.
+- **Verificación:** `./mvnw.cmd -q -B "-Dtest=CuentasApplicationTest" test`.
 
-## [ ] T-4.3 · Guarda del emulador en el Job — ≤ 20 min, ≈ 30 líneas — P-JOB-1 respondida (Paula, 6-oct): sí
+## [ ] T-4.3 · Guarda del emulador en un Job — ≤ 20 min
 
-- **Modificar:** `infrastructure/config/FirebaseConfiguration.java` (constante y método que detecta el despliegue, líneas ~63 y ~155-160): considerar desplegado si existe `K_SERVICE` **o** `CLOUD_RUN_JOB`, o si está activo `prod`. Actualizar el Javadoc y el mensaje de error («… despliegue (K_SERVICE o CLOUD_RUN_JOB definida o perfil 'prod') …»).
-- **Prueba (`FirebaseConfigurationTest`, copiando la de `K_SERVICE`):** con `FIREBASE_AUTH_EMULATOR_HOST=localhost:9099` y `CLOUD_RUN_JOB=cuentas-purga`, el arranque falla con ese mensaje.
+- **Cubre:** REQ-VC-53. **Modificar:** `infrastructure/config/FirebaseConfiguration.java` (constante de la línea 63 y método de la línea ~172) y `FirebaseConfigurationTest`.
+- **Cambio:** agregar `private static final String CLOUD_RUN_JOB_VARIABLE = "CLOUD_RUN_JOB";` y considerar desplegado si existe `K_SERVICE` **o** `CLOUD_RUN_JOB`, o si está activo `prod`. Actualizar el Javadoc y el mensaje de error («… despliegue (K_SERVICE o CLOUD_RUN_JOB definida, o perfil 'prod') …»).
+- **Prueba** (copiar la de `K_SERVICE`): con `FIREBASE_AUTH_EMULATOR_HOST=localhost:9099` y `CLOUD_RUN_JOB=cuentas-purga`, el arranque falla con ese mensaje.
+- **Verificación:** `./mvnw.cmd -q -B "-Dtest=FirebaseConfigurationTest" test`.
 
-## [ ] T-4.4 · Documentación, prueba manual y entrega — ≤ 30 min
+## [ ] T-4.4 · Documentación y prueba manual — ≤ 30 min
 
-- **`CLAUDE.md` del repo:** en «Verificación de cambios de código» agregar «Modo tarea (purga de cuentas sin verificar)», con el comando `java -jar target/cuentas-<versión>.jar --spring.profiles.active=local,purge-job` y la explicación: no abre puerto, ejecuta la purga una vez, sale con 0 aunque haya cuentas fallidas y con un código distinto de 0 si no pudo empezar. En producción lo arranca el Cloud Run Job con `SPRING_PROFILES_ACTIVE=prod,purge-job`. `.env.example`: línea comentada `# PURGE_MAX_ACCOUNTS_PER_RUN=1000` con su comentario.
-- **Prueba manual:** `./mvnw.cmd -B -DskipTests package`, arrancar la base local con `docker compose up -d` (servicio de base de datos del repo) y ejecutar el comando de arriba; anotar en el PR la salida del resumen y el código de salida real (`echo $?`).
-- `./mvnw.cmd -B clean verify`, cobertura de lo nuevo ≥ 90 %, `/code-review high`. PR: `CM-179 | feat(cuentas): modo de tarea para ejecutar la purga desde un Cloud Run Job [IA-ASISTIDO]`. Aviso a DevOps (por el documento a DevOps, punto 1): comando y variable exactos del Job.
+- **`CLAUDE.md` del repo:** junto al bloque del relevo (línea ~165), «Purga de cuentas sin verificar (modo tarea)»: `java -jar target\cuentas-0.0.1-SNAPSHOT.jar --spring.profiles.active=local,purge-job`; no abre puerto; ejecuta la purga una vez; sale con 0 aunque haya cuentas fallidas y con un código distinto de 0 si no pudo empezar o si Firebase no responde. En Cloud Run: Job con `SPRING_PROFILES_ACTIVE=prod,purge-job`, Cloud Scheduler a las 03:00 `America/Bogota`, las mismas variables que el servicio (incluidas `SPRING_RABBITMQ_*`, que exige el perfil `prod`). En la regla del emulador (línea 139), agregar `CLOUD_RUN_JOB`. En la tabla de pendientes de DevOps (línea ~190), la fila del Job de la purga.
+- **`.env.example`:** `# PURGE_MAX_ACCOUNTS_PER_RUN=1000` con su comentario (de 1 a 1000; por defecto 1000).
+- **Prueba manual:** `./mvnw.cmd -B -DskipTests package`; base y emulador locales (`docker compose up -d` del repo); registrar una cuenta por HTTP, envejecerla por SQL y ejecutar el comando; anotar en `ejecucion/evidencia/CM-179/` la línea del resumen, el código de salida real (`echo $LASTEXITCODE`) y la fila `cuenta.eliminada` de `evento_saliente`. Commit 10.
+
+# Postman, verificación final y entrega
+
+## [ ] T-5.1 · Carpeta «Activación» de Postman — ≤ 30 min
+
+- **Cubre:** P7 del estándar; DES-02. **Modificar:** `postman/cameia-cuentas.postman_collection.json`, `postman/README.md`. Molde: la carpeta `Mi cuenta` (peticiones con los encabezados del Gateway y comprobación de `charset`, `problem+json` y `< 2000 ms` del script de la colección).
+- **Peticiones:** `A-00 · 201 registro de la cuenta que se activará` (guarda el uid como lo hace `M-00`); `A-01 · 200 activación` (`X-User-Email-Verified: true`; `$.status` `ACTIVE`); `A-02 · 200 activación repetida`; `A-03 · 403 encabezado en false`; `A-04 · 403 sin encabezado de verificación`; `A-05 · 403 encabezado abc` (nunca 500); `A-06 · 403 cuerpo que afirma verificación sin encabezado` (y una variante con un cuerpo que no es JSON); `A-07 · 400 sin X-User-Id`; `A-08 · 400 X-User-Id en blanco`; `A-09 · 400 X-User-Id de 129 caracteres`; `A-10 · 404 X-User-Id sin cuenta` (con el valor `' OR '1'='1`); `A-10b · 404 X-User-Id con 128 «ñ»`; `A-11 · 200 OpenAPI publica POST /api/v1/users/me/verification`; `A-12 · 403 identidad de otra cuenta sin la verificación del Gateway` (`X-User-Id` de la cuenta de `A-00` y sin `X-User-Email-Verified`: la cuenta no cambia). Cada una comprueba `code` y `detail` literales.
+- Las respuestas 403 `ACCOUNT_DISABLED` y 409 `ACCOUNT_CONFLICT` no se pueden provocar por HTTP sin tocar la base: quedan en las pruebas automáticas, y el README lo dice.
+- Commit 11 (con T-4.4 si no se hizo antes).
+
+## [ ] T-5.2 · Verificación única sobre la punta — ≤ 30 min
+
+- `./mvnw.cmd -B clean verify` con salida real guardada en `ejecucion/evidencia/CM-179/verify-cuentas.log`.
+- Cobertura (JaCoCo, `target/site/jacoco/jacoco.csv`) de cada clase nueva o modificada, ≥ 90 % de líneas y de ramas; cada línea o rama sin cubrir con su razón.
+- Newman sobre la aplicación local con el emulador: carpetas `Registro`, `Mi cuenta` y `Activación`, salida guardada.
+- **Lista de verificación** de la spec (sección 20, L-01 a L-28): correrla fila por fila, anotar la salida real de cada una en `ejecucion/evidencia/CM-179/resumen.md` y corregir lo que falle. Agregar la exploración adversarial propia (cuerpo ilegible, campos extra, recurso ajeno, n−1, n y n+1, Unicode, doble envío).
+- Tabla «regla R1–R14 → evidencia» en el mismo `resumen.md`, siguiendo el plan de la sección 18 de la spec, con archivo, prueba, comando y salida real. No se marca `cumple` lo que no se ejecutó.
+- `/simplify`, `/code-review high`, `/security-review` (identidad, autorización y borrado de datos personales). Autochequeo: ¿algún mensaje de librería llega al cliente? ¿algún log con correo, nombre o mensaje de Firebase? ¿algún `@Transactional` que abarque toda la purga? ¿algún comentario con `CM-NNN`?
+
+## [ ] T-5.3 · Entrega — ≤ 30 min
+
+- Revisar `docs/bitacora-ia/` del repo: una entrada (solo el prompt) por cada decisión con peso humano de la spec (D3, D5, D6, D10, D12 y la de la pregunta 18), enlazando la spec.
+- Cuerpo del PR en `ejecucion/cuerpos/` de la raíz con la plantilla del repo, validado con `.github/scripts/pr_policy.py` (`Impacto: contrato, datos, despliegue` con sus líneas `Contrato:`, `Datos:` y `Despliegue:`; `Control humano: pendiente` y PR en **Draft**). Título: `CM-179 | feat(cuentas): verificación de correo, purga diaria y modo tarea [IA-ASISTIDO]`. Guía de revisión por commit (plan §1), lo mecánico y la tabla «requisito o caso borde → prueba».
+- **Push y PR solo con el sí de Paula**, como dice el `CLAUDE.md` de la raíz. Jira a «En revisión» solo con el PR abierto y el del Gateway también listo. Aviso a Frontend (spec, A3) y a Testing (las cuentas de prueba sin verificar de más de 7 días desaparecerán).
