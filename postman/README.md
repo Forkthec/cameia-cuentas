@@ -4,7 +4,7 @@ Esta carpeta trae la colección de Postman del microservicio de Cuentas y el ent
 
 | Archivo | Contenido |
 |---|---|
-| `cameia-cuentas.postman_collection.json` | Colección v2.1: carpeta `Registro` (8 peticiones), carpeta `Firebase no disponible (manual)` (1 petición), carpeta `Eventos de cuenta (local)` (10 peticiones), carpeta `Mi cuenta` (12 peticiones) y carpeta `Activación` (se completa en esta rama) |
+| `cameia-cuentas.postman_collection.json` | Colección v2.1: carpeta `Registro` (8 peticiones), carpeta `Firebase no disponible (manual)` (1 petición), carpeta `Eventos de cuenta (local)` (10 peticiones), carpeta `Mi cuenta` (12 peticiones) y carpeta `Activación` (17 peticiones) |
 | `local.postman_environment.json` | Entorno local: `baseUrl` (`http://localhost:8081`, el puerto de `SERVER_PORT`) y los datos del broker de compose (`rabbitManagementUrl`, `rabbitUser` y `rabbitPassword`, esta última vacía). No lleva secretos |
 
 ## Qué verifica
@@ -52,8 +52,8 @@ Carpeta `Mi cuenta` (`GET /api/v1/users/me`): registra dos cuentas sintéticas y
 | M-01 | `GET /api/v1/users/me` con `X-User-Id: {{meUid}}` | 200 con exactamente `id`, `firstName`, `lastName`, `birthDate` (`1995-04-12`), `phoneNumber`, `pronoun`, `status` (`PENDING_VERIFICATION`) y `plan` (`FREE`); sin correo ni identificadores internos; encabezado `Cache-Control: no-store` |
 | M-02 | La misma consulta | 200 con `phoneNumber` presente y `null` (la cuenta se registró sin celular) |
 | M-03 | Consulta con `?firebase_uid={{uidOtra}}&id={{idOtra}}&uid={{uidOtra}}` | 200 con el `id` propio y nunca el de la otra cuenta |
-| M-04 | `X-User-Id` de una cuenta que no existe | 404 `ACCOUNT_NOT_FOUND` con «No encontramos una cuenta para este usuario» |
-| M-05 | Sin `X-User-Id` | 400 `IDENTITY_REQUIRED` con «La petición no incluye los datos que exige esta ruta» |
+| M-04 | `X-User-Id` de una cuenta que no existe | 404 `ACCOUNT_NOT_FOUND` con «No encontramos una cuenta para este usuario.» |
+| M-05 | Sin `X-User-Id` | 400 `IDENTITY_REQUIRED` con «La petición no incluye los datos que exige esta ruta.» |
 | M-06 | `X-User-Id` en blanco | 400 `IDENTITY_REQUIRED` |
 | M-06b | `X-User-Id` de 129 caracteres | 400 `IDENTITY_REQUIRED` |
 | M-06c | `X-User-Id: ' OR 1=1 --` | 404 `ACCOUNT_NOT_FOUND`, sin repetir el valor |
@@ -61,6 +61,30 @@ Carpeta `Mi cuenta` (`GET /api/v1/users/me`): registra dos cuentas sintéticas y
 | M-09 | `GET /v3/api-docs` | 200 con `GET /api/v1/users/me` y sus respuestas 200, 400, 404, 406 y 500; exige `API_DOCUMENTATION_ENABLED=true` |
 
 La cuenta anterior al registro con fecha (sin fecha de nacimiento, que se devuelve con `birthDate: null`) no se puede crear por la API, así que no tiene petición aquí: la cubre `CurrentAccountEndToEndTest.getMe_shouldReturnBirthDateNull_whenLegacyAccountHasNoBirthDate`.
+
+Carpeta `Activación` (`POST /api/v1/users/me/verification`): registra una cuenta sintética y la activa con la identidad y la verificación que pondría el Gateway. Las peticiones corren en el orden de la tabla: primero los rechazos con la cuenta aún pendiente y después la activación. Todas comprueban `code` y `detail` literales y que respondan en menos de 2 s.
+
+| # | Petición | Resultado esperado |
+|---|---|---|
+| A-00 | Registro de la cuenta que se activará | 201; guarda `actUid` y `actId` |
+| A-03 | `X-User-Email-Verified: false` | 403 `EMAIL_NOT_VERIFIED` con «Tu correo aún no está verificado.» |
+| A-04 | Sin `X-User-Email-Verified` | 403 `EMAIL_NOT_VERIFIED` |
+| A-05 | `X-User-Email-Verified: abc` | 403 `EMAIL_NOT_VERIFIED` (nunca 500) |
+| A-06 | Cuerpo `{"emailVerified": true, "status": "ACTIVE"}` sin encabezado | 403 `EMAIL_NOT_VERIFIED`: el cuerpo se ignora |
+| A-06b | Cuerpo que no es JSON, sin encabezado | 403 `EMAIL_NOT_VERIFIED` |
+| A-12 | `X-User-Id` de la cuenta de A-00 sin el encabezado de verificación | 403 `EMAIL_NOT_VERIFIED` |
+| A-12b | `GET /api/v1/users/me` de esa cuenta | 200 con `status` `PENDING_VERIFICATION`: los rechazos no la cambiaron |
+| A-07 | Sin `X-User-Id` | 400 `IDENTITY_REQUIRED` con «La petición no incluye los datos que exige esta ruta.» |
+| A-08 | `X-User-Id` en blanco | 400 `IDENTITY_REQUIRED` |
+| A-09 | `X-User-Id` de 129 caracteres | 400 `IDENTITY_REQUIRED` |
+| A-10 | `X-User-Id: ' OR '1'='1` con el encabezado de verificación | 404 `ACCOUNT_NOT_FOUND`, sin repetir el valor |
+| A-10b | `X-User-Id` de 128 «ñ» | 404 `ACCOUNT_NOT_FOUND` (el largo exacto pasa la validación) |
+| A-01 | `X-User-Email-Verified: true` | 200 con exactamente `id` y `status` `ACTIVE` |
+| A-02 | La misma petición otra vez | 200, el mismo resultado |
+| A-02b | `GET /api/v1/users/me` | 200 con `status` `ACTIVE` |
+| A-11 | `GET /v3/api-docs` | 200 con `POST /api/v1/users/me/verification` y sus respuestas 200, 400, 403, 404, 409 y 500; exige `API_DOCUMENTATION_ENABLED=true` |
+
+Las respuestas 403 `ACCOUNT_DISABLED` y 409 `ACCOUNT_CONFLICT` no se pueden provocar por HTTP sin tocar la base: las cubren `AccountActivationControllerTest`, `ActivateAccountServiceTest` y `AccountRegistrationEndToEndTest`.
 
 La carpeta `Firebase no disponible (manual)` tiene una sola petición: 503 `DEPENDENCY_UNAVAILABLE` en menos de 9 s.
 
@@ -72,6 +96,7 @@ Requisitos: la aplicación en marcha (`README.md` de la raíz, sección «Ejecuc
 npx newman run postman/cameia-cuentas.postman_collection.json -e postman/local.postman_environment.json --folder Registro --reporters cli,junit --reporter-junit-export target/newman.xml
 ```
 
+- La carpeta de activación se corre con `--folder "Activación"` y `--reporter-junit-export target/newman-activacion.xml`; no necesita el broker.
 - La carpeta de eventos se corre aparte, con la contraseña del broker por variable (no se versiona):
 
   ```powershell

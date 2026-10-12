@@ -477,7 +477,9 @@ Resultado: `FirebaseConfigurationTest` 12/12 en verde (con `CLOUD_RUN_JOB` y el 
 - **Prueba** (copiar la de `K_SERVICE`): con `FIREBASE_AUTH_EMULATOR_HOST=localhost:9099` y `CLOUD_RUN_JOB=cuentas-purga`, el arranque falla con ese mensaje.
 - **Verificación:** `./mvnw.cmd -q -B "-Dtest=FirebaseConfigurationTest" test`.
 
-## [ ] T-4.4 · Documentación y prueba manual — ≤ 30 min
+## [x] T-4.4 · Documentación y prueba manual — ≤ 30 min
+
+Resultado: `CLAUDE.md` (evento, migraciones, regla del emulador con `CLOUD_RUN_JOB`, sección de la purga y fila de DevOps) y `.env.example` actualizados. La prueba manual con base y emulador locales queda en T-5.2 (mismo entorno que Newman).
 
 - **`CLAUDE.md` del repo:** junto al bloque del relevo (línea ~165), «Purga de cuentas sin verificar (modo tarea)»: `java -jar target\cuentas-0.0.1-SNAPSHOT.jar --spring.profiles.active=local,purge-job`; no abre puerto; ejecuta la purga una vez; sale con 0 aunque haya cuentas fallidas y con un código distinto de 0 si no pudo empezar o si Firebase no responde. En Cloud Run: Job con `SPRING_PROFILES_ACTIVE=prod,purge-job`, Cloud Scheduler a las 03:00 `America/Bogota`, las mismas variables que el servicio (incluidas `SPRING_RABBITMQ_*`, que exige el perfil `prod`). En la regla del emulador (línea 139), agregar `CLOUD_RUN_JOB`. En la tabla de pendientes de DevOps (línea ~190), la fila del Job de la purga.
 - **`.env.example`:** `# PURGE_MAX_ACCOUNTS_PER_RUN=1000` con su comentario (de 1 a 1000; por defecto 1000).
@@ -485,7 +487,9 @@ Resultado: `FirebaseConfigurationTest` 12/12 en verde (con `CLOUD_RUN_JOB` y el 
 
 # Postman, verificación final y entrega
 
-## [ ] T-5.1 · Carpeta «Activación» de Postman — ≤ 30 min
+## [x] T-5.1 · Carpeta «Activación» de Postman — ≤ 30 min
+
+Resultado: Carpeta `Activación` con 17 peticiones (las de la tarjeta más A-06b, A-12b y A-02b); `postman/README.md` con su tabla; textos con punto final corregidos en `Mi cuenta` (M-04, M-05). La corrida de Newman está en T-5.2.
 
 - **Cubre:** P7 del estándar; DES-02. **Modificar:** `postman/cameia-cuentas.postman_collection.json`, `postman/README.md`. Molde: la carpeta `Mi cuenta` (peticiones con los encabezados del Gateway y comprobación de `charset`, `problem+json` y `< 2000 ms` del script de la colección).
 - **Peticiones:** `A-00 · 201 registro de la cuenta que se activará` (guarda el uid como lo hace `M-00`); `A-01 · 200 activación` (`X-User-Email-Verified: true`; `$.status` `ACTIVE`); `A-02 · 200 activación repetida`; `A-03 · 403 encabezado en false`; `A-04 · 403 sin encabezado de verificación`; `A-05 · 403 encabezado abc` (nunca 500); `A-06 · 403 cuerpo que afirma verificación sin encabezado` (y una variante con un cuerpo que no es JSON); `A-07 · 400 sin X-User-Id`; `A-08 · 400 X-User-Id en blanco`; `A-09 · 400 X-User-Id de 129 caracteres`; `A-10 · 404 X-User-Id sin cuenta` (con el valor `' OR '1'='1`); `A-10b · 404 X-User-Id con 128 «ñ»`; `A-11 · 200 OpenAPI publica POST /api/v1/users/me/verification`; `A-12 · 403 identidad de otra cuenta sin la verificación del Gateway` (`X-User-Id` de la cuenta de `A-00` y sin `X-User-Email-Verified`: la cuenta no cambia). Cada una comprueba `code` y `detail` literales.
