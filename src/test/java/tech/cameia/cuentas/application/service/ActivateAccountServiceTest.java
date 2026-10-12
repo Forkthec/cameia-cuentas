@@ -206,6 +206,11 @@ class ActivateAccountServiceTest {
         }
 
         @Override
+        public List<String> findPendingVerificationCreatedBefore(java.time.Instant limit, int max) {
+            return List.of();
+        }
+
+        @Override
         public List<UnannouncedAccount> findUnannounced(int limit) {
             return List.of();
         }

@@ -22,6 +22,7 @@ import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.InvalidEmailException;
 import tech.cameia.cuentas.domain.model.DirectoryUser;
+import tech.cameia.cuentas.domain.model.UserVerificationStatus;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.RawPassword;
 import tech.cameia.cuentas.domain.port.FirebaseUserDirectory;
@@ -287,18 +288,23 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
     }
 
     /**
-     * Consulta si el usuario ya verificó su correo.
+     * Consulta el estado del correo de un usuario.
      *
      * @param firebaseUid identificador del usuario
-     * @return {@code true} si el correo está verificado
-     * @throws IllegalStateException si el usuario no existe o Firebase no responde
+     * @return si el correo está verificado, no lo está o el usuario ya no existe
+     * @throws DependencyUnavailableException si Firebase no respondió o falló de su lado
+     * @throws IllegalStateException si Firebase rechazó la consulta por otra razón (defecto de configuración)
      */
     @Override
-    public boolean isEmailVerified(String firebaseUid) {
+    public UserVerificationStatus verificationStatus(String firebaseUid) {
         try {
-            return firebaseAuth.getUser(firebaseUid).isEmailVerified();
+            return firebaseAuth.getUser(firebaseUid).isEmailVerified()
+                    ? UserVerificationStatus.VERIFIED : UserVerificationStatus.NOT_VERIFIED;
         } catch (FirebaseAuthException error) {
-            throw new IllegalStateException("Firebase no pudo confirmar el estado del correo", error);
+            if (AuthErrorCode.USER_NOT_FOUND.equals(error.getAuthErrorCode())) {
+                return UserVerificationStatus.NOT_FOUND;
+            }
+            throw unavailableOrRejection(error, "Firebase rechazó la consulta del estado del correo");
         }
     }
 }

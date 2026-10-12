@@ -44,9 +44,6 @@ class UntypedExceptionClassificationTest {
     /** Lo que nadie puede prever: un rechazo de Firebase que no es indisponibilidad ni correo inválido. */
     private static final String UNEXPECTED_FAILURE = "fallo imprevisto";
 
-    /** Previsible, con su corrección asignada a otra tarea y anotada en docs/errores.md. */
-    private static final String PENDING_CM_179 = "pendiente de CM-179 (activación)";
-
     private static final String MODEL_PACKAGE = "tech.cameia.cuentas.domain.model.";
     private static final String CONFIGURATION_PACKAGE = "tech.cameia.cuentas.infrastructure.config.";
     private static final String CLIENT_PACKAGE = "tech.cameia.cuentas.infrastructure.client.";
@@ -76,8 +73,7 @@ class UntypedExceptionClassificationTest {
             Map.entry(CONFIGURATION_PACKAGE + "FirebaseConfiguration#firebaseApp", STARTUP),
             Map.entry(CONFIGURATION_PACKAGE + "FirebaseConfiguration#rejectEmulatorInDeployment", STARTUP),
             Map.entry(CONFIGURATION_PACKAGE + "BrokerSettingsGuard#<init>", STARTUP),
-            Map.entry(CLIENT_PACKAGE + "FirebaseUserDirectoryAdapter#unavailableOrRejection", UNEXPECTED_FAILURE),
-            Map.entry(CLIENT_PACKAGE + "FirebaseUserDirectoryAdapter#isEmailVerified", PENDING_CM_179));
+            Map.entry(CLIENT_PACKAGE + "FirebaseUserDirectoryAdapter#unavailableOrRejection", UNEXPECTED_FAILURE));
 
     @Test
     @DisplayName("Todo método que lanza una excepción sin código está clasificado con su motivo")

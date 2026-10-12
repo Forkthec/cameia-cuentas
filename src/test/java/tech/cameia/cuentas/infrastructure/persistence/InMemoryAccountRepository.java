@@ -1,6 +1,8 @@
 package tech.cameia.cuentas.infrastructure.persistence;
 
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +20,10 @@ public class InMemoryAccountRepository implements AccountRepository {
 
     private final Map<String, Account> accounts = new LinkedHashMap<>();
     private final List<UnannouncedAccount> unannounced = new ArrayList<>();
+    private final Map<String, Instant> creationDates = new LinkedHashMap<>();
     private Boolean forcedDeleteResult;
+    private Instant requestedLimit;
+    private int requestedMax;
 
     /**
      * Guarda la cuenta en memoria.
@@ -62,6 +67,48 @@ public class InMemoryAccountRepository implements AccountRepository {
         }
         accounts.remove(firebaseUid);
         return true;
+    }
+
+    /**
+     * Registra la fecha de creación de una cuenta guardada, para que {@link #findPendingVerificationCreatedBefore} la
+     * considere.
+     *
+     * @param firebaseUid identidad de Firebase
+     * @param createdAt instante de creación
+     */
+    public void seedCreatedAt(String firebaseUid, Instant createdAt) {
+        creationDates.put(firebaseUid, createdAt);
+    }
+
+    /**
+     * Devuelve los usuarios pendientes creados antes del límite, del más antiguo al más nuevo.
+     *
+     * @param limit instante, exclusivo
+     * @param max cantidad máxima
+     * @return los identificadores, como máximo {@code max}
+     */
+    @Override
+    public List<String> findPendingVerificationCreatedBefore(Instant limit, int max) {
+        requestedLimit = limit;
+        requestedMax = max;
+        return accounts.values().stream()
+                .filter(account -> account.getStatus() == AccountStatus.PENDING_VERIFICATION)
+                .filter(account -> creationDates.containsKey(account.getFirebaseUid())
+                        && creationDates.get(account.getFirebaseUid()).isBefore(limit))
+                .sorted(Comparator.comparing(account -> creationDates.get(account.getFirebaseUid())))
+                .map(Account::getFirebaseUid)
+                .limit(max)
+                .toList();
+    }
+
+    /** @return el límite de antigüedad de la última lectura de candidatas, o nulo si no hubo ninguna */
+    public Instant requestedLimit() {
+        return requestedLimit;
+    }
+
+    /** @return el máximo pedido en la última lectura de candidatas */
+    public int requestedMax() {
+        return requestedMax;
     }
 
     /**

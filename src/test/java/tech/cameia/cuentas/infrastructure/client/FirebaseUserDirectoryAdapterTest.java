@@ -23,6 +23,7 @@ import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.UserMetadata;
 import com.google.firebase.auth.UserRecord;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -34,6 +35,7 @@ import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.model.DirectoryUser;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.RawPassword;
+import tech.cameia.cuentas.domain.model.UserVerificationStatus;
 
 /**
  * Prueba del adaptador descrito en {@code specs/CM-14-RegistroUsuario/spec.md}
@@ -99,12 +101,23 @@ class FirebaseUserDirectoryAdapterTest {
     }
 
     @Test
-    void informaElEstadoDelCorreo() throws Exception {
+    @DisplayName("Informa VERIFIED cuando el correo está verificado")
+    void verificationStatus_shouldReturnVerified_whenEmailVerified() throws Exception {
         UserRecord usuario = mock(UserRecord.class);
         when(usuario.isEmailVerified()).thenReturn(true);
         when(firebaseAuth.getUser(anyString())).thenReturn(usuario);
 
-        assertThat(adaptador.isEmailVerified(UID)).isTrue();
+        assertThat(adaptador.verificationStatus(UID)).isEqualTo(UserVerificationStatus.VERIFIED);
+    }
+
+    @Test
+    @DisplayName("Informa NOT_VERIFIED cuando el correo no está verificado")
+    void verificationStatus_shouldReturnNotVerified_whenEmailNotVerified() throws Exception {
+        UserRecord usuario = mock(UserRecord.class);
+        when(usuario.isEmailVerified()).thenReturn(false);
+        when(firebaseAuth.getUser(anyString())).thenReturn(usuario);
+
+        assertThat(adaptador.verificationStatus(UID)).isEqualTo(UserVerificationStatus.NOT_VERIFIED);
     }
 
     @Test
@@ -133,14 +146,35 @@ class FirebaseUserDirectoryAdapterTest {
     }
 
     @Test
-    void siNoPuedeConsultarElCorreoFallaSinInventarUnEstado() throws Exception {
+    @DisplayName("Informa NOT_FOUND cuando el usuario ya no existe en Firebase")
+    void verificationStatus_shouldReturnNotFound_whenUserDoesNotExist() throws Exception {
         when(firebaseAuth.getUser(anyString()))
                 .thenThrow(new FirebaseAuthException(ErrorCode.NOT_FOUND, "sin usuario", null, null,
                         AuthErrorCode.USER_NOT_FOUND));
 
-        assertThatThrownBy(() -> adaptador.isEmailVerified(UID))
+        assertThat(adaptador.verificationStatus(UID)).isEqualTo(UserVerificationStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("Firebase caído es indisponibilidad, no un estado")
+    void verificationStatus_shouldThrowDependencyUnavailable_whenFirebaseIsDown() throws Exception {
+        when(firebaseAuth.getUser(anyString()))
+                .thenThrow(new FirebaseAuthException(ErrorCode.UNAVAILABLE, "servicio caído", null, null, null));
+
+        assertThatThrownBy(() -> adaptador.verificationStatus(UID))
+                .isInstanceOf(DependencyUnavailableException.class)
+                .hasCauseInstanceOf(FirebaseAuthException.class);
+    }
+
+    @Test
+    @DisplayName("Un rechazo por otra razón es un fallo imprevisto con mensaje técnico sin datos")
+    void verificationStatus_shouldThrowIllegalState_whenRejectedForOtherReason() throws Exception {
+        when(firebaseAuth.getUser(anyString())).thenThrow(errorDeFirebase(AuthErrorCode.UNAUTHORIZED_CONTINUE_URL));
+
+        assertThatThrownBy(() -> adaptador.verificationStatus(UID))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Firebase no pudo confirmar el estado del correo");
+                .hasMessage("Firebase rechazó la consulta del estado del correo")
+                .hasMessageNotContaining(UID);
     }
 
     @ParameterizedTest

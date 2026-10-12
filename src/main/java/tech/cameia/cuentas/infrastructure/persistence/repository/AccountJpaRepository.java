@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -62,6 +63,20 @@ public interface AccountJpaRepository extends JpaRepository<AccountEntity, UUID>
     @Query("delete from AccountEntity a where a.firebaseUid = :firebaseUid "
             + "and a.estado = tech.cameia.cuentas.domain.model.AccountStatus.PENDING_VERIFICATION")
     int deletePendingByFirebaseUid(@Param("firebaseUid") String firebaseUid);
+
+    /**
+     * Lista los usuarios de las cuentas sin verificar creadas antes de un instante, la más antigua primero.
+     *
+     * <p>Usa el índice parcial de cuentas pendientes por fecha de creación.</p>
+     *
+     * @param limite instante, exclusivo
+     * @param cantidad máximo de filas
+     * @return los {@code firebaseUid}
+     */
+    @Query("select a.firebaseUid from AccountEntity a "
+            + "where a.estado = tech.cameia.cuentas.domain.model.AccountStatus.PENDING_VERIFICATION "
+            + "and a.fechaCreacion < :limite order by a.fechaCreacion asc, a.id asc")
+    List<String> findPendingFirebaseUids(@Param("limite") Instant limite, Limit cantidad);
 
     /** Proyección de la consulta de cuentas sin evento. */
     interface UnannouncedProjection {

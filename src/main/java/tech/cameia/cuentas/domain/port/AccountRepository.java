@@ -1,5 +1,6 @@
 package tech.cameia.cuentas.domain.port;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -48,4 +49,14 @@ public interface AccountRepository {
      * @return {@code true} si borró una fila; {@code false} si no existía o ya no estaba pendiente
      */
     boolean deletePendingByFirebaseUid(String firebaseUid);
+
+    /**
+     * Lista los usuarios cuya cuenta lleva sin verificar desde antes de un instante.
+     *
+     * @param limit instante, exclusivo: una cuenta creada exactamente en él no entra
+     * @param max cantidad máxima de usuarios
+     * @return los {@code firebaseUid} de las cuentas {@code PENDING_VERIFICATION} creadas antes de {@code limit}, de la más
+     *         antigua a la más nueva, como máximo {@code max}
+     */
+    List<String> findPendingVerificationCreatedBefore(Instant limit, int max);
 }

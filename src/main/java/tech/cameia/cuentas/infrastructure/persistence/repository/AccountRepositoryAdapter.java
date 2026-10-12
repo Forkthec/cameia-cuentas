@@ -1,8 +1,10 @@
 package tech.cameia.cuentas.infrastructure.persistence.repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Limit;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 
@@ -88,6 +90,18 @@ public class AccountRepositoryAdapter implements AccountRepository {
     @Override
     public boolean deletePendingByFirebaseUid(String firebaseUid) {
         return repositorio.deletePendingByFirebaseUid(firebaseUid) == 1;
+    }
+
+    /**
+     * Lista los usuarios cuya cuenta lleva sin verificar desde antes de un instante.
+     *
+     * @param limit instante, exclusivo
+     * @param max cantidad máxima de usuarios
+     * @return los {@code firebaseUid}, de la cuenta más antigua a la más nueva
+     */
+    @Override
+    public List<String> findPendingVerificationCreatedBefore(Instant limit, int max) {
+        return repositorio.findPendingFirebaseUids(limit, Limit.of(max));
     }
 
     /**

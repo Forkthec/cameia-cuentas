@@ -6,6 +6,7 @@ import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.InvalidEmailException;
 import tech.cameia.cuentas.domain.model.DirectoryUser;
+import tech.cameia.cuentas.domain.model.UserVerificationStatus;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.RawPassword;
 
@@ -76,10 +77,11 @@ public interface FirebaseUserDirectory {
     void deleteUser(String firebaseUid);
 
     /**
-     * Consulta si el usuario ya verificó su correo.
+     * Consulta el estado del correo de un usuario.
      *
      * @param firebaseUid identificador del usuario
-     * @return {@code true} si el correo está verificado
+     * @return si el correo está verificado, no lo está o el usuario ya no existe en el directorio
+     * @throws DependencyUnavailableException si el directorio no respondió o falló de su lado
      */
-    boolean isEmailVerified(String firebaseUid);
+    UserVerificationStatus verificationStatus(String firebaseUid);
 }

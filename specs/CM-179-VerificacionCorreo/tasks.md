@@ -291,7 +291,9 @@ Resultado: `PendingAccountDeletionServiceTest` 3 y `PendingAccountDeletionTransa
 - **Pruebas:** sin Spring: `deletePending_shouldRecordEvent_whenRowDeleted` (un evento con `TYPE` y el uid) y `deletePending_shouldNotRecordEvent_whenNothingDeleted`. Con base real: `deletePending_shouldKeepRow_whenEventInsertFails` (copiar cómo `AccountRecordingTransactionTest` provoca el fallo del `INSERT`, línea 46: un evento previo con el mismo `tipo` y `agregado_id`) y `deletePending_shouldNotDelete_whenAccountIsActive`.
 - **Verificación:** `./mvnw.cmd -q -B "-Dtest=PendingAccountDeletionServiceTest,PendingAccountDeletionTransactionTest,UntypedExceptionClassificationTest" test`. Commit 6 (T-2.2 y T-2.3).
 
-## [ ] T-2.4 · Lectura de candidatas — ≤ 20 min
+## [x] T-2.4 · Lectura de candidatas — ≤ 20 min
+
+Resultado: `AccountRepositoryAdapterTest` 9/9 en verde con Docker (169 h entra; 168 h exactas, 10 h, `ACTIVE` y `DISABLED` no; con `max = 2` salen las dos más antiguas en orden). Se usó `Limit` de Spring Data, que compiló sin cambios.
 
 - **Cubre:** REQ-VC-21, 29, 32. **Modificar:** `AccountRepository`, `AccountJpaRepository`, `AccountRepositoryAdapter`, `InMemoryAccountRepository`, `src/test/java/tech/cameia/cuentas/infrastructure/persistence/AccountRepositoryAdapterTest.java`.
 - **Puerto:** `List<String> findPendingVerificationCreatedBefore(Instant limit, int max)`: «@param limit instante, exclusivo: una cuenta creada exactamente en él no entra; @return los `firebaseUid`, de la más antigua a la más nueva».
@@ -306,7 +308,9 @@ Resultado: `PendingAccountDeletionServiceTest` 3 y `PendingAccountDeletionTransa
 - **Pruebas** (Testcontainers): insertar por SQL cinco filas con `fecha_creacion = fecha_actualizacion` fijas (`ck_cuenta_fecha_actualizacion` exige `fecha_actualizacion >= fecha_creacion`): pendiente de 169 h, pendiente de 168 h exactas, pendiente de 10 h, `ACTIVE` de 300 h, `DISABLED` de 300 h; con `limite = now − 168 h` calculado en la prueba → solo la de 169 h. Con tres pendientes viejas y `max = 2` → las dos más antiguas, en orden.
 - **Verificación:** con Docker, `./mvnw.cmd -q -B "-Dtest=AccountRepositoryAdapterTest" test`.
 
-## [ ] T-2.5 · Consulta tipada a Firebase — ≤ 20 min
+## [x] T-2.5 · Consulta tipada a Firebase — ≤ 20 min
+
+Resultado: `FirebaseUserDirectoryAdapterTest` 39/39 y `UntypedExceptionClassificationTest` en verde. `git grep isEmailVerified -- src/main` mostraba solo el puerto y su adaptador antes del cambio. `verificationStatus` no necesita entrada de clasificación (lanza por `unavailableOrRejection`); se quitó la de `isEmailVerified` y la constante `PENDING_CM_179`, que quedó sin uso.
 
 - **Cubre:** REQ-VC-22, 26. **Antes:** `git grep -n "isEmailVerified" -- src/main` debe mostrar solo el puerto y su adaptador (T-1.3 quitó el otro uso). Si hay otro, detenerse. **Crear:** `domain/model/UserVerificationStatus.java`. **Modificar:** `FirebaseUserDirectory`, `FirebaseUserDirectoryAdapter` (líneas 266-280), `InMemoryFirebaseUserDirectory` (línea 131), `FirebaseUserDirectoryAdapterTest`, `UntypedExceptionClassificationTest` (quitar la entrada de `isEmailVerified`, línea 79).
 - **Código:**

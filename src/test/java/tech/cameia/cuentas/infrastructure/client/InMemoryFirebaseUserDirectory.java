@@ -14,6 +14,7 @@ import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.model.DirectoryUser;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.RawPassword;
+import tech.cameia.cuentas.domain.model.UserVerificationStatus;
 import tech.cameia.cuentas.domain.port.FirebaseUserDirectory;
 
 /**
@@ -49,6 +50,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     private volatile int consultasDeCorreoRestantes = -1;
     private volatile boolean reintentoDelSdk;
     private volatile boolean respuestaPerdida;
+    private volatile String uidRechazado;
 
     @Override
     public synchronized void createUser(String firebaseUid, EmailAddress email, RawPassword password) {
@@ -128,8 +130,27 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     }
 
     @Override
-    public boolean isEmailVerified(String firebaseUid) {
-        return correosVerificados.contains(firebaseUid);
+    public UserVerificationStatus verificationStatus(String firebaseUid) {
+        consultas.incrementAndGet();
+        if (fallarAlConsultar) {
+            throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
+        }
+        if (firebaseUid.equals(uidRechazado)) {
+            throw new IllegalStateException("Firebase rechazó la consulta del estado del correo");
+        }
+        if (correosVerificados.contains(firebaseUid)) {
+            return UserVerificationStatus.VERIFIED;
+        }
+        return correosPorUid.containsKey(firebaseUid) ? UserVerificationStatus.NOT_VERIFIED : UserVerificationStatus.NOT_FOUND;
+    }
+
+    /**
+     * Hace que la consulta del estado del correo de un usuario falle como un rechazo de Firebase.
+     *
+     * @param firebaseUid identificador del usuario cuya consulta se rechaza
+     */
+    public void rejectLookupOf(String firebaseUid) {
+        this.uidRechazado = firebaseUid;
     }
 
     /**
