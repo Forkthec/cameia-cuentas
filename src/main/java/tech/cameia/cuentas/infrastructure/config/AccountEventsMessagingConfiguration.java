@@ -9,15 +9,17 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 
 import tech.cameia.cuentas.domain.port.EventPublisher;
+import tech.cameia.cuentas.infrastructure.messaging.publisher.DisabledEventPublisher;
 import tech.cameia.cuentas.infrastructure.messaging.publisher.RabbitEventPublisher;
 
 /**
  * Declara el exchange de eventos de cuenta y el publicador que lo usa.
  *
- * <p>Con {@code cuentas.events.enabled=false} no se crea el publicador: así las pruebas y los entornos sin broker arrancan
- * sin conectarse a RabbitMQ.</p>
+ * <p>Con {@code cuentas.events.enabled=false} el publicador es uno inerte que deja los eventos pendientes: así las
+ * pruebas y los entornos sin broker arrancan sin conectarse a RabbitMQ. Con el perfil {@code prod} no se admite.</p>
  */
 @Configuration
 @EnableConfigurationProperties(AccountEventsProperties.class)
@@ -58,6 +60,26 @@ public class AccountEventsMessagingConfiguration {
     @Bean
     public RabbitTemplateCustomizer returnedMessageCustomizer() {
         return template -> template.setReturnsCallback(returned -> { });
+    }
+
+    /**
+     * Publicador inerte para cuando los eventos están apagados.
+     *
+     * <p>No se admite con el perfil {@code prod}: apagar los eventos en un despliegue dejaría todos pendientes sin que
+     * nadie lo note.</p>
+     *
+     * @param environment entorno de Spring, del que se leen los perfiles activos
+     * @return un publicador que nunca confirma
+     * @throws IllegalStateException si el perfil {@code prod} está activo
+     */
+    @Bean
+    @ConditionalOnProperty(name = "cuentas.events.enabled", havingValue = "false")
+    public EventPublisher disabledEventPublisher(Environment environment) {
+        if (environment.matchesProfiles("prod")) {
+            throw new IllegalStateException("EVENTS_ENABLED=false no se admite con el perfil 'prod': los eventos "
+                    + "quedarían sin publicar. Quite la variable o póngala en true");
+        }
+        return new DisabledEventPublisher();
     }
 
     /**

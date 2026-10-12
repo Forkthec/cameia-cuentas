@@ -73,6 +73,7 @@ class UntypedExceptionClassificationTest {
             Map.entry(CONFIGURATION_PACKAGE + "FirebaseConfiguration#firebaseApp", STARTUP),
             Map.entry(CONFIGURATION_PACKAGE + "FirebaseConfiguration#rejectEmulatorInDeployment", STARTUP),
             Map.entry(CONFIGURATION_PACKAGE + "BrokerSettingsGuard#<init>", STARTUP),
+            Map.entry(CONFIGURATION_PACKAGE + "AccountEventsMessagingConfiguration#disabledEventPublisher", STARTUP),
             Map.entry(CLIENT_PACKAGE + "FirebaseUserDirectoryAdapter#unavailableOrRejection", UNEXPECTED_FAILURE));
 
     @Test
