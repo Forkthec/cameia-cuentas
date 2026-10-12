@@ -419,7 +419,9 @@ Opción C de la pregunta 18, elegida por Paula el 11-oct-2026: solo credenciales
 
 # Pieza 4 — modo tarea
 
-## [ ] T-4.1 · Perfil y ejecutor — ≤ 20 min
+## [x] T-4.1 · Perfil y ejecutor — ≤ 20 min
+
+Resultado: `PurgeJobRunnerTest` 5/5 (sin Spring) y una prueba extra con el perfil real, `PurgeJobProfileTest` 2/2 con Docker (la purga corre una vez al arrancar y no hay servidor web).
 
 - **Cubre:** REQ-VC-50, 52. **Crear:** `src/main/resources/application-purge-job.properties`, `infrastructure/config/PurgeJobRunner.java`, `src/test/java/tech/cameia/cuentas/infrastructure/config/PurgeJobRunnerTest.java` (sin Spring; molde `AccountEventsRelayJobRunnerTest`).
 - **Propiedades (exacto):**
@@ -453,7 +455,9 @@ Opción C de la pregunta 18, elegida por Paula el 11-oct-2026: solo credenciales
 - **Pruebas:** `run_shouldPurgeOnce_whenStarted`; `run_shouldWarn_whenSomeAccountsFailed` (salida con `fallidas=2`); `run_shouldNotWarn_whenAllSucceeded`; `run_shouldPropagate_whenPurgeThrows`.
 - **Verificación:** `./mvnw.cmd -q -B "-Dtest=PurgeJobRunnerTest" test`.
 
-## [ ] T-4.2 · Salida del proceso — ≤ 15 min
+## [x] T-4.2 · Salida del proceso — ≤ 15 min
+
+Resultado: `CuentasApplicationTest` 3/3 en verde (la del perfil `purge-job` termina con 0 y cierra el contexto; la de solo `local` no).
 
 - **Cubre:** REQ-VC-51. **Modificar:** `CuentasApplication.exitWhenOneShotJob` (la condición) y su Javadoc; `CuentasApplicationTest`.
   ```java
@@ -464,7 +468,9 @@ Opción C de la pregunta 18, elegida por Paula el 11-oct-2026: solo credenciales
 - **Pruebas** (copiar `exitWhenOneShotJob_shouldExitWithZeroAndCloseContext_whenRelayProfileIsActive`): `…_whenPurgeProfileIsActive`. La prueba con solo `local` sigue igual.
 - **Verificación:** `./mvnw.cmd -q -B "-Dtest=CuentasApplicationTest" test`.
 
-## [ ] T-4.3 · Guarda del emulador en un Job — ≤ 20 min
+## [x] T-4.3 · Guarda del emulador en un Job — ≤ 20 min
+
+Resultado: `FirebaseConfigurationTest` 12/12 en verde (con `CLOUD_RUN_JOB` y el emulador definidos, el arranque falla con el mensaje nuevo). Texto: «… despliegue (K_SERVICE o CLOUD_RUN_JOB definida, o perfil 'prod' activo)».
 
 - **Cubre:** REQ-VC-53. **Modificar:** `infrastructure/config/FirebaseConfiguration.java` (constante de la línea 63 y método de la línea ~172) y `FirebaseConfigurationTest`.
 - **Cambio:** agregar `private static final String CLOUD_RUN_JOB_VARIABLE = "CLOUD_RUN_JOB";` y considerar desplegado si existe `K_SERVICE` **o** `CLOUD_RUN_JOB`, o si está activo `prod`. Actualizar el Javadoc y el mensaje de error («… despliegue (K_SERVICE o CLOUD_RUN_JOB definida, o perfil 'prod') …»).

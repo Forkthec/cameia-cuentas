@@ -62,6 +62,9 @@ public class FirebaseConfiguration {
     /** Variable que Cloud Run inyecta en cada servicio desplegado. */
     private static final String CLOUD_RUN_SERVICE_VARIABLE = "K_SERVICE";
 
+    /** Variable que Cloud Run inyecta en cada Job desplegado (la tarea de purga y la de relevo). */
+    private static final String CLOUD_RUN_JOB_VARIABLE = "CLOUD_RUN_JOB";
+
     private static final String DEPLOY_PROFILE = "prod";
 
     /**
@@ -156,24 +159,25 @@ public class FirebaseConfiguration {
      * Falla el arranque si la variable del emulador está definida en un despliegue. Cuenta como
      * definida aunque su valor esté vacío: es el criterio más conservador.
      *
-     * @throws IllegalStateException si la variable existe y hay {@code K_SERVICE} o el perfil
+     * @throws IllegalStateException si la variable existe y hay {@code K_SERVICE}, {@code CLOUD_RUN_JOB} o el perfil
      *                               {@code prod}
      */
     private void rejectEmulatorInDeployment() {
         if (environment.containsProperty(EMULATOR_HOST_VARIABLE) && isDeployment()) {
             throw new IllegalStateException(EMULATOR_HOST_VARIABLE + " apunta al emulador de "
                     + "Firebase Auth, que emite tokens sin firma, y no puede estar definida en un "
-                    + "despliegue (" + CLOUD_RUN_SERVICE_VARIABLE + " definida o perfil '"
-                    + DEPLOY_PROFILE + "' activo)");
+                    + "despliegue (" + CLOUD_RUN_SERVICE_VARIABLE + " o " + CLOUD_RUN_JOB_VARIABLE
+                    + " definida, o perfil '" + DEPLOY_PROFILE + "' activo)");
         }
     }
 
     /**
-     * @return {@code true} si existe {@code K_SERVICE} (Cloud Run la inyecta) o está activo el
-     *         perfil {@code prod}
+     * @return {@code true} si existe {@code K_SERVICE} o {@code CLOUD_RUN_JOB} (Cloud Run las inyecta en un servicio
+     *         y en un Job) o está activo el perfil {@code prod}
      */
     private boolean isDeployment() {
         return environment.containsProperty(CLOUD_RUN_SERVICE_VARIABLE)
+                || environment.containsProperty(CLOUD_RUN_JOB_VARIABLE)
                 || environment.matchesProfiles(DEPLOY_PROFILE);
     }
 
