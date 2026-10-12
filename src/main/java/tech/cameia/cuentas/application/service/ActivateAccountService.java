@@ -18,7 +18,10 @@ import tech.cameia.cuentas.domain.port.AccountRepository;
  * Activa una cuenta cuando su correo queda verificado.
  *
  * <p>La verificación sale solo del encabezado que escribe el Gateway a partir del token ya
- * validado: el servicio no consulta a Firebase ni confía en el navegador. No es transaccional
+ * validado: el servicio no consulta a Firebase ni confía en el navegador. El estado de la cuenta decide primero (activa:
+ * 200; deshabilitada: 403; anonimizada: igual que una cuenta inexistente) y la afirmación del Gateway solo cuenta para
+ * la cuenta pendiente: así una cuenta anonimizada no se distingue de una inexistente y quien repite la llamada con un
+ * token anterior a la verificación no recibe un rechazo por una cuenta que ya está activa. No es transaccional
  * porque el conflicto de versión ocurre al confirmar la escritura y así el servicio puede
  * releer la cuenta para decidir qué responder.</p>
  */
@@ -48,7 +51,7 @@ public class ActivateAccountService {
      * @throws IdentityRequiredException si el identificador está ausente, en blanco o es más largo que
      *                                   el de Firebase
      * @throws AccountNotFoundException si ese usuario no tiene cuenta local, o la cuenta fue anonimizada
-     * @throws EmailNotVerifiedException si el Gateway no afirmó que el correo está verificado
+     * @throws EmailNotVerifiedException si la cuenta está pendiente y el Gateway no afirmó que el correo está verificado
      * @throws AccountDisabledException si la cuenta está deshabilitada
      * @throws AccountConflictException si otra petición cambió la cuenta y sigue sin estar activa
      */
@@ -59,13 +62,13 @@ public class ActivateAccountService {
             throw new IdentityRequiredException(); // misma regla que la consulta de la cuenta
         }
         Account cuenta = repositorio.findByFirebaseUid(firebaseUid).orElseThrow(AccountNotFoundException::new);
-        if (!command.emailVerified()) {
-            throw new EmailNotVerifiedException(); // la verificación sale solo del token
-        }
         if (cuenta.getStatus() == AccountStatus.ACTIVE) {
-            return cuenta; // idempotente: no se escribe
+            return cuenta; // idempotente: no se escribe, con o sin la afirmación del Gateway
         }
-        cuenta.activate(); // deshabilitada y anonimizada lanzan su excepción
+        if (cuenta.getStatus() == AccountStatus.PENDING_VERIFICATION && !command.emailVerified()) {
+            throw new EmailNotVerifiedException(); // la verificación sale solo del token y solo importa a la pendiente
+        }
+        cuenta.activate(); // deshabilitada y anonimizada lanzan su excepción, también sin la afirmación del Gateway
         try {
             Account activada = repositorio.save(cuenta);
             logger.info("Cuenta activada tras verificar el correo del usuario {}", firebaseUid);

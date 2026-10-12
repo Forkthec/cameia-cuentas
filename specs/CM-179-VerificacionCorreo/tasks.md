@@ -96,7 +96,7 @@ Resultado: `AccountRepositoryAdapterConflictTest` 2/2 en verde.
 
 ## [x] T-1.3 · Servicio de activación — ≤ 30 min
 
-Resultado: `ActivateAccountServiceTest` 18/18 en verde.
+Resultado: `ActivateAccountServiceTest` 18/18 en verde. Ajuste posterior (D13 y D14 de la spec, decididos por Paula el 11-oct): el estado de la cuenta se evalúa antes que el encabezado y el guardado compara la versión leída; `ActivateAccountServiceTest` 21/21.
 
 - **Cubre:** REQ-VC-01 a 10. **Modificar:** `application/command/ActivateAccountCommand.java`, `application/service/ActivateAccountService.java`, `application/service/ActivateAccountServiceTest.java`.
 - **Comando:** `public record ActivateAccountCommand(String firebaseUid, boolean emailVerified)`. Javadoc de `emailVerified`: «`true` solo cuando el Gateway afirmó la verificación del correo; la ausencia del encabezado o cualquier otro valor llegan como `false`».

@@ -4,7 +4,7 @@ Esta carpeta trae la colección de Postman del microservicio de Cuentas y el ent
 
 | Archivo | Contenido |
 |---|---|
-| `cameia-cuentas.postman_collection.json` | Colección v2.1: carpeta `Registro` (8 peticiones), carpeta `Firebase no disponible (manual)` (1 petición), carpeta `Eventos de cuenta (local)` (10 peticiones), carpeta `Mi cuenta` (12 peticiones) y carpeta `Activación` (17 peticiones) |
+| `cameia-cuentas.postman_collection.json` | Colección v2.1: carpeta `Registro` (8 peticiones), carpeta `Firebase no disponible (manual)` (1 petición), carpeta `Eventos de cuenta (local)` (10 peticiones), carpeta `Mi cuenta` (12 peticiones) y carpeta `Activación` (18 peticiones) |
 | `local.postman_environment.json` | Entorno local: `baseUrl` (`http://localhost:8081`, el puerto de `SERVER_PORT`) y los datos del broker de compose (`rabbitManagementUrl`, `rabbitUser` y `rabbitPassword`, esta última vacía). No lleva secretos |
 
 ## Qué verifica
@@ -82,6 +82,7 @@ Carpeta `Activación` (`POST /api/v1/users/me/verification`): registra una cuent
 | A-01 | `X-User-Email-Verified: true` | 200 con exactamente `id` y `status` `ACTIVE` |
 | A-02 | La misma petición otra vez | 200, el mismo resultado |
 | A-02b | `GET /api/v1/users/me` | 200 con `status` `ACTIVE` |
+| A-02c | Activación con `X-User-Email-Verified: false` sobre la cuenta ya activa | 200 con `ACTIVE`: el encabezado solo cuenta para la cuenta pendiente |
 | A-11 | `GET /v3/api-docs` | 200 con `POST /api/v1/users/me/verification` y sus respuestas 200, 400, 403, 404, 409 y 500; exige `API_DOCUMENTATION_ENABLED=true` |
 
 Las respuestas 403 `ACCOUNT_DISABLED` y 409 `ACCOUNT_CONFLICT` no se pueden provocar por HTTP sin tocar la base: las cubren `AccountActivationControllerTest`, `ActivateAccountServiceTest` y `AccountRegistrationEndToEndTest`.

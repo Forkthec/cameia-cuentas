@@ -86,7 +86,7 @@ class AccountActivationController {
      */
     @Operation(summary = "Activa la cuenta tras verificar el correo",
             description = "Pasa la cuenta de PENDING_VERIFICATION a ACTIVE cuando el Gateway afirma que el correo "
-                    + "está verificado. Es idempotente: repetirla sobre una cuenta activa responde 200 sin escribir. "
+                    + "está verificado. Es idempotente: repetirla sobre una cuenta activa responde 200 sin escribir, aunque el Gateway no afirme la verificación. "
                     + "El cuerpo de la petición se ignora.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Cuenta activa (también al repetir la llamada)",
@@ -97,8 +97,8 @@ class AccountActivationController {
                 + "más de 128 caracteres", content = @Content(mediaType = "application/problem+json",
                         schema = @Schema(implementation = ProblemDetail.class),
                         examples = @ExampleObject(name = "sinIdentidad", value = EJEMPLO_400))),
-        @ApiResponse(responseCode = "403", description = "EMAIL_NOT_VERIFIED: el Gateway no afirmó la verificación "
-                + "del correo; ACCOUNT_DISABLED: la cuenta está deshabilitada",
+        @ApiResponse(responseCode = "403", description = "EMAIL_NOT_VERIFIED: la cuenta está pendiente y el Gateway no afirmó la "
+                + "verificación del correo; ACCOUNT_DISABLED: la cuenta está deshabilitada",
                 content = @Content(mediaType = "application/problem+json",
                         schema = @Schema(implementation = ProblemDetail.class),
                         examples = {

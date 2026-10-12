@@ -157,6 +157,38 @@ class ActivateAccountServiceTest {
     }
 
     @Test
+    @DisplayName("Una cuenta ya activa responde igual aunque el Gateway no afirme la verificación, y no escribe")
+    void activate_shouldReturnActiveWithoutWriting_whenAlreadyActiveAndHeaderIsNotTrue() {
+        repositorio.con(cuentaEn(AccountStatus.ACTIVE));
+
+        Account resultado = servicio.activate(new ActivateAccountCommand(UID, false));
+
+        assertThat(resultado.getStatus()).isEqualTo(AccountStatus.ACTIVE);
+        assertThat(repositorio.guardados).isZero();
+    }
+
+    @Test
+    @DisplayName("Una cuenta anonimizada responde como una inexistente también sin la afirmación del Gateway")
+    void activate_shouldAnswerLikeMissingAccount_whenAnonymizedAndHeaderIsNotTrue() {
+        repositorio.con(cuentaEn(AccountStatus.ANONYMIZED));
+        String mensajeSinCuenta = catchThrowable(
+                () -> servicio.activate(new ActivateAccountCommand("uid-sin-cuenta", false))).getMessage();
+
+        assertThatThrownBy(() -> servicio.activate(new ActivateAccountCommand(UID, false)))
+                .isInstanceOf(AccountNotFoundException.class)
+                .hasMessage(mensajeSinCuenta);
+    }
+
+    @Test
+    @DisplayName("Una cuenta deshabilitada responde ACCOUNT_DISABLED también sin la afirmación del Gateway")
+    void activate_shouldThrowAccountDisabled_whenDisabledAndHeaderIsNotTrue() {
+        repositorio.con(cuentaEn(AccountStatus.DISABLED));
+
+        assertThatThrownBy(() -> servicio.activate(new ActivateAccountCommand(UID, false)))
+                .isInstanceOf(AccountDisabledException.class);
+    }
+
+    @Test
     @DisplayName("Si otra petición activó la cuenta primero, se devuelve la cuenta activa")
     void activate_shouldReturnActiveAccount_whenLosingTheRaceToAnotherActivation() {
         repositorio.con(cuentaPendiente());

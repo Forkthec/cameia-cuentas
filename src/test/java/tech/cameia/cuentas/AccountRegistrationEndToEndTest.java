@@ -495,6 +495,36 @@ class AccountRegistrationEndToEndTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"false", "", "abc"})
+    @DisplayName("Una cuenta anonimizada responde 404 igual que una inexistente aunque el encabezado no sea «true»")
+    void activate_shouldAnswerLikeMissingAccount_whenAnonymizedAndHeaderIsNotTrue(String verificado) {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+        jdbcTemplate.update("UPDATE microcuentas.cuenta SET estado = 'ANONYMIZED', fecha_eliminacion = now() "
+                + "WHERE firebase_uid = ?", uid);
+
+        ResponseEntity<String> anonimizada = activar(uid, verificado);
+        ResponseEntity<String> sinCuenta = activar("uid-que-nunca-existio", verificado);
+
+        assertThat(anonimizada.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(sinRequestId(anonimizada.getBody())).isEqualTo(sinRequestId(sinCuenta.getBody()));
+    }
+
+    @Test
+    @DisplayName("Repetir la activación de una cuenta activa con el encabezado en false responde 200 y no escribe")
+    void activate_shouldReturn200WithoutWriting_whenAlreadyActiveAndHeaderIsFalse() {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+        activar(uid, "true");
+        Map<String, Object> trasLaPrimera = filaGuardada();
+
+        ResponseEntity<String> repetida = activar(uid, "false");
+
+        assertThat(repetida.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(filaGuardada().get("version")).isEqualTo(trasLaPrimera.get("version"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"false", "", "abc"})
     @DisplayName("Sin la afirmación exacta «true» del Gateway se rechaza con 403 y la cuenta sigue pendiente")
     void activate_shouldReturn403AndKeepPending_whenHeaderIsNotTrue(String verificado) {
         registrar(cuerpoValido());

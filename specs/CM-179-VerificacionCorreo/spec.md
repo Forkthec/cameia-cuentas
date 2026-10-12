@@ -61,14 +61,14 @@ Notas técnicas de HU-1.2 que obligan a Backend: «la verificación se toma del 
 
 ### Pieza 1 — activación robusta (Cuentas)
 
-- **REQ-VC-01 (CA-1.2.6).** Cuando llegue `POST /api/v1/users/me/verification` con `X-User-Email-Verified` distinto del texto exacto `true` (`false`, ausente, vacío, `TRUE`, `abc` o cualquier otro; el Gateway siempre escribe `true` en minúsculas), el servicio debe responder 403 con `code` `EMAIL_NOT_VERIFIED` y el mensaje «Tu correo aún no está verificado.», no debe activar la cuenta, no debe consultar a Firebase y debe ignorar el cuerpo de la petición.
+- **REQ-VC-01 (CA-1.2.6).** Cuando la cuenta esté `PENDING_VERIFICATION` y llegue `POST /api/v1/users/me/verification` con `X-User-Email-Verified` distinto del texto exacto `true` (`false`, ausente, vacío, `TRUE`, `abc` o cualquier otro; el Gateway siempre escribe `true` en minúsculas), el servicio debe responder 403 con `code` `EMAIL_NOT_VERIFIED` y el mensaje «Tu correo aún no está verificado.», no debe activar la cuenta, no debe consultar a Firebase y debe ignorar el cuerpo de la petición.
 - **REQ-VC-02 (CA-1.2.14).** Cuando llegue la petición con `X-User-Email-Verified: true` y la cuenta esté `PENDING_VERIFICATION`, el servicio debe pasarla a `ACTIVE`, actualizar `fecha_actualizacion`, conservar el plan y responder 200 con `{"id":"<uuid>","status":"ACTIVE"}`.
-- **REQ-VC-03 (CA-1.2.4).** Cuando la cuenta ya esté `ACTIVE`, el servicio debe responder 200 con `{"id":"<uuid>","status":"ACTIVE"}` sin escribir: `fecha_actualizacion` y `version` no cambian.
+- **REQ-VC-03 (CA-1.2.4).** Cuando la cuenta ya esté `ACTIVE`, con o sin la afirmación `X-User-Email-Verified: true` (un token anterior a la verificación sigue diciendo `false`), el servicio debe responder 200 con `{"id":"<uuid>","status":"ACTIVE"}` sin escribir: `fecha_actualizacion` y `version` no cambian.
 - **REQ-VC-04.** Cuando `X-User-Id` no tenga cuenta local, el servicio debe responder 404 con `code` `ACCOUNT_NOT_FOUND` y el mensaje «No encontramos una cuenta para este usuario.».
 - **REQ-VC-05.** Cuando la cuenta esté `DISABLED`, el servicio debe responder 403 con `code` `ACCOUNT_DISABLED` y el mensaje «Esta cuenta está deshabilitada.» (texto de CA-1.3.11), sin cambiar la cuenta.
-- **REQ-VC-06.** Cuando la cuenta esté `ANONYMIZED`, el servicio debe responder exactamente lo mismo que si no existiera (404 `ACCOUNT_NOT_FOUND`), sin cambiar la cuenta. Es la misma regla que ya aplica `GET /api/v1/users/me`.
+- **REQ-VC-06.** Cuando la cuenta esté `ANONYMIZED`, con o sin la afirmación `X-User-Email-Verified: true`, el servicio debe responder exactamente lo mismo que si no existiera (404 `ACCOUNT_NOT_FOUND`), sin cambiar la cuenta. Es la misma regla que ya aplica `GET /api/v1/users/me`.
 - **REQ-VC-07.** Cuando falte `X-User-Id`, o llegue vacío, solo con espacios o con más de 128 caracteres, el servicio debe responder 400 con `code` `IDENTITY_REQUIRED` y el mensaje «La petición no incluye los datos que exige esta ruta.», sin consultar la base ni Firebase. Es la regla que ya aplica `GET /api/v1/users/me` (`GetCurrentAccountService`). Con 128 caracteres exactos la petición sigue.
-- **REQ-VC-08.** Cuando dos activaciones de la misma cuenta lleguen a la vez, la cuenta debe escribirse una sola vez y ninguna debe responder 500. La que gana responde 200. La que pierde la carrera de versiones vuelve a leer la cuenta **una vez**: si la encuentra `ACTIVE` (el caso esperado), responde 200 con `{id, status:"ACTIVE"}`. Si la encuentra en otro estado (muy improbable), responde 409 con `code` `ACCOUNT_CONFLICT` y el mensaje «La cuenta se está actualizando. Inténtalo de nuevo.».
+- **REQ-VC-08.** Cuando dos activaciones de la misma cuenta lleguen a la vez, la cuenta debe escribirse una sola vez y ninguna debe responder 500. La que gana responde 200. La que pierde la carrera de versiones vuelve a leer la cuenta **una vez**: si la encuentra `ACTIVE` (el caso esperado), responde 200 con `{id, status:"ACTIVE"}`. Si la encuentra en otro estado (muy improbable), responde 409 con `code` `ACCOUNT_CONFLICT` y el mensaje «La cuenta se está actualizando. Inténtalo de nuevo.». El guardado compara la versión de la fila que se leyó con la actual: si otra petición cambió la cuenta en medio (por ejemplo, la deshabilitó), no se guarda nada y se responde igual (200 si quedó `ACTIVE`, 409 si no).
 - **REQ-VC-09.** Mientras Firebase no responda, la activación con `X-User-Email-Verified: true` debe seguir funcionando (el servicio no consulta a Firebase).
 - **REQ-VC-10.** El servicio debe registrar la activación en `INFO` con el `firebaseUid` y cada rechazo previsible en `WARN` con `code` y `requestId` (lo hace el manejador), sin correo, nombre ni otro dato personal.
 - **REQ-VC-11.** La documentación OpenAPI de la ruta debe describir las respuestas 200, 400, 403 (`EMAIL_NOT_VERIFIED` y `ACCOUNT_DISABLED`), 404, 409 y 500 con su `code`, y los dos encabezados (los pone el Gateway; el navegador no los envía; solo `true` activa).
@@ -205,6 +205,8 @@ Se crean, porque no existe nada para esos casos: `AccountDisabledException` y `A
 | D10 | Firebase caído detiene la purga y el Job sale con código distinto de 0 | Con el directorio caído fallarían todas; el reintento del Job es el mecanismo de recuperación, como en el Job de relevo | Seguir con todas (1000 llamadas inútiles) | Técnica, con precedente (`AccountEventsRelayJobRunner`); aprobada por Paula con la spec (11-oct-2026) |
 | D11 | Textos de la activación con punto final | Estilo del catálogo (D2-01, observación de RT-01); Paula pidió en CM-36 cambiarlos aquí una sola vez | Dejarlos | Paula, 7-oct-2026 (sección «Pendientes que deja CM-36») |
 | D12 | Una fila activa sin credencial tras la purga se registra en `ERROR` | Requiere conciliación manual («ERROR = alguien debe actuar») | `WARN` (no alerta) | Técnica; aprobada por Paula con la spec (11-oct-2026) |
+| D13 | El estado de la cuenta decide primero y la afirmación del Gateway solo cuenta para la cuenta `PENDING_VERIFICATION` | CA-1.2.6 habla de la cuenta pendiente; CA-1.2.4 pide dar por buena la confirmación repetida de una cuenta activa; REQ-VC-06 pide que la anonimizada no se distinga de la inexistente. Un token anterior a la verificación sigue diciendo `false` y no debe rechazar a quien ya está activo | Rechazar con 403 todo encabezado distinto de `true` sin mirar el estado (filtra la anonimizada y rechaza a la activa) | Paula, 11-oct-2026 ("elige lo que sea mejor") |
+| D14 | La cuenta lleva la versión de la fila que se leyó y el guardado la compara con la actual | El adaptador recargaba la fila con su versión vigente y pisaba el cambio ajeno sin que el bloqueo optimista lo notara (una cuenta deshabilitada en medio se reactivaba) | Dejar solo el bloqueo optimista de JPA (no cubre la ventana entre la lectura del servicio y la recarga del adaptador); bloqueo pesimista | Paula, 11-oct-2026 ("corregimos") |
 
 ## 12. Pruebas (resumen; el detalle está en `tasks.md`)
 
@@ -265,7 +267,7 @@ Pieza 1 ≈ 4 h · pieza 2 ≈ 9 h (purga 6 h, evento y migración 2 h, concilia
 |---|---|---|---|
 | 1.2.1, 1.2.2, 1.2.3, 1.2.5, 1.2.7 | — (dueño F) | No es de Backend: los cubre CM-180 (Frontend) y los prueba Testing en staging | — |
 | 1.2.4 | REQ-VC-03 | `ActivateAccountServiceTest#activarDosVecesNoFallaNiVuelveAGuardar`; `AccountRegistrationEndToEndTest#activate_shouldNotWrite_whenAlreadyActive` (T-1.3, T-1.5) | `A-02 · 200 activación repetida` |
-| 1.2.6 | REQ-VC-01 | `ActivateAccountServiceTest#activate_shouldRejectWithoutCallingFirebase_whenHeaderIsNotTrue`; `AccountActivationControllerTest#activate_shouldPassNotVerified_whenHeaderIsMissingOrNotTrue` y `#activate_shouldIgnoreBody_whenItClaimsVerification`; `AccountRegistrationEndToEndTest#activate_shouldReturn403AndKeepPending_whenHeaderIsNotTrue` | `A-03`, `A-04`, `A-05`, `A-06` |
+| 1.2.6 | REQ-VC-01 | `ActivateAccountServiceTest#activate_shouldRejectWithoutCallingFirebase_whenHeaderIsNotTrue`; `AccountActivationControllerTest#activate_shouldPassNotVerified_whenHeaderIsNotTrue`, `#activate_shouldPassNotVerified_whenHeaderIsMissing` y `#activate_shouldIgnoreBody_whenItClaimsVerification`; `AccountRegistrationEndToEndTest#activate_shouldReturn403AndKeepPending_whenHeaderIsNotTrue` | `A-03`, `A-04`, `A-05`, `A-06` |
 | 1.2.8 | — (dueño F, configuración de DevOps) | CM-255 | — |
 | 1.2.9 | REQ-VC-21 | `PurgeUnverifiedAccountsServiceTest#purge_shouldAskForCandidatesOlderThan168Hours_whenRun`; `AccountRepositoryAdapterTest` (168 h exactas no entra; 169 h sí) (T-2.4, T-2.7) | Sin ruta HTTP (Job): prueba manual de T-4.4 con la salida del resumen |
 | 1.2.10 | REQ-VC-22, 24 a 27 | `PurgeUnverifiedAccountsServiceTest` casos 2 a 6 y 10; `PendingAccountDeletionTransactionTest`; `AccountDeletedPayloadV1Test`; `PurgeEndToEndTest` (1) y (3) | Prueba manual de T-4.4 (fila `cuenta.eliminada` en `evento_saliente`) |
@@ -301,8 +303,8 @@ La ruta no tiene cuerpo: solo dos encabezados que pone el Gateway. No hay DTO de
 **Orden de evaluación:**
 1. Identidad: 400.
 2. Cuenta: 404.
-3. Verificación: 403.
-4. Estado: `ACTIVE` 200, `DISABLED` 403, `ANONYMIZED` 404.
+3. Estado: `ACTIVE` 200 sin mirar el encabezado, `DISABLED` 403, `ANONYMIZED` 404 (decisión D13).
+4. Verificación, solo para la cuenta `PENDING_VERIFICATION`: 403.
 5. Guardado: 409 o 200.
 
 La purga no recibe entradas externas. Su único parámetro es `cuentas.purge.max-accounts-per-run`, de 1 a 1000; `PurgePropertiesTest` prueba que 0 y 1001 no arrancan.

@@ -2459,6 +2459,48 @@
           }
         },
         {
+          "name": "A-02c · 200 cuenta activa con el encabezado en false",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Sigue ACTIVE: el encabezado solo cuenta para la cuenta pendiente', () => pm.expect(pm.response.json().status).to.eql('ACTIVE'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "false"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
           "name": "A-11 · 200 OpenAPI publica POST /api/v1/users/me/verification",
           "event": [
             {
