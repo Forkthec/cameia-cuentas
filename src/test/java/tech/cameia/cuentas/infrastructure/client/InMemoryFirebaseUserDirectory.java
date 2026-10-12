@@ -49,6 +49,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     private volatile boolean fallarAlEscribirElPlan;
     private volatile boolean indisponibleAlEscribirElPlan;
     private volatile boolean fallarAlBorrar;
+    private volatile boolean indisponibleAlBorrar;
     private volatile boolean fallarAlConsultar;
     private volatile int consultasDeCorreoRestantes = -1;
     private volatile boolean reintentoDelSdk;
@@ -121,6 +122,9 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
 
     @Override
     public void deleteUser(String firebaseUid) {
+        if (indisponibleAlBorrar) {
+            throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
+        }
         if (fallarAlBorrar) {
             throw new IllegalStateException("Firebase rechazó la eliminación del usuario");
         }
@@ -341,6 +345,11 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         this.indisponibleAlEscribirElPlan = true;
     }
 
+    /** Hace que el borrado de una credencial falle como si Firebase no estuviera disponible. */
+    public void quedarIndisponibleAlBorrar() {
+        this.indisponibleAlBorrar = true;
+    }
+
     /** Hace que el borrado de credenciales falle, para probar la compensación fallida. */
     public void fallarAlBorrar() {
         this.fallarAlBorrar = true;
@@ -350,6 +359,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     public void dejarDeFallar() {
         this.fallarAlEscribirElPlan = false;
         this.indisponibleAlEscribirElPlan = false;
+        this.indisponibleAlBorrar = false;
         this.fallarAlBorrar = false;
         this.fallarAlConsultar = false;
         this.consultasDeCorreoRestantes = -1;
@@ -372,6 +382,7 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         fallarAlConsultar = false;
         fallarAlEscribirElPlan = false;
         indisponibleAlEscribirElPlan = false;
+        indisponibleAlBorrar = false;
         fallarAlBorrar = false;
         reintentoDelSdk = false;
         respuestaPerdida = false;

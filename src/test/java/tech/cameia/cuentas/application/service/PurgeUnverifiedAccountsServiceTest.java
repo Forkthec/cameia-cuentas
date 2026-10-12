@@ -310,6 +310,63 @@ class PurgeUnverifiedAccountsServiceTest {
     }
 
     @Test
+    @DisplayName("Si el borrado de una huérfana se rechaza, se cuenta como fallida y no se borra")
+    void purge_shouldCountFailed_whenOrphanDeletionIsRejected() {
+        String uid = directory.crearSinCuentaLocal("huerfana@correo.co", OLD);
+        directory.fallarAlBorrar();
+
+        PurgeSummary summary = service(10).purge();
+
+        assertThat(summary).isEqualTo(new PurgeSummary(0, 0, 0, 1, 0, false));
+        assertThat(directory.existe(uid)).isTrue();
+    }
+
+    @Test
+    @DisplayName("Si el directorio no responde al borrar una huérfana, relanza la indisponibilidad")
+    void purge_shouldRethrow_whenDirectoryIsUnavailableDeletingOrphan() {
+        directory.crearSinCuentaLocal("huerfana@correo.co", OLD);
+        directory.quedarIndisponibleAlBorrar();
+
+        assertThatThrownBy(() -> service(10).purge()).isInstanceOf(DependencyUnavailableException.class);
+    }
+
+    @Test
+    @DisplayName("Si la cuenta desaparece antes de activarla, se cuenta como fallida")
+    void purge_shouldCountFailed_whenVerifiedAccountDisappearsBeforeActivation() {
+        InMemoryAccountRepository vanishing = new InMemoryAccountRepository() {
+            @Override
+            public java.util.Optional<Account> findByFirebaseUid(String firebaseUid) {
+                return java.util.Optional.empty();
+            }
+        };
+        String uid = directory.crearSinCuentaLocal("ana@correo.co", OLD);
+        vanishing.save(Account.register(uid, "Ana", "Pérez", new BirthDate(LocalDate.of(1995, 4, 12)), null, null));
+        vanishing.seedCreatedAt(uid, OLD);
+        directory.marcarCorreoVerificado(uid);
+        PurgeUnverifiedAccountsService service = new PurgeUnverifiedAccountsService(vanishing, directory,
+                new PendingAccountDeletionService(vanishing, outbox, Clock.fixed(NOW, ZoneOffset.UTC)), 10,
+                Clock.fixed(NOW, ZoneOffset.UTC));
+
+        PurgeSummary summary = service.purge();
+
+        assertThat(summary.failed()).isEqualTo(1);
+        assertThat(summary.activated()).isZero();
+    }
+
+    @Test
+    @DisplayName("Sin credencial, si la fila ya no está pendiente, se cuenta como fallida y no hay evento")
+    void purge_shouldCountFailed_whenCredentialIsGoneAndRowIsNoLongerPending() {
+        String uid = pendingAccount("ana@correo.co", OLD);
+        directory.deleteUser(uid);
+        accounts.failNextDeleteAsNoLongerPending();
+
+        PurgeSummary summary = service(10).purge();
+
+        assertThat(summary.failed()).isEqualTo(1);
+        assertThat(outbox.appendedDeletions()).isEmpty();
+    }
+
+    @Test
     @DisplayName("El resumen se registra con el texto del contrato")
     void purge_shouldLogSummary_whenFinished(CapturedOutput output) {
         pendingAccount("ana@correo.co", OLD);
