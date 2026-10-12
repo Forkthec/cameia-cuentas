@@ -69,7 +69,7 @@ El servicio solo debe aceptar peticiones autenticadas del API Gateway, con dos c
 | `X-User-Roles` | Sí | Roles del usuario |
 | `X-Request-Id` | Sí | Identificador de la petición |
 | `X-User-Plan` | No | Plan del usuario; no respalda ningún derecho ni cuota hasta que exista la spec de planes |
-| `X-User-Email-Verified` | No | Si el correo está verificado |
+| `X-User-Email-Verified` | No | `true` si el correo está verificado. La activación solo toma el texto exacto `true`, y solo cuenta para la cuenta pendiente: la activa responde 200, la deshabilitada 403 y la anonimizada 404 sin mirarlo |
 
 No se confía en un encabezado enviado directamente por un cliente externo, y no se agregan campos derivados del JWT sin justificar su necesidad y documentar el contrato.
 
@@ -121,7 +121,7 @@ Tabla `microcuentas.evento_saliente` (tabla de salida de eventos, [ADR 0003](doc
 | Columna | Tipo | Regla |
 |---|---|---|
 | `id` | `uuid` | Clave primaria; es el `message_id` del mensaje |
-| `tipo` | `varchar(64)` | Hoy solo `cuenta.creada` (`ck_evento_saliente_tipo`) |
+| `tipo` | `varchar(64)` | `cuenta.creada` o `cuenta.eliminada` (`ck_evento_saliente_tipo`) |
 | `version` | `smallint` | Versión del contrato; ≥ 1 |
 | `agregado_id` | `varchar(128)` | `firebaseUid` de la cuenta; no vacío; único junto con `tipo` (`uq_evento_saliente_tipo_agregado`) |
 | `carga` | `jsonb` | Cuerpo del evento; nulo solo cuando ya se publicó (`ck_evento_saliente_carga_pendiente`) |
@@ -169,6 +169,9 @@ No abre puerto HTTP; sale con código `0` y deja la línea `Relevo de eventos de
 `SPRING_PROFILES_ACTIVE=prod,account-events-relay` que dispara Cloud Scheduler cada 5 minutos. El broker local es el servicio
 `rabbitmq` de `docker-compose.yml` (AMQP en el puerto 5673 y consola en `http://localhost:15673`).
 
+Para levantar la aplicación sin broker, `EVENTS_ENABLED=false` pone un publicador inerte: los eventos quedan pendientes en la tabla de
+salida y se publican cuando se vuelva a encender. Con el perfil `prod` no se admite y la aplicación no arranca.
+
 **Purga de cuentas sin verificar (modo tarea).** Revisa las cuentas `PENDING_VERIFICATION` de más de 168 horas: activa las que ya
 verificaron su correo y borra el resto con su credencial de Firebase y su evento `cuenta.eliminada`; al final borra las credenciales
 huérfanas (sin cuenta local, sin verificar, de más de 168 horas y con único proveedor `password`). Con la base y el emulador locales
@@ -190,7 +193,7 @@ Rama, commit, tipos, título de PR, revisión y merge: rige [CONTRIBUTING.md](CO
 
 - El título del PR lleva `[IA-ASISTIDO]` al final cuando hubo IA; el commit no lo lleva. Un commit asistido por IA lleva el trailer `Co-Authored-By` con el modelo.
 - Una IA puede abrir un PR; nunca lo fusiona. El control humano lo marca la persona que revisa.
-- Un PR cubre una pieza reconocible y no pasa de 1000 líneas entre agregadas y eliminadas.
+- Un PR por tarea de Jira (CM), sin tope de líneas: una rama, un PR hacia `develop` y un commit por capacidad (migración, dominio, API, pruebas, Postman y documentación) en orden de lectura, cada uno compila. Se parte en dos solo si la tarea trae dos piezas que se despliegan por separado o depende de otra sin fusionar.
 - Antes del código hay una spec aprobada en `specs/CM-NNN-Descripcion/` (`spec.md`, `plan.md` y `tasks.md`); el flujo está en la sección 12 de [docs/estandar-backend.md](docs/estandar-backend.md).
 - Las decisiones con peso humano se registran en [docs/bitacora-ia/](docs/bitacora-ia/README.md).
 
