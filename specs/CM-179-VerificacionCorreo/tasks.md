@@ -205,7 +205,9 @@ Resultado: `AccountRegistrationEndToEndTest` 50/50 en verde, tres corridas segui
 
 # Pieza 2 — purga y evento
 
-## [ ] T-2.1 · Migraciones — ≤ 30 min
+## [x] T-2.1 · Migraciones — ≤ 30 min
+
+Resultado: `V6` y `V7` (no había migraciones posteriores a `V5` en `develop`). `CuentaSchemaMigrationTest` 9/9, `EventoSalienteSchemaMigrationTest` 15/15 y `MigracionEventoSalienteConDatosTest` 1/1 en verde con Docker.
 
 - **Cubre:** REQ-VC-27, 32. **Crear:** `src/main/resources/db/migration/V6__indice_cuenta_pendiente_fecha_creacion.sql` y `V7__evento_cuenta_eliminada.sql` (si `develop` ya tiene `V6`, usar los dos siguientes libres y decirlo). **Modificar:** `infrastructure/persistence/CuentaSchemaMigrationTest.java`, `infrastructure/persistence/EventoSalienteSchemaMigrationTest.java`.
 - **Contenido exacto:**

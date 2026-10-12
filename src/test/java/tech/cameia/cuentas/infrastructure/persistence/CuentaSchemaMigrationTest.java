@@ -3,6 +3,8 @@ package tech.cameia.cuentas.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -52,6 +54,20 @@ class CuentaSchemaMigrationTest {
 				""", Integer.class);
 
 		assertThat(tablas).isEqualTo(1);
+	}
+
+	/**
+	 * Comprueba que existe el índice parcial que usa la purga de cuentas sin verificar.
+	 */
+	@Test
+	void indicePendienteExisteYSoloCubreLasCuentasSinVerificar() {
+		List<String> definiciones = jdbcTemplate.queryForList("""
+				SELECT indexdef FROM pg_indexes
+				 WHERE schemaname = 'microcuentas' AND indexname = 'ix_cuenta_pendiente_fecha_creacion'
+				""", String.class);
+
+		assertThat(definiciones).hasSize(1);
+		assertThat(definiciones.get(0)).contains("(fecha_creacion)").contains("WHERE").contains("PENDING_VERIFICATION");
 	}
 
 	/**

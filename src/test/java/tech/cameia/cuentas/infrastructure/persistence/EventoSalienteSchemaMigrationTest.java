@@ -60,6 +60,16 @@ class EventoSalienteSchemaMigrationTest {
     }
 
     @Test
+    @DisplayName("El evento de cuenta eliminada se acepta")
+    void insert_shouldAccept_whenTypeIsAccountDeleted() {
+        insert(EVENT_ID, "cuenta.eliminada", 1, "uid-1", "'" + PAYLOAD + "'", "req-1", CREATED, null);
+
+        Integer filas = jdbc.queryForObject(
+                "SELECT count(*) FROM microcuentas.evento_saliente WHERE tipo = 'cuenta.eliminada'", Integer.class);
+        assertThat(filas).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("Un tipo desconocido se rechaza")
     void insert_shouldFail_whenTypeIsUnknown() {
         assertViolation(() -> insert(EVENT_ID, "cuenta.borrada", 1, "uid-1", "'" + PAYLOAD + "'", "req-1", CREATED, null),
