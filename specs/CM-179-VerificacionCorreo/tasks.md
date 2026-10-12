@@ -188,7 +188,9 @@ Resultado: `AccountActivationControllerTest` 16, `BusinessExceptionHandlerTest` 
 - **Manejador:** en `BusinessExceptionHandlerTest`, una prueba por excepción nueva (estado, `code`, `title`, `detail`) y actualizar las aserciones de texto de `EMAIL_NOT_VERIFIED`, `ACCOUNT_NOT_FOUND` e `IDENTITY_REQUIRED` si las tiene. Buscar también con `git grep -n "No encontramos una cuenta para este usuario\"\|exige esta ruta\"\|Primero debes verificar" -- src/test` y actualizar cada aserción que compare el texto sin punto (por ejemplo, en `CurrentAccountControllerTest` y `CurrentAccountEndToEndTest`).
 - **Verificación:** `./mvnw.cmd -q -B "-Dtest=AccountActivationControllerTest,BusinessExceptionHandlerTest,CurrentAccountControllerTest" test`. Commit 3 de `plan.md` (T-1.1 a T-1.4).
 
-## [ ] T-1.5 · Activación de punta a punta con base real — ≤ 30 min
+## [x] T-1.5 · Activación de punta a punta con base real — ≤ 30 min
+
+Resultado: `AccountRegistrationEndToEndTest` 50/50 en verde, tres corridas seguidas con Docker (incluye las 7 pruebas nuevas de activación y la de concurrencia de 10 rondas; log de la tercera en `ejecucion/evidencia/CM-179/t15-e2e-activacion-3a-corrida.log`).
 
 - **Cubre:** REQ-VC-02, 03, 05, 06, 08, 09; FIA-02. **Modificar:** `AccountRegistrationEndToEndTest.java` (copiar la forma de `registraLaCuentaYLuegoLaActivaAlVerificarElCorreo`, línea 69). Ayudante privado `ResponseEntity<String> activar(String uid, String verificado)` que pone `X-User-Id` y, si `verificado` no es `null`, `X-User-Email-Verified`.
 - **Pruebas nuevas:**

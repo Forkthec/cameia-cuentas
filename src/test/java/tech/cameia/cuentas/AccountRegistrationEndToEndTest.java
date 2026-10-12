@@ -4,12 +4,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -19,6 +27,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -417,6 +426,141 @@ class AccountRegistrationEndToEndTest {
 
         assertThat(activacion.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(estadoGuardado()).isEqualTo("PENDING_VERIFICATION");
+    }
+
+    @Test
+    @DisplayName("Activar una cuenta pendiente cambia el estado, la fecha de actualización y la versión")
+    void activate_shouldChangeStatusAndUpdateDate_whenPending() {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+        Map<String, Object> antes = filaGuardada();
+
+        ResponseEntity<String> activacion = activar(uid, "true");
+
+        Map<String, Object> despues = filaGuardada();
+        assertThat(activacion.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(despues.get("estado")).isEqualTo("ACTIVE");
+        assertThat(instante(despues, "fecha_actualizacion")).isAfter(instante(antes, "fecha_actualizacion"));
+        assertThat((Long) despues.get("version")).isEqualTo((Long) antes.get("version") + 1);
+    }
+
+    @Test
+    @DisplayName("Activar una cuenta ya activa responde 200 igual y no escribe en la base")
+    void activate_shouldNotWrite_whenAlreadyActive() {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+        ResponseEntity<String> primera = activar(uid, "true");
+        Map<String, Object> trasLaPrimera = filaGuardada();
+
+        for (int repeticion = 0; repeticion < 20; repeticion++) {
+            ResponseEntity<String> otra = activar(uid, "true");
+
+            assertThat(otra.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(otra.getBody()).isEqualTo(primera.getBody());
+        }
+        Map<String, Object> alFinal = filaGuardada();
+        assertThat(alFinal.get("version")).isEqualTo(trasLaPrimera.get("version"));
+        assertThat(instante(alFinal, "fecha_actualizacion")).isEqualTo(instante(trasLaPrimera, "fecha_actualizacion"));
+    }
+
+    @Test
+    @DisplayName("Una cuenta deshabilitada se rechaza con 403 ACCOUNT_DISABLED y sigue deshabilitada")
+    void activate_shouldReturn403_whenAccountIsDisabled() {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+        jdbcTemplate.update("UPDATE microcuentas.cuenta SET estado = 'DISABLED' WHERE firebase_uid = ?", uid);
+
+        ResponseEntity<String> activacion = activar(uid, "true");
+
+        assertThat(activacion.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(activacion.getBody()).contains("ACCOUNT_DISABLED").contains("Esta cuenta está deshabilitada.");
+        assertThat(estadoGuardado()).isEqualTo("DISABLED");
+    }
+
+    @Test
+    @DisplayName("Una cuenta anonimizada responde igual que un usuario sin cuenta")
+    void activate_shouldAnswerLikeMissingAccount_whenAnonymized() {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+        jdbcTemplate.update("UPDATE microcuentas.cuenta SET estado = 'ANONYMIZED', fecha_eliminacion = now() "
+                + "WHERE firebase_uid = ?", uid);
+
+        ResponseEntity<String> anonimizada = activar(uid, "true");
+        ResponseEntity<String> sinCuenta = activar("uid-que-nunca-existio", "true");
+
+        assertThat(anonimizada.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(sinRequestId(anonimizada.getBody())).isEqualTo(sinRequestId(sinCuenta.getBody()));
+        assertThat(anonimizada.getBody()).contains("ACCOUNT_NOT_FOUND");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"false", "", "abc"})
+    @DisplayName("Sin la afirmación exacta «true» del Gateway se rechaza con 403 y la cuenta sigue pendiente")
+    void activate_shouldReturn403AndKeepPending_whenHeaderIsNotTrue(String verificado) {
+        registrar(cuerpoValido());
+
+        ResponseEntity<String> activacion = activar(uidGuardado(), verificado);
+
+        assertThat(activacion.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(activacion.getBody()).contains("EMAIL_NOT_VERIFIED");
+        assertThat(estadoGuardado()).isEqualTo("PENDING_VERIFICATION");
+    }
+
+    @Test
+    @DisplayName("Con el encabezado «true» la activación no necesita a Firebase")
+    void activate_shouldNotNeedFirebase_whenHeaderIsTrue() {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+        directorio.fallarAlConsultar();
+
+        ResponseEntity<String> activacion = activar(uid, "true");
+
+        assertThat(activacion.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    @DisplayName("Dos activaciones simultáneas de la misma cuenta responden 200 y escriben una sola vez")
+    void activate_shouldSucceedOnce_whenTwoRequestsRace() throws Exception {
+        ExecutorService hilos = Executors.newFixedThreadPool(2);
+        try {
+            for (int ronda = 0; ronda < 10; ronda++) {
+                directorio.limpiar();
+                jdbcTemplate.update("DELETE FROM microcuentas.cuenta");
+                registrar(cuerpoValido().replace("ana@cameia.tech", "ana" + ronda + "@cameia.tech"));
+                String uid = uidGuardado();
+                Long versionAntes = (Long) filaGuardada().get("version");
+                CountDownLatch salida = new CountDownLatch(1);
+                Callable<HttpStatusCode> peticion = () -> {
+                    salida.await();
+                    return activar(uid, "true").getStatusCode();
+                };
+                Future<HttpStatusCode> primera = hilos.submit(peticion);
+                Future<HttpStatusCode> segunda = hilos.submit(peticion);
+                salida.countDown();
+
+                assertThat(primera.get(30, TimeUnit.SECONDS)).isEqualTo(HttpStatus.OK);
+                assertThat(segunda.get(30, TimeUnit.SECONDS)).isEqualTo(HttpStatus.OK);
+                assertThat(estadoGuardado()).isEqualTo("ACTIVE");
+                assertThat((Long) filaGuardada().get("version")).isEqualTo(versionAntes + 1);
+            }
+        } finally {
+            hilos.shutdownNow();
+        }
+    }
+
+    private ResponseEntity<String> activar(String uid, String verificado) {
+        HttpHeaders encabezados = new HttpHeaders();
+        encabezados.add("X-User-Id", uid);
+        if (verificado != null) {
+            encabezados.add("X-User-Email-Verified", verificado);
+        }
+        return cliente.exchange("/api/v1/users/me/verification", HttpMethod.POST, new HttpEntity<>(encabezados),
+                String.class);
+    }
+
+    private static Instant instante(Map<String, Object> fila, String columna) {
+        Object valor = fila.get(columna);
+        return valor instanceof java.time.OffsetDateTime fecha ? fecha.toInstant() : ((java.sql.Timestamp) valor).toInstant();
     }
 
     private ResponseEntity<String> registrar(String cuerpo) {
