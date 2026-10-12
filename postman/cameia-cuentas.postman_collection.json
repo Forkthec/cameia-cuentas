@@ -1707,6 +1707,11 @@
           }
         }
       ]
+    },
+    {
+      "name": "Activación",
+      "description": "POST /api/v1/users/me/verification: activa la cuenta cuando el Gateway afirma que el correo está verificado. Se completa en esta rama.",
+      "item": []
     }
   ]
 }

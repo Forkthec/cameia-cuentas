@@ -4,7 +4,7 @@ Esta carpeta trae la colección de Postman del microservicio de Cuentas y el ent
 
 | Archivo | Contenido |
 |---|---|
-| `cameia-cuentas.postman_collection.json` | Colección v2.1: carpeta `Registro` (8 peticiones), carpeta `Firebase no disponible (manual)` (1 petición), carpeta `Eventos de cuenta (local)` (10 peticiones) y carpeta `Mi cuenta` (12 peticiones) |
+| `cameia-cuentas.postman_collection.json` | Colección v2.1: carpeta `Registro` (8 peticiones), carpeta `Firebase no disponible (manual)` (1 petición), carpeta `Eventos de cuenta (local)` (10 peticiones), carpeta `Mi cuenta` (12 peticiones) y carpeta `Activación` (se completa en esta rama) |
 | `local.postman_environment.json` | Entorno local: `baseUrl` (`http://localhost:8081`, el puerto de `SERVER_PORT`) y los datos del broker de compose (`rabbitManagementUrl`, `rabbitUser` y `rabbitPassword`, esta última vacía). No lleva secretos |
 
 ## Qué verifica
