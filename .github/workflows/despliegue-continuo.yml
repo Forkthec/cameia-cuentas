@@ -161,3 +161,15 @@ jobs:
           print("Smoke test PASA.")
           PYEOF
           python3 /tmp/smoke.py
+
+      # El Job de relevo de eventos usa la misma imagen que el servicio, con otro perfil
+      # de Spring. Se actualiza despues del smoke test para que nunca corra una version
+      # distinta de la que quedo sirviendo trafico. Solo se cambia la imagen: el resto de
+      # la configuracion del Job se administra fuera de este repositorio. Si el Job no
+      # existe, el paso falla y el despliegue lo muestra.
+      - name: Actualizar la imagen del Job de relevo de eventos
+        run: |
+          gcloud run jobs update account-events-relay \
+            --image="${{ steps.imagen.outputs.imagen }}" \
+            --project="${{ vars.GCP_PROJECT_ID }}" \
+            --region="${{ env.REGION }}"
