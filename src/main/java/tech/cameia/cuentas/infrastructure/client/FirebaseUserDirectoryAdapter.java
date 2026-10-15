@@ -266,6 +266,29 @@ public class FirebaseUserDirectoryAdapter implements FirebaseUserDirectory {
     }
 
     /**
+     * Revoca las sesiones del usuario con {@code revokeRefreshTokens}.
+     *
+     * <p>Una credencial que ya no existe no tiene sesiones que revocar: se da por hecho, igual que al borrar.</p>
+     *
+     * @param firebaseUid identificador del usuario
+     * @throws DependencyUnavailableException si Firebase no respondió o falló de su lado
+     * @throws IllegalStateException si Firebase rechaza la revocación por cualquier otro motivo (permisos o configuración)
+     */
+    @Override
+    public void revokeSessions(String firebaseUid) {
+        try {
+            firebaseAuth.revokeRefreshTokens(firebaseUid);
+            logger.info("Sesiones revocadas en Firebase para el usuario {}", firebaseUid);
+        } catch (FirebaseAuthException error) {
+            if (AuthErrorCode.USER_NOT_FOUND.equals(error.getAuthErrorCode())) {
+                logger.info("El usuario {} no existe en Firebase; no hay sesiones que revocar", firebaseUid);
+                return;
+            }
+            throw unavailableOrRejection(error, "Firebase rechazó la revocación de las sesiones del usuario");
+        }
+    }
+
+    /**
      * Separa la indisponibilidad de Firebase de un rechazo.
      *
      * <p>Cuenta como indisponibilidad lo que la persona resuelve reintentando: el servicio no
