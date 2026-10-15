@@ -10,10 +10,13 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "const delBroker = (pm.request.url.toString().indexOf(pm.environment.get('rabbitManagementUrl') || '\\u0000') === 0);",
-          "if (!delBroker) {",
+          "const deOtroSistema = ['rabbitManagementUrl', 'firebaseEmulatorUrl'].some((nombre) =>",
+          "    pm.request.url.toString().indexOf(pm.environment.get(nombre) || '\\u0000') === 0);",
+          "if (!deOtroSistema) {",
           "    const tipo = (pm.response.headers.get('Content-Type') || '').toLowerCase();",
-          "    pm.test('Content-Type con charset utf-8', () => pm.expect(tipo).to.include('charset=utf-8'));",
+          "    if (pm.response.code !== 204) {",
+          "        pm.test('Content-Type con charset utf-8', () => pm.expect(tipo).to.include('charset=utf-8'));",
+          "    }",
           "    if (pm.response.code >= 400) {",
           "        pm.test('Error: application/problem+json', () => pm.expect(tipo).to.include('application/problem+json'));",
           "        pm.test('Error: requestId igual a X-Request-Id', () =>",
@@ -22,7 +25,7 @@
           "            const texto = pm.response.text();",
           "            ['Exception', 'SQL', 'org.', 'tech.cameia'].forEach((marca) => pm.expect(texto).to.not.include(marca));",
           "        });",
-          "    } else {",
+          "    } else if (pm.response.code !== 204) {",
           "        pm.test('Éxito: JSON', () => pm.expect(tipo).to.include('application/json'));",
           "    }",
           "}"
@@ -2513,6 +2516,516 @@
                   "    const operacion = pm.response.json().paths['/api/v1/users/me/verification'].post;",
                   "    pm.expect(operacion).to.be.an('object');",
                   "    ['200', '400', '403', '404', '409', '500'].forEach((estado) => pm.expect(operacion.responses).to.have.property(estado));",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v3/api-docs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v3",
+                "api-docs"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cerrar sesión en todos los dispositivos",
+      "item": [
+        {
+          "name": "L-00 — 201 registro de la cuenta que cerrará sesión",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('logoutEmail', 'prueba+' + Date.now() + '-' + pm.info.iteration + '-logout@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('logoutUid', pm.response.json().firebaseUid);",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{logoutEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "L-01 — 204 cierra la sesión en todos los dispositivos",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Firebase guarda el instante de la revocación en segundos: se espera para que sea posterior a este.",
+                  "pm.collectionVariables.set('revocadoDesde', String(Math.floor(Date.now() / 1000)));",
+                  "setTimeout(() => {}, 1100);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Cuerpo vacío', () => pm.expect(pm.response.text()).to.eql(''));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{logoutUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            }
+          }
+        },
+        {
+          "name": "L-01b — 200 el emulador de Firebase registra la revocación",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('validSince es posterior al inicio de la revocación', () => {",
+                  "    const desde = pm.response.json().users[0].validSince;",
+                  "    pm.expect(Number(desde)).to.be.at.least(Number(pm.collectionVariables.get('revocadoDesde')));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer owner"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{firebaseEmulatorUrl}}/identitytoolkit.googleapis.com/v1/projects/{{firebaseProjectId}}/accounts:lookup",
+              "host": [
+                "{{firebaseEmulatorUrl}}"
+              ],
+              "path": [
+                "identitytoolkit.googleapis.com",
+                "v1",
+                "projects",
+                "{{firebaseProjectId}}",
+                "accounts:lookup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"localId\":[\"{{logoutUid}}\"]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "L-02 — 204 repetir la petición",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Cuerpo vacío', () => pm.expect(pm.response.text()).to.eql(''));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{logoutUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            }
+          }
+        },
+        {
+          "name": "L-03 — 204 usuario que no existe en Firebase",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Cuerpo vacío', () => pm.expect(pm.response.text()).to.eql(''));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "uid-que-no-existe-{{$timestamp}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            }
+          }
+        },
+        {
+          "name": "L-04 — 400 sin X-User-Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Código IDENTITY_REQUIRED', () => pm.expect(pm.response.json().code).to.eql('IDENTITY_REQUIRED'));",
+                  "pm.test('Mensaje del criterio', () => pm.expect(pm.response.json().detail).to.eql('La petición no incluye los datos que exige esta ruta.'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            }
+          }
+        },
+        {
+          "name": "L-05 — 400 X-User-Id de 129 caracteres",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Código IDENTITY_REQUIRED', () => pm.expect(pm.response.json().code).to.eql('IDENTITY_REQUIRED'));",
+                  "pm.test('Mensaje del criterio', () => pm.expect(pm.response.json().detail).to.eql('La petición no incluye los datos que exige esta ruta.'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            }
+          }
+        },
+        {
+          "name": "L-06 — 204 ignora el usuario del cuerpo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Cuerpo vacío', () => pm.expect(pm.response.text()).to.eql(''));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{logoutUid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"firebaseUid\":\"uid-ajeno\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "L-07 — 204 ignora el usuario de la consulta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Cuerpo vacío', () => pm.expect(pm.response.text()).to.eql(''));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{logoutUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all?uid=uid-ajeno&firebaseUid=uid-ajeno",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ],
+              "query": [
+                {
+                  "key": "uid",
+                  "value": "uid-ajeno"
+                },
+                {
+                  "key": "firebaseUid",
+                  "value": "uid-ajeno"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "L-08 — 204 identidad hostil sin reflejarla",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Cuerpo vacío', () => pm.expect(pm.response.text()).to.eql(''));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "' OR 1=1 --"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            }
+          }
+        },
+        {
+          "name": "L-09 — 405 GET sobre la ruta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 405', () => pm.response.to.have.status(405));",
+                  "pm.test('Código METHOD_NOT_ALLOWED', () => pm.expect(pm.response.json().code).to.eql('METHOD_NOT_ALLOWED'));",
+                  "pm.test('Allow contiene POST', () => pm.expect(pm.response.headers.get('Allow')).to.include('POST'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{logoutUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            }
+          }
+        },
+        {
+          "name": "L-10 — 200 OpenAPI publica la ruta con sus cinco respuestas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('POST /api/v1/auth/logout-all con 204, 400, 405, 500 y 503', () => {",
+                  "    const respuestas = pm.response.json().paths['/api/v1/auth/logout-all'].post.responses;",
+                  "    ['204', '400', '405', '500', '503'].forEach((estado) => pm.expect(respuestas).to.have.property(estado));",
                   "});",
                   "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
                 ]

@@ -31,10 +31,13 @@ import com.google.firebase.auth.UserRecord;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
@@ -51,6 +54,7 @@ import tech.cameia.cuentas.domain.model.UserVerificationStatus;
  * el adaptador con cada respuesta de Firebase. Comprobar que Firebase crea usuarios es
  * trabajo de Firebase, no de esta suite, y exigiría credenciales reales.</p>
  */
+@ExtendWith(OutputCaptureExtension.class)
 class FirebaseUserDirectoryAdapterTest {
 
     private static final String UID = "uid-firebase";
@@ -478,6 +482,67 @@ class FirebaseUserDirectoryAdapterTest {
                 .isInstanceOf(IllegalStateException.class)
                 .isNotInstanceOf(DependencyUnavailableException.class)
                 .hasMessageNotContaining("ana@cameia.tech");
+    }
+
+    @Test
+    @DisplayName("Revocar las sesiones llama a Firebase con el identificador del usuario")
+    void revokeSessions_shouldCallFirebaseWithUid_whenUserExists() throws Exception {
+        adaptador.revokeSessions("uid-rev-1");
+
+        verify(firebaseAuth).revokeRefreshTokens("uid-rev-1");
+    }
+
+    @Test
+    @DisplayName("Un usuario que ya no existe en Firebase no tiene sesiones: no es un error")
+    void revokeSessions_shouldSucceed_whenUserNotFound() throws Exception {
+        doThrow(new FirebaseAuthException(ErrorCode.NOT_FOUND, "sin usuario", null, null, AuthErrorCode.USER_NOT_FOUND))
+                .when(firebaseAuth).revokeRefreshTokens("uid-rev-2");
+
+        assertThatCode(() -> adaptador.revokeSessions("uid-rev-2")).doesNotThrowAnyException();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ErrorCode.class, names = {"UNAVAILABLE", "DEADLINE_EXCEEDED", "INTERNAL", "RESOURCE_EXHAUSTED"})
+    @DisplayName("Si Firebase no responde o falla de su lado, la revocación es indisponibilidad")
+    void revokeSessions_shouldThrowDependencyUnavailable_whenFirebaseFails(ErrorCode codigo) throws Exception {
+        doThrow(new FirebaseAuthException(codigo, "fallo", null, null, null))
+                .when(firebaseAuth).revokeRefreshTokens("uid-rev-3");
+
+        assertThatThrownBy(() -> adaptador.revokeSessions("uid-rev-3")).isInstanceOf(DependencyUnavailableException.class);
+    }
+
+    @Test
+    @DisplayName("Una conexión rechazada al revocar es indisponibilidad")
+    void revokeSessions_shouldThrowDependencyUnavailable_whenConnectionFails() throws Exception {
+        doThrow(new FirebaseAuthException(ErrorCode.UNKNOWN, "conexión rechazada",
+                new java.net.ConnectException("rechazada"), null, null))
+                .when(firebaseAuth).revokeRefreshTokens("uid-rev-4");
+
+        assertThatThrownBy(() -> adaptador.revokeSessions("uid-rev-4")).isInstanceOf(DependencyUnavailableException.class);
+    }
+
+    @Test
+    @DisplayName("Un rechazo de Firebase por permisos al revocar es un fallo imprevisto")
+    void revokeSessions_shouldThrowIllegalState_whenFirebaseRejects() throws Exception {
+        doThrow(new FirebaseAuthException(ErrorCode.PERMISSION_DENIED, "sin permisos", null, null, null))
+                .when(firebaseAuth).revokeRefreshTokens("uid-rev-5");
+
+        assertThatThrownBy(() -> adaptador.revokeSessions("uid-rev-5"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("revocación");
+    }
+
+    @Test
+    @DisplayName("El log de la revocación lleva el identificador y ningún token ni correo")
+    void revokeSessions_shouldLogUidOnly(CapturedOutput salida) {
+        adaptador.revokeSessions("uid-rev-log");
+
+        String linea = salida.getOut().lines()
+                .filter(l -> l.contains("FirebaseUserDirectoryAdapter") && l.contains("uid-rev-log"))
+                .findFirst().orElseThrow();
+
+        assertThat(linea).endsWith("Sesiones revocadas en Firebase para el usuario uid-rev-log")
+                .doesNotContain("Bearer").doesNotContain("@");
     }
 
     /**

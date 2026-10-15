@@ -99,4 +99,15 @@ public interface FirebaseUserDirectory {
      * @throws DependencyUnavailableException si el directorio no respondió o falló de su lado
      */
     List<String> findUnverifiedPasswordUsersCreatedBefore(Instant limit, int max);
+
+    /**
+     * Revoca todas las sesiones del usuario en todos sus dispositivos.
+     *
+     * <p>Después de revocar, ningún dispositivo puede renovar su sesión, y los tokens emitidos antes dejan de servir en cuanto el
+     * Gateway comprueba la revocación. Un usuario que ya no existe en el directorio no tiene sesiones: no es un error.</p>
+     *
+     * @param firebaseUid identificador del usuario
+     * @throws DependencyUnavailableException si el directorio no respondió o falló de su lado
+     */
+    void revokeSessions(String firebaseUid);
 }

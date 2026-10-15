@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
@@ -56,6 +57,9 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
     private volatile boolean respuestaPerdida;
     private volatile String uidRechazado;
     private volatile String uidIndisponible;
+    private final List<String> revokedUids = new CopyOnWriteArrayList<>();
+    private volatile boolean unavailableOnRevoke;
+    private volatile boolean rejectOnRevoke;
 
     @Override
     public synchronized void createUser(String firebaseUid, EmailAddress email, RawPassword password) {
@@ -367,6 +371,41 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         this.respuestaPerdida = false;
     }
 
+    /**
+     * Registra la revocación de las sesiones de un usuario, o falla si se provocó el fallo.
+     *
+     * @param firebaseUid identificador del usuario
+     */
+    @Override
+    public void revokeSessions(String firebaseUid) {
+        if (unavailableOnRevoke) {
+            throw new DependencyUnavailableException(new IllegalStateException("Firebase no respondió"));
+        }
+        if (rejectOnRevoke) {
+            throw new IllegalStateException("Firebase rechazó la revocación de las sesiones del usuario");
+        }
+        revokedUids.add(firebaseUid);
+    }
+
+    /**
+     * Informa de las revocaciones recibidas.
+     *
+     * @return los identificadores revocados, en orden y con repeticiones
+     */
+    public List<String> revokedUids() {
+        return List.copyOf(revokedUids);
+    }
+
+    /** Hace que la revocación falle como si Firebase no respondiera. */
+    public void becomeUnavailableOnRevoke() {
+        unavailableOnRevoke = true;
+    }
+
+    /** Hace que la revocación falle como un rechazo de configuración. */
+    public void rejectRevocations() {
+        rejectOnRevoke = true;
+    }
+
     /** Vacía el directorio y desactiva los fallos provocados. */
     public void limpiar() {
         correosPorUid.clear();
@@ -386,5 +425,8 @@ public class InMemoryFirebaseUserDirectory implements FirebaseUserDirectory {
         fallarAlBorrar = false;
         reintentoDelSdk = false;
         respuestaPerdida = false;
+        revokedUids.clear();
+        unavailableOnRevoke = false;
+        rejectOnRevoke = false;
     }
 }
