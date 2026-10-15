@@ -7,7 +7,7 @@ CAMEIA ofrece práctica y simulación de entrevistas virtuales para preparar ent
 - Mantiene el estado local de la cuenta asociado al `firebaseUid`.
 - Gestiona planes, suscripciones, transacciones y su idempotencia.
 - Se integra con Wompi para pagos, una vez aprobado el contrato de integración.
-- Se integra con Firebase Admin SDK para consultar usuarios, actualizar sus datos y permisos, y bloquear cuentas cuando corresponda.
+- Se integra con Firebase Admin SDK para consultar usuarios, actualizar sus datos y permisos, revocar sus sesiones y bloquear cuentas cuando corresponda.
 - Publica cambios mediante contratos de eventos aprobados: hoy `cuenta.creada` versión 1 ([docs/eventos/cuenta-creada-v1.md](docs/eventos/cuenta-creada-v1.md)) y `cuenta.eliminada` versión 1 ([docs/eventos/cuenta-eliminada-v1.md](docs/eventos/cuenta-eliminada-v1.md)), con tabla de salida y relevo ([ADR 0003](docs/adr/0003-eventos-con-outbox.md)).
 - Mantiene persistencia propia, sin claves foráneas hacia otros microservicios.
 
