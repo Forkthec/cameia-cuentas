@@ -173,3 +173,15 @@ jobs:
             --image="${{ steps.imagen.outputs.imagen }}" \
             --project="${{ vars.GCP_PROJECT_ID }}" \
             --region="${{ env.REGION }}"
+
+      # El Job de purga de cuentas sin verificar usa la misma imagen que el servicio, con
+      # otro perfil de Spring. Se actualiza despues del smoke test para que nunca corra una
+      # version distinta de la que quedo sirviendo trafico. Solo se cambia la imagen: el
+      # resto de la configuracion del Job y su programacion se administran fuera de este
+      # repositorio. Si el Job no existe, el paso falla y el despliegue lo muestra.
+      - name: Actualizar la imagen del Job de purga de cuentas sin verificar
+        run: |
+          gcloud run jobs update purge-job \
+            --image="${{ steps.imagen.outputs.imagen }}" \
+            --project="${{ vars.GCP_PROJECT_ID }}" \
+            --region="${{ env.REGION }}"
