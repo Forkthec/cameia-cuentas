@@ -4,15 +4,15 @@ Esta carpeta trae la colección de Postman del microservicio de Cuentas y el ent
 
 | Archivo | Contenido |
 |---|---|
-| `cameia-cuentas.postman_collection.json` | Colección v2.1: carpeta `Registro` (8 peticiones), carpeta `Firebase no disponible (manual)` (1 petición), carpeta `Eventos de cuenta (local)` (10 peticiones), carpeta `Mi cuenta` (12 peticiones) y carpeta `Activación` (18 peticiones) |
-| `local.postman_environment.json` | Entorno local: `baseUrl` (`http://localhost:8081`, el puerto de `SERVER_PORT`) y los datos del broker de compose (`rabbitManagementUrl`, `rabbitUser` y `rabbitPassword`, esta última vacía). No lleva secretos |
+| `cameia-cuentas.postman_collection.json` | Colección v2.1: carpeta `Registro` (8 peticiones), carpeta `Firebase no disponible (manual)` (1 petición), carpeta `Eventos de cuenta (local)` (10 peticiones), carpeta `Mi cuenta` (12 peticiones), carpeta `Activación` (18 peticiones) y carpeta `Cerrar sesión en todos los dispositivos` (12 peticiones) |
+| `local.postman_environment.json` | Entorno local: `baseUrl` (`http://localhost:8081`, el puerto de `SERVER_PORT`) y los datos del broker de compose (`rabbitManagementUrl`, `rabbitUser` y `rabbitPassword`, esta última vacía) y el emulador de Firebase Auth (`firebaseEmulatorUrl`, `http://localhost:9099`, y `firebaseProjectId`, `demo-cameia`). No lleva secretos |
 
 ## Qué verifica
 
 Cada petición comprueba su estado y su cuerpo. Además, el script de la colección comprueba en **todas** las respuestas:
 
-- `Content-Type` con `charset=utf-8`;
-- en los éxitos, tipo JSON;
+- `Content-Type` con `charset=utf-8` (salvo en un 204, que no lleva cuerpo ni tipo);
+- en los éxitos con cuerpo, tipo JSON;
 - en los errores (estado 400 o mayor), `application/problem+json`, `requestId` igual al encabezado `X-Request-Id` y un cuerpo sin las marcas `Exception`, `SQL`, `org.` ni `tech.cameia`.
 
 Carpeta `Registro` (`POST /api/v1/users`), en este orden y con un correo sintético nuevo en cada vuelta (`prueba+<marca de tiempo>-<iteración>@ejemplo.test`):
@@ -87,6 +87,25 @@ Carpeta `Activación` (`POST /api/v1/users/me/verification`): registra una cuent
 
 Las respuestas 403 `ACCOUNT_DISABLED` y 409 `ACCOUNT_CONFLICT` no se pueden provocar por HTTP sin tocar la base: las cubren `AccountActivationControllerTest`, `ActivateAccountServiceTest` y `AccountRegistrationEndToEndTest`.
 
+Carpeta `Cerrar sesión en todos los dispositivos` (`POST /api/v1/auth/logout-all`): registra una cuenta sintética, cierra su sesión con la identidad que pondría el Gateway y comprueba en el emulador de Firebase que la revocación quedó guardada. Como las otras carpetas, comprueba `code` y `detail` literales y que cada petición a Cuentas responda en menos de 2 s; las peticiones al emulador y el script de la colección no aplican a una respuesta 204 la comprobación de `charset`.
+
+| # | Petición | Resultado esperado |
+|---|---|---|
+| L-00 | Registro de la cuenta que cerrará sesión | 201; guarda `logoutUid` |
+| L-01 | `POST /api/v1/auth/logout-all` con `X-User-Id: {{logoutUid}}`; antes guarda `revocadoDesde` (segundos) y espera 1,1 s | 204 con cuerpo vacío |
+| L-01b | `POST {{firebaseEmulatorUrl}}/identitytoolkit.googleapis.com/v1/projects/{{firebaseProjectId}}/accounts:lookup` con `Authorization: Bearer owner` | 200; `validSince` del usuario es mayor o igual que `revocadoDesde` |
+| L-02 | Repetir L-01 | 204: es idempotente |
+| L-03 | `X-User-Id` de un usuario que no existe en Firebase | 204 |
+| L-04 | Sin `X-User-Id` | 400 `IDENTITY_REQUIRED` con «La petición no incluye los datos que exige esta ruta.» |
+| L-05 | `X-User-Id` de 129 caracteres | 400 `IDENTITY_REQUIRED` |
+| L-06 | Cuerpo `{"firebaseUid":"uid-ajeno"}` | 204: el cuerpo se ignora |
+| L-07 | `?uid=uid-ajeno&firebaseUid=uid-ajeno` | 204: la consulta se ignora |
+| L-08 | `X-User-Id: ' OR 1=1 --` | 204 con cuerpo vacío, sin repetir el valor |
+| L-09 | `GET` sobre la ruta | 405 `METHOD_NOT_ALLOWED`; `Allow` contiene `POST` |
+| L-10 | `GET /v3/api-docs` | 200 con `POST /api/v1/auth/logout-all` y sus respuestas 204, 400, 405, 500 y 503; exige `API_DOCUMENTATION_ENABLED=true` |
+
+La respuesta 503 `DEPENDENCY_UNAVAILABLE` (Firebase caído al revocar) y la 500 `INTERNAL_ERROR` (Firebase rechaza la revocación por permisos) no se pueden provocar contra el emulador: las cubren `SessionRevocationControllerTest` y `SessionRevocationEndToEndTest`. La primera petición tras arrancar la aplicación puede superar los 2 s por el arranque en frío; volver a correr la carpeta.
+
 La carpeta `Firebase no disponible (manual)` tiene una sola petición: 503 `DEPENDENCY_UNAVAILABLE` en menos de 9 s.
 
 ## Cómo correrla
@@ -105,6 +124,7 @@ npx newman run postman/cameia-cuentas.postman_collection.json -e postman/local.p
   ```
 
 - La carpeta de la consulta se corre con `--folder "Mi cuenta"` y `--reporter-junit-export target/newman-mi-cuenta.xml`; no necesita el broker.
+- La carpeta de cierre de sesión se corre con `--folder "Cerrar sesión en todos los dispositivos"` y `--reporter-junit-export target/newman-logout.xml`; necesita el emulador de Firebase en `firebaseEmulatorUrl` y no necesita el broker.
 - Para medir tiempos, `-n 100` repite la carpeta 100 veces; cada vuelta usa correos nuevos.
 - Para importarla en Postman: **Import** con los dos archivos `.json`, y elegir el entorno `cameia-cuentas local`.
 
