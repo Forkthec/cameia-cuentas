@@ -93,6 +93,9 @@ public enum ErrorCode {
     /** El cuerpo de la petición no se puede interpretar. */
     REQUEST_BODY_INVALID_FORMAT,
 
+    /** Un multipart de la petición no se pudo leer (por ejemplo, sin boundary). */
+    REQUEST_MULTIPART_INVALID_FORMAT,
+
     /** Falta el encabezado de identidad que pone el Gateway. */
     IDENTITY_REQUIRED,
 

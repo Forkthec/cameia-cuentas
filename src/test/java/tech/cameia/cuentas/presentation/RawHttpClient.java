@@ -7,11 +7,14 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Cliente HTTP de pruebas que escribe la petición byte a byte en un socket. Existe porque
@@ -64,17 +67,34 @@ final class RawHttpClient {
         head.append(CRLF);
         try (Socket socket = new Socket("localhost", port)) {
             socket.setSoTimeout(15_000);
+            // La respuesta se lee mientras se escribe: ante un cuerpo grande el servidor contesta y
+            // cierra la conexión sin leerlo entero, y el cierre descartaría lo que no se hubiera leído.
+            CompletableFuture<String> response = CompletableFuture.supplyAsync(() -> readAll(socket));
             OutputStream out = socket.getOutputStream();
-            out.write(head.toString().getBytes(ISO_8859_1));
-            out.write(payload);
-            out.flush();
-            return parse(readAll(socket.getInputStream()));
+            try {
+                out.write(head.toString().getBytes(ISO_8859_1));
+                out.write(payload);
+                out.flush();
+            } catch (SocketException serverClosedEarly) {
+                // El servidor ya respondió y cerró; lo que importa es la respuesta que se leyó.
+            }
+            return parse(response.join());
         }
     }
 
-    private static String readAll(InputStream in) throws IOException {
+    private static String readAll(Socket socket) {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        in.transferTo(buffer);
+        byte[] chunk = new byte[8192];
+        try {
+            InputStream in = socket.getInputStream();
+            for (int read = in.read(chunk); read >= 0; read = in.read(chunk)) {
+                buffer.write(chunk, 0, read);
+            }
+        } catch (SocketException reset) {
+            // El servidor cerró con la conexión a medias: vale lo ya leído.
+        } catch (IOException failure) {
+            throw new UncheckedIOException(failure);
+        }
         // ISO-8859-1 conserva un carácter por byte: los largos de los fragmentos son en bytes.
         return buffer.toString(ISO_8859_1);
     }

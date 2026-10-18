@@ -18,6 +18,7 @@ import com.jayway.jsonpath.JsonPath;
 
 import jakarta.validation.Constraint;
 
+import org.apache.tomcat.util.http.InvalidParameterException;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +28,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -44,6 +46,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartException;
 
 import tech.cameia.cuentas.domain.exception.AccountConflictException;
 import tech.cameia.cuentas.domain.exception.AccountDisabledException;
@@ -171,13 +174,126 @@ class BusinessExceptionHandlerTest {
         assertThat(salida.getOut()).contains("ERROR").contains("Restricción del contrato sin código de error: telefono.Pattern");
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"POST", "PUT", "PATCH", "DELETE"})
+    @DisplayName("Un parámetro mal codificado en un formulario responde 415")
+    void invalidParameter_shouldReturn415_whenFormBody(String method) {
+        MockHttpServletRequest request = new MockHttpServletRequest(method, "/api/v1/users");
+        request.setContentType("application/x-www-form-urlencoded");
+
+        ProblemDetail problema = manejador.falloInterno(
+                new InvalidParameterException("x"), request);
+
+        assertThat(problema.getStatus()).isEqualTo(415);
+        assertThat(problema.getProperties()).containsEntry("code", "MEDIA_TYPE_NOT_ALLOWED");
+        assertThat(problema.getProperties()).containsKey("requestId");
+    }
+
+    @Test
+    @DisplayName("El tipo de contenido del formulario se reconoce con mayúsculas y charset")
+    void invalidParameter_shouldReturn415_whenFormContentTypeHasCharsetAndUppercase() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/users");
+        request.setContentType("Application/X-WWW-Form-Urlencoded; charset=UTF-8");
+
+        ProblemDetail problema = manejador.falloInterno(
+                new InvalidParameterException("x"), request);
+
+        assertThat(problema.getStatus()).isEqualTo(415);
+    }
+
+    @Test
+    @DisplayName("El mismo rechazo de Tomcat fuera de un formulario sigue siendo un fallo interno")
+    void invalidParameter_shouldReturn500_whenNotFormBody() {
+        ProblemDetail problema = manejador.falloInterno(
+                new InvalidParameterException("x"),
+                new MockHttpServletRequest("GET", "/api/v1/users"));
+
+        assertThat(problema.getStatus()).isEqualTo(500);
+        assertThat(problema.getProperties()).containsEntry("code", "INTERNAL_ERROR");
+    }
+
+    @Test
+    @DisplayName("Una IllegalStateException cualquiera responde 500")
+    void illegalState_shouldReturn500_whenNotInvalidParameter() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/users");
+        request.setContentType("application/x-www-form-urlencoded");
+
+        ProblemDetail problema = manejador.falloInterno(new IllegalStateException("x"), request);
+
+        assertThat(problema.getStatus()).isEqualTo(500);
+        assertThat(problema.getProperties()).containsEntry("code", "INTERNAL_ERROR");
+    }
+
+    @Test
+    @DisplayName("El mensaje de la excepción de Tomcat no se devuelve")
+    void invalidParameter_shouldNotEchoMessage() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/users");
+        request.setContentType("application/x-www-form-urlencoded");
+
+        ProblemDetail problema = manejador.falloInterno(
+                new InvalidParameterException("Parameter [a] with value [%zz]"), request);
+
+        assertThat(problema.toString()).doesNotContain("%zz");
+        assertThat(problema.getDetail()).doesNotContain("zz");
+    }
+
+    @Test
+    @DisplayName("Un multipart roto responde 415 con su código propio")
+    void multipart_shouldReturn415_whenMultipartContentType() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/users");
+        request.setContentType("multipart/form-data");
+
+        ProblemDetail problema = manejador.multipartMalFormado(
+                new MultipartException("x"), request);
+
+        assertThat(problema.getStatus()).isEqualTo(415);
+        assertThat(problema.getProperties()).containsEntry("code", "REQUEST_MULTIPART_INVALID_FORMAT");
+    }
+
+    @Test
+    @DisplayName("Un fallo de multipart en una petición que no es multipart responde 500")
+    void multipart_shouldReturn500_whenNotMultipartContentType() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/users");
+        request.setContentType("application/json");
+
+        ProblemDetail problema = manejador.multipartMalFormado(
+                new MultipartException("x"), request);
+
+        assertThat(problema.getStatus()).isEqualTo(500);
+        assertThat(problema.getProperties()).containsEntry("code", "INTERNAL_ERROR");
+    }
+
+    @Test
+    @DisplayName("Un multipart sin tipo de contenido responde 500")
+    void multipart_shouldReturn500_whenContentTypeIsMissing() {
+        ProblemDetail problema = manejador.multipartMalFormado(
+                new MultipartException("x"), new MockHttpServletRequest());
+
+        assertThat(problema.getStatus()).isEqualTo(500);
+    }
+
     @Test
     void fueraDeUnaPeticionElRequestIdSeGeneraIgual() {
         RequestContextHolder.resetRequestAttributes();
 
-        ProblemDetail problema = manejador.falloInterno(new IllegalStateException("x"));
+        ProblemDetail problema = manejador.falloInterno(new IllegalStateException("x"), new MockHttpServletRequest());
 
         assertThat((String) problema.getProperties().get("requestId")).matches(UUID_V4);
+    }
+
+    @Test
+    @DisplayName("El error fija application/problem+json con charset en la respuesta, para que un Accept ilegible no lo deje sin cuerpo")
+    void requestId_shouldSetProblemJsonContentType_whenResponseIsAvailable() {
+        MockHttpServletRequest peticion = new MockHttpServletRequest();
+        MockHttpServletResponse respuesta = new MockHttpServletResponse();
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(peticion, respuesta));
+        try {
+            manejador.falloInterno(new IllegalStateException("x"), peticion);
+
+            assertThat(respuesta.getContentType()).isEqualToIgnoringCase("application/problem+json;charset=UTF-8");
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
     }
 
     @Test
@@ -186,7 +302,7 @@ class BusinessExceptionHandlerTest {
         peticion.addHeader("X-Request-Id", "solo-peticion");
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(peticion));
         try {
-            ProblemDetail problema = manejador.falloInterno(new IllegalStateException("x"));
+            ProblemDetail problema = manejador.falloInterno(new IllegalStateException("x"), new MockHttpServletRequest());
 
             assertThat(problema.getProperties()).containsEntry("requestId", "solo-peticion");
         } finally {

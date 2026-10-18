@@ -5,11 +5,13 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 
 import org.hibernate.exception.ConstraintViolationException;
@@ -18,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -33,6 +36,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import tech.cameia.cuentas.domain.exception.AccountConflictException;
@@ -78,6 +82,9 @@ class BusinessExceptionHandler {
 
     /** Encabezado con el identificador de la petición, que pone el Gateway. */
     private static final String REQUEST_ID_HEADER = "X-Request-Id";
+
+    /** Tipo de contenido de todo error del servicio, con la codificación explícita (ASVS 4.1.1). */
+    private static final String PROBLEM_JSON_UTF8 = "application/problem+json;charset=UTF-8";
 
     /**
      * Forma admitida para un identificador recibido. Lo que no la cumple se reemplaza por
@@ -391,26 +398,62 @@ class BusinessExceptionHandler {
      * Tipo de respuesta que quien llama no acepta.
      *
      * <p>Es un error del cliente: su {@code Accept} no admite ninguno de los tipos que la ruta
-     * produce. El cuerpo sale igual en {@code application/problem+json}, como todo error del
-     * servicio.</p>
+     * produce, o no se puede interpretar. El cuerpo sale en {@code application/problem+json}, como
+     * todo error del servicio; el tipo se fija de forma explícita porque, con un {@code Accept}
+     * ilegible, Spring no puede negociar uno y respondería sin cuerpo (a los demás errores se lo
+     * fija {@link #resolverRequestId()}).</p>
      *
      * @param error excepción con los tipos que la ruta sí produce
      * @return {@code 406 Not Acceptable} con el código {@code MEDIA_TYPE_NOT_ACCEPTABLE}
      */
     @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
-    ProblemDetail responseTypeNotAcceptable(HttpMediaTypeNotAcceptableException error) {
-        return rechazo(HttpStatus.NOT_ACCEPTABLE, "Tipo de respuesta no admitido", "Tipo de respuesta no admitido.",
-                ErrorCode.MEDIA_TYPE_NOT_ACCEPTABLE);
+    ResponseEntity<ProblemDetail> responseTypeNotAcceptable(HttpMediaTypeNotAcceptableException error) {
+        ProblemDetail problema = rechazo(HttpStatus.NOT_ACCEPTABLE, "Tipo de respuesta no admitido",
+                "Tipo de respuesta no admitido.", ErrorCode.MEDIA_TYPE_NOT_ACCEPTABLE);
+        return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE)
+                .contentType(new MediaType("application", "problem+json", StandardCharsets.UTF_8))
+                .body(problema);
     }
 
     /**
-     * Cualquier otro fallo.
+     * Multipart que el contenedor no pudo leer (por ejemplo, sin {@code boundary}).
+     *
+     * <p>Cuentas no recibe multipart: uno roto es un tipo de contenido no admitido, no un fallo del
+     * servicio. Si la petición no era multipart, el fallo es otro y sigue el camino de los imprevistos.</p>
+     *
+     * @param error excepción de Spring al leer el multipart
+     * @param request petición, de la que se toma el tipo de contenido
+     * @return {@code 415 Unsupported Media Type} con el código {@code REQUEST_MULTIPART_INVALID_FORMAT}
+     */
+    @ExceptionHandler(MultipartException.class)
+    ProblemDetail multipartMalFormado(MultipartException error, HttpServletRequest request) {
+        String tipo = request.getContentType();
+        if (tipo != null && tipo.toLowerCase(Locale.ROOT).startsWith("multipart/")) {
+            return rechazo(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Tipo de contenido no admitido",
+                    "Tipo de contenido no admitido.", ErrorCode.REQUEST_MULTIPART_INVALID_FORMAT,
+                    "causa=multipart-mal-formado");
+        }
+        return falloInterno(error, request);
+    }
+
+    /**
+     * Cualquier otro fallo, salvo un formulario mal codificado.
+     *
+     * <p>Un parámetro con una codificación inválida ({@code %zz}) en el cuerpo de un formulario es un
+     * dato del cliente: se responde como el formulario bien formado, {@code 415}, y no como un fallo.</p>
      *
      * @param error excepción no prevista
+     * @param request petición, de la que se toman el método y el tipo de contenido
      * @return {@code 500 Internal Server Error} con un mensaje genérico
      */
     @ExceptionHandler(Exception.class)
-    ProblemDetail falloInterno(Exception error) {
+    ProblemDetail falloInterno(Exception error, HttpServletRequest request) {
+        if (BadParameterEncoding.matches(error)
+                && BadParameterEncoding.fromFormBody(request.getMethod(), request.getContentType())) {
+            return rechazo(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Tipo de contenido no admitido",
+                    "Tipo de contenido no admitido.", ErrorCode.MEDIA_TYPE_NOT_ALLOWED,
+                    "causa=formulario-mal-codificado");
+        }
         ProblemDetail problema = problema(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno", DETALLE_INTERNO,
                 ErrorCode.INTERNAL_ERROR);
         // Con la traza: es la única forma de diagnosticar un fallo que nadie previó. El
@@ -487,10 +530,12 @@ class BusinessExceptionHandler {
      * Identificador de trazabilidad de la petición: el del Gateway si cumple la forma
      * admitida; si no, uno nuevo. Se devuelve también en el encabezado de la respuesta.
      *
-     * <p>Además fija la codificación de la respuesta en UTF-8. Al resolver una excepción,
-     * Spring limpia el tipo de contenido de la respuesta y el contenedor de servlets borra
-     * con él la codificación que había puesto el filtro de codificación; sin esto, el
-     * {@code Content-Type} del error saldría sin {@code charset} (ASVS 4.1.1).</p>
+     * <p>Además fija el tipo de contenido de la respuesta en
+     * {@code application/problem+json;charset=UTF-8}. Al resolver una excepción, Spring limpia el
+     * tipo de contenido y el contenedor de servlets borra con él la codificación que había puesto
+     * el filtro de codificación; sin esto, el {@code Content-Type} del error saldría sin
+     * {@code charset} (ASVS 4.1.1). Con el tipo ya fijado Spring no negocia el de la respuesta con
+     * el {@code Accept}: un {@code Accept} ilegible no deja el error sin cuerpo.</p>
      */
     private String resolverRequestId() {
         RequestAttributes atributos = RequestContextHolder.getRequestAttributes();
@@ -503,7 +548,7 @@ class BusinessExceptionHandler {
                 : UUID.randomUUID().toString();
         if (servlet.getResponse() != null) {
             servlet.getResponse().setHeader(REQUEST_ID_HEADER, requestId);
-            servlet.getResponse().setCharacterEncoding(StandardCharsets.UTF_8.name());
+            servlet.getResponse().setContentType(PROBLEM_JSON_UTF8);
         }
         return requestId;
     }

@@ -64,6 +64,7 @@ servicio. Las pruebas citadas están en `src/test/java/tech/cameia/cuentas/`.
 | `METHOD_NOT_ALLOWED` | 405 | cualquiera | — | Método no permitido. | `HttpRequestMethodNotSupportedException` (con `Allow`) | `FrameworkErrorsTest` |
 | `MEDIA_TYPE_NOT_ALLOWED` | 415 | cualquiera | — | Tipo de contenido no admitido. | `HttpMediaTypeNotSupportedException` (con `Accept`) | `FrameworkErrorsTest` |
 | `MEDIA_TYPE_NOT_ACCEPTABLE` | 406 | cualquiera | — | Tipo de respuesta no admitido. | `HttpMediaTypeNotAcceptableException` (el `Accept` no admite ningún tipo que el servicio produzca) | `FrameworkErrorsTest` |
+| `REQUEST_MULTIPART_INVALID_FORMAT` | 415 | cualquiera | — | Tipo de contenido no admitido. | Un `multipart/*` que el contenedor no pudo leer, por ejemplo sin `boundary` (`MultipartException` en `BusinessExceptionHandler`) | `BusinessExceptionHandlerTest.multipart_shouldReturn415_whenMultipartContentType`, `ProtocolErrorsEndToEndTest.register_shouldReturn415_whenMultipartHasNoBoundary` |
 | `INTERNAL_ERROR` | 500 | cualquiera | — | Ocurrió un error. Inténtalo de nuevo. | Cualquier fallo imprevisto, incluida la violación de una restricción de la base | `BusinessExceptionHandlerTest` |
 
 Un rechazo de Firebase no es indisponibilidad. Si Identity Toolkit responde `INVALID_EMAIL`, la persona recibe 422
