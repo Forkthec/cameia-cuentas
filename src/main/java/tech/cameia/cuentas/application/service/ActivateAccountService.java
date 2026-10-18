@@ -12,6 +12,7 @@ import tech.cameia.cuentas.domain.exception.EmailNotVerifiedException;
 import tech.cameia.cuentas.domain.exception.IdentityRequiredException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
+import tech.cameia.cuentas.domain.model.FirebaseUid;
 import tech.cameia.cuentas.domain.port.AccountRepository;
 
 /**
@@ -48,19 +49,15 @@ public class ActivateAccountService {
      *
      * @param command identificador del usuario y lo que el Gateway afirma sobre su correo
      * @return la cuenta, ya activa
-     * @throws IdentityRequiredException si el identificador está ausente, en blanco o es más largo que
-     *                                   el de Firebase
+     * @throws IdentityRequiredException si el identificador está ausente, en blanco, es más largo que
+     *                                   el de Firebase o trae caracteres de control
      * @throws AccountNotFoundException si ese usuario no tiene cuenta local, o la cuenta fue anonimizada
      * @throws EmailNotVerifiedException si la cuenta está pendiente y el Gateway no afirmó que el correo está verificado
      * @throws AccountDisabledException si la cuenta está deshabilitada
      * @throws AccountConflictException si otra petición cambió la cuenta y sigue sin estar activa
      */
     public Account activate(ActivateAccountCommand command) {
-        String firebaseUid = command.firebaseUid();
-        if (firebaseUid == null || firebaseUid.isBlank()
-                || firebaseUid.length() > GetCurrentAccountService.MAX_FIREBASE_UID_LENGTH) {
-            throw new IdentityRequiredException(); // misma regla que la consulta de la cuenta
-        }
+        String firebaseUid = FirebaseUid.required(command.firebaseUid()).value(); // misma regla que la consulta de la cuenta
         Account cuenta = repositorio.findByFirebaseUid(firebaseUid).orElseThrow(AccountNotFoundException::new);
         if (cuenta.getStatus() == AccountStatus.ACTIVE) {
             return cuenta; // idempotente: no se escribe, con o sin la afirmación del Gateway

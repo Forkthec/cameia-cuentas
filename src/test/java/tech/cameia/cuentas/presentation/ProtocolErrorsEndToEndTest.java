@@ -288,4 +288,23 @@ class ProtocolErrorsEndToEndTest {
 
         assertCommonShape(reply, 404, "ROUTE_NOT_FOUND");
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"GET /api/v1/users/me", "POST /api/v1/users/me/verification", "POST /api/v1/auth/logout-all"})
+    @DisplayName("Una identidad con un tabulador responde 400 con IDENTITY_REQUIRED")
+    void identity_shouldReturn400_whenHeaderHasTab(String routeSpec) throws IOException {
+        String[] parts = routeSpec.split(" ");
+
+        RawHttpClient.Reply reply = raw().send(parts[0], parts[1], List.of("X-User-Id: uid\tx"), null);
+
+        assertCommonShape(reply, 400, "IDENTITY_REQUIRED");
+    }
+
+    @Test
+    @DisplayName("Una identidad con un control C1 (0x85) responde 400 con IDENTITY_REQUIRED")
+    void identity_shouldReturn400_whenHeaderHasC1Control() throws IOException {
+        RawHttpClient.Reply reply = raw().send("GET", "/api/v1/users/me", List.of("X-User-Id: uid\u0085x"), null);
+
+        assertCommonShape(reply, 400, "IDENTITY_REQUIRED");
+    }
 }
