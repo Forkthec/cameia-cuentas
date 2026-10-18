@@ -1,6 +1,6 @@
 # Tarjetas · CM-335 Errores de protocolo previsibles en Cuentas
 
-**Reglas para todas las tarjetas:** identificadores y nombres de prueba nuevos en inglés (`method_shouldX_whenY`) con `@DisplayName` en español; Javadoc en todo lo nuevo; sin `CM-335` en comentarios ni rutas a otros archivos; sin dependencias nuevas; sin tocar migraciones ni `.github/`; nunca registrar valores de parámetros, cuerpos ni mensajes de la excepción de Tomcat. Escapes `\uXXXX` en Java: verificar con `git diff` que no se convirtieron en el carácter real. Si algo no coincide con la tarjeta, detenerse y reportar a Paula con la salida real. Docker Desktop encendido. Estado de la spec: **BORRADOR, sin aprobación: no se implementa nada hasta que Paula la apruebe.**
+**Reglas para todas las tarjetas:** identificadores y nombres de prueba nuevos en inglés (`method_shouldX_whenY`) con `@DisplayName` en español; Javadoc en todo lo nuevo; sin `CM-335` en comentarios ni rutas a otros archivos; sin dependencias nuevas; sin tocar migraciones ni `.github/`; nunca registrar valores de parámetros, cuerpos ni mensajes de la excepción de Tomcat. Escapes `\uXXXX` en Java: verificar con `git diff` que no se convirtieron en el carácter real. Si algo no coincide con la tarjeta, detenerse y reportar a Paula con la salida real. Docker Desktop encendido. Estado de la spec: **aprobada por Paula; implementada.**
 
 ---
 
@@ -339,3 +339,21 @@ Correr: levantar el jar empaquetado con la base de `docker compose`; `newman run
 4. Lista de verificación de la spec (V-01 a V-13), fila por fila.
 5. `ejecucion/evidencia/CM-335/resumen.md`: lo hecho por tarjeta, cobertura por clase, hallazgos, líneas o ramas sin cubrir, commits y la tabla regla R1–R14 → evidencia con salida real. No marcar «cumple» lo que no se ejecutó.
 6. Sin push ni PR: se pregunta a Paula con el resumen.
+
+---
+
+## Resultados de la ejecución
+
+Línea base en `develop` 13055eb: `clean verify` con 1109 pruebas, 0 fallos, 0 omitidas. Punta: `clean verify` con 1212 pruebas, 0 fallos, 0 omitidas.
+
+| Tarjeta | Antes del arreglo | Después | Comando |
+|---|---|---|---|
+| T1 | 6 de 9 fallan con 500 (formulario `a=%zz` con `PUT`, `PATCH`, `DELETE`) | 9 de 9 pasan | `-Dtest=ProtocolErrorsEndToEndTest` |
+| T2 | 11 fallos y 1 error: formulario y `multipart` en 500, `Accept` ilegible sin cuerpo | 94 pruebas de la tarjeta y 196 con los controladores y OpenAPI, todas verdes | comando de la tarjeta |
+| T3 | `GET /error` responde 500; `TRACE` conserva `Allow` pero sin la forma común | 99 pruebas verdes | comando de la tarjeta |
+| T4 | `X-User-Id` con tabulador o `0x85` responde 404 o 204 | 127 pruebas verdes | comando de la tarjeta |
+| T5 | — | Newman: 6 peticiones, 57 aserciones, 0 fallos (incluye el `multipart` sin `boundary` y el `Accept` ilegible); la colección completa sin la carpeta de eventos, que necesita el broker: 56 peticiones, 330 aserciones, 0 fallos | `newman run … --folder "Errores de protocolo"` |
+| T6 | — | `ErrorCodeDocumentationTest` verde; ADR 0004 y entrada 12 de la bitácora | `-Dtest=ErrorCodeDocumentationTest` |
+
+Desviaciones: el `Content-Type` de todo error se fija en `application/problem+json;charset=UTF-8` desde `resolverRequestId`, no solo en el 406, para que un `Accept` ilegible no deje sin cuerpo a un 422, 415, 404 o 405 (cubierto por pruebas de punta a punta); el 406 está documentado en OpenAPI en las cinco rutas. La fila de `REQUEST_MULTIPART_INVALID_FORMAT` de `docs/errores.md` se agregó en el commit de T2 (no en T6) para que `ErrorCodeDocumentationTest` siguiera verde en cada commit. El `HealthController` no tenía anotaciones de OpenAPI; se le agregó `@Operation` y las respuestas 200 y 415 para documentar el 415 de las cinco rutas.
+
