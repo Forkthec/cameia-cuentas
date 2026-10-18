@@ -3048,6 +3048,321 @@
           }
         }
       ]
+    },
+    {
+      "name": "Errores de protocolo",
+      "item": [
+        {
+          "name": "C-01 — 405 formulario mal codificado con PATCH",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 405', () => pm.response.to.have.status(405));",
+                  "pm.test('code METHOD_NOT_ALLOWED', () => pm.expect(pm.response.json().code).to.eql('METHOD_NOT_ALLOWED'));",
+                  "pm.test('requestId presente', () => pm.expect(pm.response.json().requestId).to.be.a('string').and.not.empty);",
+                  "pm.test('Content-Type application/problem+json con charset=UTF-8', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.eql('application/problem+json;charset=UTF-8'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "a=%zz"
+            }
+          }
+        },
+        {
+          "name": "C-02 — 415 formulario mal codificado en el registro",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 415', () => pm.response.to.have.status(415));",
+                  "pm.test('code MEDIA_TYPE_NOT_ALLOWED', () => pm.expect(pm.response.json().code).to.eql('MEDIA_TYPE_NOT_ALLOWED'));",
+                  "pm.test('requestId presente', () => pm.expect(pm.response.json().requestId).to.be.a('string').and.not.empty);",
+                  "pm.test('Content-Type application/problem+json con charset=UTF-8', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.eql('application/problem+json;charset=UTF-8'));",
+                  "pm.test('El valor recibido no se repite', () => pm.expect(pm.response.text()).to.not.include('zz'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "a=%zz"
+            }
+          }
+        },
+        {
+          "name": "C-03 — 405 TRACE con la forma común",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 405', () => pm.response.to.have.status(405));",
+                  "pm.test('code METHOD_NOT_ALLOWED', () => pm.expect(pm.response.json().code).to.eql('METHOD_NOT_ALLOWED'));",
+                  "pm.test('requestId presente', () => pm.expect(pm.response.json().requestId).to.be.a('string').and.not.empty);",
+                  "pm.test('Content-Type application/problem+json con charset=UTF-8', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.eql('application/problem+json;charset=UTF-8'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "TRACE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "C-04 — 415 multipart sin boundary en el registro",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 415', () => pm.response.to.have.status(415));",
+                  "pm.test('code REQUEST_MULTIPART_INVALID_FORMAT', () => pm.expect(pm.response.json().code).to.eql('REQUEST_MULTIPART_INVALID_FORMAT'));",
+                  "pm.test('requestId presente', () => pm.expect(pm.response.json().requestId).to.be.a('string').and.not.empty);",
+                  "pm.test('Content-Type application/problem+json con charset=UTF-8', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.eql('application/problem+json;charset=UTF-8'));",
+                  "pm.test('El texto de la excepción no se repite', () => pm.expect(pm.response.text()).to.not.include('boundary'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "x"
+            }
+          }
+        },
+        {
+          "name": "C-04b — 413 multipart de más de 1 MiB en el registro",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Parte de ~1,1 MiB: pasa el tope de 1 MiB por parte y se rechaza sin guardar nada.",
+                  "const relleno = 'x'.repeat(1150000);",
+                  "const crlf = String.fromCharCode(13, 10);",
+                  "pm.request.body.update({ mode: 'raw', raw: '--cm335' + crlf + 'Content-Disposition: form-data; name=\"f\"; filename=\"f.bin\"' + crlf + 'Content-Type: application/octet-stream' + crlf + crlf + relleno + crlf + '--cm335--' + crlf });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 413', () => pm.response.to.have.status(413));",
+                  "pm.test('code REQUEST_BODY_TOO_LARGE', () => pm.expect(pm.response.json().code).to.eql('REQUEST_BODY_TOO_LARGE'));",
+                  "pm.test('requestId presente', () => pm.expect(pm.response.json().requestId).to.be.a('string').and.not.empty);",
+                  "pm.test('Content-Type application/problem+json con charset=UTF-8', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.eql('application/problem+json;charset=UTF-8'));",
+                  "pm.test('No cita el límite ni lo enviado', () => pm.expect(pm.response.text()).to.not.include('xxxx').and.not.include('1048576'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data; boundary=cm335"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "x"
+            }
+          }
+        },
+        {
+          "name": "C-05 — 406 Accept ilegible en la ruta de salud",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 406', () => pm.response.to.have.status(406));",
+                  "pm.test('code MEDIA_TYPE_NOT_ACCEPTABLE', () => pm.expect(pm.response.json().code).to.eql('MEDIA_TYPE_NOT_ACCEPTABLE'));",
+                  "pm.test('requestId presente', () => pm.expect(pm.response.json().requestId).to.be.a('string').and.not.empty);",
+                  "pm.test('Content-Type application/problem+json con charset=UTF-8', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.eql('application/problem+json;charset=UTF-8'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": ";;;"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "C-06 — 422 Accept ilegible con un registro vacío (el error conserva su cuerpo)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 422', () => pm.response.to.have.status(422));",
+                  "pm.test('code VALIDATION_FAILED', () => pm.expect(pm.response.json().code).to.eql('VALIDATION_FAILED'));",
+                  "pm.test('requestId presente', () => pm.expect(pm.response.json().requestId).to.be.a('string').and.not.empty);",
+                  "pm.test('Content-Type application/problem+json con charset=UTF-8', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.eql('application/problem+json;charset=UTF-8'));",
+                  "pm.test('errors[] presente', () => pm.expect(pm.response.json().errors).to.be.an('array').and.not.empty);",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": ";;;"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          }
+        }
+      ]
     }
   ]
 }
