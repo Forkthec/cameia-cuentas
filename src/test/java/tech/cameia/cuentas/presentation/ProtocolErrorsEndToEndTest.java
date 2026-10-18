@@ -262,4 +262,30 @@ class ProtocolErrorsEndToEndTest {
 
         assertCommonShape(reply, 404, "ROUTE_NOT_FOUND");
     }
+
+    @Test
+    @DisplayName("TRACE responde 405 con la forma común")
+    void trace_shouldReturn405WithCommonShape() throws IOException {
+        RawHttpClient.Reply reply = raw().send("TRACE", "/api/v1/users/me", List.of(), null);
+
+        assertCommonShape(reply, 405, "METHOD_NOT_ALLOWED");
+        assertThat(reply.headers()).containsKey("x-request-id");
+    }
+
+    @Test
+    @DisplayName("TRACE conserva el encabezado Allow que envía el contenedor")
+    void trace_shouldKeepAllowHeader_whenContainerSentIt() throws IOException {
+        RawHttpClient.Reply reply = raw().send("TRACE", "/api/v1/users/me", List.of(), null);
+
+        assertThat(reply.status()).isEqualTo(405);
+        assertThat(reply.headers().get("allow")).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("Pedir /error directamente responde 404 con la forma común")
+    void error_shouldReturnCommonShape_whenRouteIsRequestedDirectly() throws IOException {
+        RawHttpClient.Reply reply = raw().send("GET", "/error", List.of(), null);
+
+        assertCommonShape(reply, 404, "ROUTE_NOT_FOUND");
+    }
 }
