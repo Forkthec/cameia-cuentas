@@ -64,7 +64,7 @@ El servicio solo debe aceptar peticiones autenticadas del API Gateway, con dos c
 
 | Encabezado | Obligatorio | Contenido |
 |---|---|---|
-| `X-User-Id` | Sí | `firebaseUid` del usuario |
+| `X-User-Id` | Sí | `firebaseUid` del usuario: de 1 a 128 caracteres y sin caracteres de control (`FirebaseUid.required`); si no, 400 `IDENTITY_REQUIRED` |
 | `X-User-Email` | Sí | Correo del usuario |
 | `X-User-Roles` | Sí | Roles del usuario |
 | `X-Request-Id` | Sí | Identificador de la petición |
@@ -85,6 +85,7 @@ Una ruta nueva no se suma a esta lista sin una spec que lo justifique.
 - La versión va en la ruta: `/api/v1/...`.
 - Los nombres JSON van en `camelCase`.
 - Los errores son `ProblemDetail` (RFC 9457) con `Content-Type: application/problem+json`; los de validación agregan una lista `errors` con un elemento por campo rechazado. El formato y las reglas están en la [sección 6 del estándar](docs/estandar-backend.md#6-errores) y lo que el servicio emite hoy, en [docs/errores.md](docs/errores.md).
+- Las peticiones mal formadas que el cliente puede enviar (formulario o `multipart` mal codificado, `Accept` ilegible, `TRACE`, `/error`) responden 4xx con su código y la forma común ([ADR 0004](docs/adr/0004-errores-de-protocolo-previsibles.md)); lo que Tomcat rechaza antes de la aplicación queda en la sección de limitaciones de `docs/errores.md`.
 - Los mensajes de las excepciones de negocio llegan al usuario tal cual, porque le dicen qué corregir. Un fallo técnico se registra completo en el log y al cliente solo le llega un texto genérico.
 
 **Documentación de la API.** OpenAPI en `http://localhost:8081/v3/api-docs` y Swagger UI en `http://localhost:8081/swagger-ui.html`. Ambos dependen de `API_DOCUMENTATION_ENABLED`, apagada por defecto; en desarrollo se enciende con la variable (viene en `.env.example`). El perfil `prod` la fija en `false` y no admite que una variable de entorno la encienda. Ver [specs/CM-103-DocumentacionApi/spec.md](specs/CM-103-DocumentacionApi/spec.md).

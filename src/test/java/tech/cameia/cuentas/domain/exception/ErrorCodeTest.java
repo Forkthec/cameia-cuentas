@@ -22,7 +22,7 @@ class ErrorCodeTest {
 
     /** Vocabulario cerrado de causas; una causa nueva se agrega aquí junto con su spec. */
     private static final List<String> CAUSAS = List.of(
-            "REQUIRED", "TOO_SHORT", "TOO_LONG", "TOO_COMMON", "INVALID_FORMAT",
+            "REQUIRED", "TOO_SHORT", "TOO_LONG", "TOO_LARGE", "TOO_COMMON", "INVALID_FORMAT",
             "INVALID_CHARACTERS", "INVALID_VALUE", "OUT_OF_RANGE", "IN_THE_FUTURE", "UNDERAGE",
             "NOT_FOUND", "ALREADY_REGISTERED", "NOT_ALLOWED", "NOT_ACCEPTABLE", "NOT_VERIFIED", "UNAVAILABLE",
             "DISABLED", "CONFLICT");

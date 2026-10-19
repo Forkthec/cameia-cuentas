@@ -74,7 +74,8 @@ class UntypedExceptionClassificationTest {
             Map.entry(CONFIGURATION_PACKAGE + "FirebaseConfiguration#rejectEmulatorInDeployment", STARTUP),
             Map.entry(CONFIGURATION_PACKAGE + "BrokerSettingsGuard#<init>", STARTUP),
             Map.entry(CONFIGURATION_PACKAGE + "AccountEventsMessagingConfiguration#disabledEventPublisher", STARTUP),
-            Map.entry(CLIENT_PACKAGE + "FirebaseUserDirectoryAdapter#unavailableOrRejection", UNEXPECTED_FAILURE));
+            Map.entry(CLIENT_PACKAGE + "FirebaseUserDirectoryAdapter#unavailableOrRejection", UNEXPECTED_FAILURE),
+            Map.entry("tech.cameia.cuentas.presentation.advice.ContainerErrorController#error", UNEXPECTED_FAILURE));
 
     @Test
     @DisplayName("Todo método que lanza una excepción sin código está clasificado con su motivo")

@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service;
 
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.IdentityRequiredException;
+import tech.cameia.cuentas.domain.model.FirebaseUid;
 import tech.cameia.cuentas.domain.port.FirebaseUserDirectory;
 
 /**
@@ -32,14 +33,11 @@ public class RevokeAllSessionsService {
      * <p>Es idempotente: repetirla vuelve a revocar y no tiene otro efecto.</p>
      *
      * @param firebaseUid identificador del usuario que propaga el Gateway
-     * @throws IdentityRequiredException si el identificador es nulo, está en blanco o es más largo que el de Firebase
+     * @throws IdentityRequiredException si el identificador es nulo, está en blanco, es más largo que el de Firebase o trae caracteres de control
      * @throws DependencyUnavailableException si Firebase no respondió o falló de su lado
      */
     public void revokeAll(String firebaseUid) {
-        if (firebaseUid == null || firebaseUid.isBlank()
-                || firebaseUid.length() > GetCurrentAccountService.MAX_FIREBASE_UID_LENGTH) {
-            throw new IdentityRequiredException(); // misma regla que la consulta y la activación de la cuenta
-        }
-        directory.revokeSessions(firebaseUid);
+        // misma regla que la consulta y la activación de la cuenta
+        directory.revokeSessions(FirebaseUid.required(firebaseUid).value());
     }
 }

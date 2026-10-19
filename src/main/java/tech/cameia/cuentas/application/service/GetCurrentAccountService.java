@@ -7,6 +7,7 @@ import tech.cameia.cuentas.domain.exception.AccountNotFoundException;
 import tech.cameia.cuentas.domain.exception.IdentityRequiredException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
+import tech.cameia.cuentas.domain.model.FirebaseUid;
 import tech.cameia.cuentas.domain.port.AccountRepository;
 
 /**
@@ -17,9 +18,6 @@ import tech.cameia.cuentas.domain.port.AccountRepository;
  */
 @Service
 public class GetCurrentAccountService {
-
-    /** Largo máximo de un identificador de Firebase; es el de la columna {@code firebase_uid}. */
-    static final int MAX_FIREBASE_UID_LENGTH = 128;
 
     private final AccountRepository repository;
 
@@ -35,21 +33,16 @@ public class GetCurrentAccountService {
     /**
      * Busca la cuenta del usuario que propaga el Gateway.
      *
-     * <p>Un identificador de Firebase es ASCII, así que contar unidades UTF-16 equivale a contar
-     * puntos de código.</p>
-     *
      * @param firebaseUid identificador del usuario que propaga el Gateway
      * @return la cuenta de ese usuario
-     * @throws IdentityRequiredException si el identificador es nulo, está en blanco o es más largo que el de Firebase
+     * @throws IdentityRequiredException si el identificador es nulo, está en blanco, es más largo que el de Firebase o trae caracteres de control
      * @throws AccountNotFoundException si no hay cuenta o la cuenta fue anonimizada
      */
     @Transactional(readOnly = true)
     public Account find(String firebaseUid) {
-        if (firebaseUid == null || firebaseUid.isBlank() || firebaseUid.length() > MAX_FIREBASE_UID_LENGTH) {
-            throw new IdentityRequiredException();
-        }
+        FirebaseUid uid = FirebaseUid.required(firebaseUid);
         // Una cuenta anonimizada ya no tiene datos personales que mostrar: para quien llama, no existe.
-        return repository.findByFirebaseUid(firebaseUid)
+        return repository.findByFirebaseUid(uid.value())
                 .filter(account -> account.getStatus() != AccountStatus.ANONYMIZED)
                 .orElseThrow(AccountNotFoundException::new);
     }

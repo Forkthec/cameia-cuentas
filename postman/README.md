@@ -4,7 +4,7 @@ Esta carpeta trae la colección de Postman del microservicio de Cuentas y el ent
 
 | Archivo | Contenido |
 |---|---|
-| `cameia-cuentas.postman_collection.json` | Colección v2.1: carpeta `Registro` (8 peticiones), carpeta `Firebase no disponible (manual)` (1 petición), carpeta `Eventos de cuenta (local)` (10 peticiones), carpeta `Mi cuenta` (12 peticiones), carpeta `Activación` (18 peticiones) y carpeta `Cerrar sesión en todos los dispositivos` (12 peticiones) |
+| `cameia-cuentas.postman_collection.json` | Colección v2.1: carpeta `Registro` (8 peticiones), carpeta `Firebase no disponible (manual)` (1 petición), carpeta `Eventos de cuenta (local)` (10 peticiones), carpeta `Mi cuenta` (12 peticiones), carpeta `Activación` (18 peticiones), carpeta `Cerrar sesión en todos los dispositivos` (12 peticiones) y carpeta `Errores de protocolo` (7 peticiones) |
 | `local.postman_environment.json` | Entorno local: `baseUrl` (`http://localhost:8081`, el puerto de `SERVER_PORT`) y los datos del broker de compose (`rabbitManagementUrl`, `rabbitUser` y `rabbitPassword`, esta última vacía) y el emulador de Firebase Auth (`firebaseEmulatorUrl`, `http://localhost:9099`, y `firebaseProjectId`, `demo-cameia`). No lleva secretos |
 
 ## Qué verifica
@@ -108,6 +108,20 @@ La respuesta 503 `DEPENDENCY_UNAVAILABLE` (Firebase caído al revocar) y la 500 
 
 La carpeta `Firebase no disponible (manual)` tiene una sola petición: 503 `DEPENDENCY_UNAVAILABLE` en menos de 9 s.
 
+Carpeta `Errores de protocolo` (peticiones que un navegador normal no produce):
+
+| # | Petición | Resultado esperado |
+|---|---|---|
+| C-01 | `PATCH /api/v1/users` con un formulario crudo `a=%zz` | 405 `METHOD_NOT_ALLOWED` |
+| C-02 | `POST /api/v1/users` con un formulario crudo `a=%zz` | 415 `MEDIA_TYPE_NOT_ALLOWED`, sin repetir el valor |
+| C-03 | `TRACE /api/v1/users/me` | 405 `METHOD_NOT_ALLOWED` con la forma común |
+| C-04 | `POST /api/v1/users` con `Content-Type: multipart/form-data` sin `boundary` y cuerpo crudo `x` | 415 `REQUEST_MULTIPART_INVALID_FORMAT`, sin el texto de la excepción |
+| C-04b | `POST /api/v1/users` con un `multipart` cuya parte pesa ~1,1 MiB (la genera un script previo) | 413 `REQUEST_BODY_TOO_LARGE`, sin citar el límite ni lo enviado |
+| C-05 | `GET /api/v1/users/health` con `Accept: ;;;` | 406 `MEDIA_TYPE_NOT_ACCEPTABLE` con cuerpo |
+| C-06 | `POST /api/v1/users` con `{}` y `Accept: ;;;` | 422 `VALIDATION_FAILED` con `errors[]`: un `Accept` ilegible no deja el error sin cuerpo |
+
+Cada una comprueba estado, `code`, `requestId` y `Content-Type: application/problem+json;charset=UTF-8`. Solo las peticiones con caracteres de control en los encabezados no se pueden armar en Postman: las cubre `ProtocolErrorsEndToEndTest`, que escribe la petición byte a byte en un socket.
+
 ## Cómo correrla
 
 Requisitos: la aplicación en marcha (`README.md` de la raíz, sección «Ejecución local»), con el emulador de Firebase Auth y su base de datos, y Node.js para Newman.
@@ -125,6 +139,7 @@ npx newman run postman/cameia-cuentas.postman_collection.json -e postman/local.p
 
 - La carpeta de la consulta se corre con `--folder "Mi cuenta"` y `--reporter-junit-export target/newman-mi-cuenta.xml`; no necesita el broker.
 - La carpeta de cierre de sesión se corre con `--folder "Cerrar sesión en todos los dispositivos"` y `--reporter-junit-export target/newman-logout.xml`; necesita el emulador de Firebase en `firebaseEmulatorUrl` y no necesita el broker.
+- La carpeta de errores de protocolo se corre con `--folder "Errores de protocolo"` y `--reporter-junit-export target/newman-protocolo.xml`; no necesita el broker ni el emulador de Firebase.
 - Para medir tiempos, `-n 100` repite la carpeta 100 veces; cada vuelta usa correos nuevos.
 - Para importarla en Postman: **Import** con los dos archivos `.json`, y elegir el entorno `cameia-cuentas local`.
 
