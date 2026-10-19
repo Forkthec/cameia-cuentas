@@ -42,7 +42,7 @@ class OpenApiDatabaseUnavailableTest {
         return reply.body();
     }
 
-    private static String response503(String docs, String route, String method) {
+    private static String response503(String route, String method) {
         return "$.paths['" + route + "']." + method + ".responses['503']";
     }
 
@@ -54,7 +54,7 @@ class OpenApiDatabaseUnavailableTest {
     @DisplayName("Las rutas que usan la base documentan su 503 DATABASE_UNAVAILABLE con un ejemplo")
     void apiDocs_shouldDocument503_whenRequested(String route, String method) throws IOException {
         String docs = apiDocs();
-        String base = response503(docs, route, method);
+        String base = response503(route, method);
 
         assertThat((String) JsonPath.read(docs, base + ".description")).contains("DATABASE_UNAVAILABLE");
         assertThat(JsonPath.read(docs, base + EXAMPLES).toString()).contains("DATABASE_UNAVAILABLE");
@@ -64,7 +64,7 @@ class OpenApiDatabaseUnavailableTest {
     @DisplayName("El registro conserva además su 503 de Firebase")
     void apiDocs_shouldKeepFirebase503_whenRequested() throws IOException {
         String docs = apiDocs();
-        String base = response503(docs, "/api/v1/users", "post");
+        String base = response503("/api/v1/users", "post");
 
         assertThat((String) JsonPath.read(docs, base + ".description")).contains("DEPENDENCY_UNAVAILABLE");
         assertThat(JsonPath.read(docs, base + EXAMPLES).toString()).contains("DEPENDENCY_UNAVAILABLE");
@@ -74,7 +74,7 @@ class OpenApiDatabaseUnavailableTest {
     @DisplayName("Cerrar sesión en todos los dispositivos conserva su 503 de Firebase y no declara el de la base")
     void apiDocs_shouldNotDocumentDatabase503_whenLogoutAll() throws IOException {
         String docs = apiDocs();
-        String base = response503(docs, "/api/v1/auth/logout-all", "post");
+        String base = response503("/api/v1/auth/logout-all", "post");
 
         assertThat((String) JsonPath.read(docs, base + ".description"))
                 .contains("DEPENDENCY_UNAVAILABLE").doesNotContain("DATABASE_UNAVAILABLE");

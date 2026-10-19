@@ -3,6 +3,8 @@ package tech.cameia.cuentas.presentation.advice;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.sql.SQLException;
+import java.sql.SQLNonTransientConnectionException;
+import java.sql.SQLTimeoutException;
 import java.sql.SQLTransientConnectionException;
 import java.util.stream.Stream;
 
@@ -18,6 +20,7 @@ import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.QueryTimeoutException;
+import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.transaction.CannotCreateTransactionException;
@@ -74,6 +77,25 @@ class DatabaseUnavailabilityTest {
     void matches_shouldBeTrue_whenQueryTimesOut() {
         Exception error = new QueryTimeoutException("x", new SQLException("canceling", "57014"));
 
+        assertThat(DatabaseUnavailability.matches(error)).isTrue();
+    }
+
+    static Stream<Throwable> outageTypes() {
+        return Stream.of(
+                new DataAccessResourceFailureException("x"),
+                new TransientDataAccessResourceException("x"),
+                new QueryTimeoutException("x"),
+                new JDBCConnectionException("x", new SQLException("x")),
+                new TransactionException("x"),
+                new SQLTransientConnectionException("x"),
+                new SQLNonTransientConnectionException("x"),
+                new SQLTimeoutException("x"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("outageTypes")
+    @DisplayName("Reconoce cada tipo de excepción de indisponibilidad por sí solo")
+    void matches_shouldBeTrue_whenNodeIsOutageType(Throwable error) {
         assertThat(DatabaseUnavailability.matches(error)).isTrue();
     }
 
