@@ -117,6 +117,9 @@ public enum ErrorCode {
     /** Firebase no está disponible; la persona puede reintentar. */
     DEPENDENCY_UNAVAILABLE,
 
+    /** La base de datos no está disponible; la persona puede reintentar. */
+    DATABASE_UNAVAILABLE,
+
     /** La ruta solicitada no existe. */
     ROUTE_NOT_FOUND,
 
