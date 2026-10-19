@@ -46,6 +46,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
 
 import tech.cameia.cuentas.domain.exception.AccountConflictException;
@@ -248,6 +249,46 @@ class BusinessExceptionHandlerTest {
 
         assertThat(problema.getStatus()).isEqualTo(415);
         assertThat(problema.getProperties()).containsEntry("code", "REQUEST_MULTIPART_INVALID_FORMAT");
+    }
+
+    @Test
+    @DisplayName("Un multipart que pasa el tope de tamaño responde 413 con su código propio, en WARN y sin citar el límite")
+    void multipart_shouldReturn413_whenSizeLimitIsExceeded(CapturedOutput output) {
+        ProblemDetail problema = manejador.cuerpoDemasiadoGrande(new MaxUploadSizeExceededException(1_048_576L));
+
+        assertThat(problema.getStatus()).isEqualTo(413);
+        assertThat(problema.getProperties()).containsEntry("code", "REQUEST_BODY_TOO_LARGE");
+        assertThat(problema.getDetail()).isEqualTo("Cuerpo de la petición demasiado grande.");
+        assertThat(problema.toString()).doesNotContain("1048576");
+        assertThat(output.getAll()).contains("WARN", "status=413", "code=REQUEST_BODY_TOO_LARGE")
+                .doesNotContain("ERROR").doesNotContain("1048576");
+    }
+
+    @Test
+    @DisplayName("Entre el tope de tamaño y el multipart roto, Spring elige el manejador más específico")
+    void multipart_shouldPickSizeHandler_whenSizeExceptionIsThrown() throws Exception {
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new FallaDeMultipart()).setControllerAdvice(manejador).build();
+
+        mvc.perform(get("/tamano").contentType("multipart/form-data; boundary=x"))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.code").value("REQUEST_BODY_TOO_LARGE"));
+        mvc.perform(get("/lectura").contentType("multipart/form-data; boundary=x"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("REQUEST_MULTIPART_INVALID_FORMAT"));
+    }
+
+    /** Controlador de la prueba: lanza el fallo de tamaño y el de lectura de un multipart. */
+    @RestController
+    static class FallaDeMultipart {
+        @GetMapping("/tamano")
+        void tamano() {
+            throw new MaxUploadSizeExceededException(1_048_576L);
+        }
+
+        @GetMapping("/lectura")
+        void lectura() {
+            throw new MultipartException("no se pudo leer");
+        }
     }
 
     @Test

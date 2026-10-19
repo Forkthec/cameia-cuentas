@@ -13,6 +13,7 @@ import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -35,7 +36,7 @@ class ContainerErrorController implements ErrorController {
      * inexistente. La ruta original no se pasa a la excepción: puede traer una codificación inválida
      * ({@code %zz}) que no debe llegar a la respuesta ni al registro.</p>
      *
-     * <p>Un estado sin código propio (por ejemplo 413 o 503) termina en el error genérico; si el
+     * <p>Un estado sin código propio (por ejemplo 503) termina en el error genérico; si el
      * contenedor informó la excepción que lo causó, viaja como causa para que el registro la conserve.</p>
      *
      * @param request petición del despacho de error, con el estado original como atributo
@@ -50,6 +51,8 @@ class ContainerErrorController implements ErrorController {
             case 405 -> throw new HttpRequestMethodNotSupportedException(method);
             case 406 -> throw new HttpMediaTypeNotAcceptableException("");
             case 415 -> throw new HttpMediaTypeNotSupportedException("");
+            // Un 413 del contenedor es el mismo caso que el tope de tamaño de Spring: un cuerpo demasiado grande.
+            case 413 -> throw new MaxUploadSizeExceededException(-1);
             // Un 400 del contenedor es un dato del cliente que no se pudo leer: sale como cuerpo ilegible.
             case 400 -> throw new HttpMessageNotReadableException("", (HttpInputMessage) null);
             // Se conserva la excepción original del contenedor (si la hay) como causa, para que el registro del 500 la muestre.

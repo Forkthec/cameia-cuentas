@@ -66,6 +66,23 @@ class OpenApiProtocolErrorsTest {
         "/api/v1/auth/logout-all,post",
         "/api/v1/users/me,get",
         "/api/v1/users/health,get"})
+    @DisplayName("Cada ruta del contrato documenta su 413 con el código y un ejemplo")
+    void apiDocs_shouldDocument413_whenRequested(String route, String method) throws IOException {
+        String docs = apiDocs();
+        String base = "$.paths['" + route + "']." + method + ".responses['413']";
+
+        assertThat((String) JsonPath.read(docs, base + ".description")).contains("REQUEST_BODY_TOO_LARGE");
+        assertThat(JsonPath.read(docs, base + ".content['application/problem+json'].examples").toString())
+                .contains("REQUEST_BODY_TOO_LARGE");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "/api/v1/users,post",
+        "/api/v1/users/me/verification,post",
+        "/api/v1/auth/logout-all,post",
+        "/api/v1/users/me,get",
+        "/api/v1/users/health,get"})
     @DisplayName("Cada ruta del contrato documenta su 406 con el código y un ejemplo")
     void apiDocs_shouldDocument406_whenRequested(String route, String method) throws IOException {
         String docs = apiDocs();

@@ -3,14 +3,19 @@ package tech.cameia.cuentas.presentation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import com.jayway.jsonpath.JsonPath;
+
+import jakarta.servlet.ServletContext;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -53,6 +58,9 @@ class ProtocolErrorsEndToEndTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private ServletContext servletContext;
 
     private RawHttpClient raw() {
         return new RawHttpClient(port);
@@ -225,6 +233,88 @@ class ProtocolErrorsEndToEndTest {
         assertCommonShape(reply, 415, "REQUEST_MULTIPART_INVALID_FORMAT");
     }
 
+    private static String multipart(int parts, int bytesPerPart) {
+        StringBuilder body = new StringBuilder();
+        for (int i = 0; i < parts; i++) {
+            body.append("--cm335\r\nContent-Disposition: form-data; name=\"f").append(i)
+                    .append("\"; filename=\"f").append(i).append(".bin\"\r\nContent-Type: application/octet-stream\r\n\r\n")
+                    .append("x".repeat(bytesPerPart)).append("\r\n");
+        }
+        return body.append("--cm335--\r\n").toString();
+    }
+
+    private static final String MULTIPART = "Content-Type: multipart/form-data; boundary=cm335";
+
+    private long filesInUploadTempDir() throws IOException {
+        Path dir = ((java.io.File) servletContext.getAttribute(ServletContext.TEMPDIR)).toPath();
+        try (Stream<Path> files = Files.walk(dir)) {
+            return files.filter(Files::isRegularFile).count();
+        }
+    }
+
+    @Test
+    @DisplayName("Un multipart de 0,5 MB bien formado conserva su respuesta de siempre: 415 de tipo no admitido")
+    void register_shouldKeepMediaTypeAnswer_whenMultipartIsHalfMegabyte() throws IOException {
+        RawHttpClient.Reply reply = raw().send("POST", "/api/v1/users", List.of(MULTIPART),
+                multipart(1, 512 * 1024));
+
+        assertCommonShape(reply, 415, "MEDIA_TYPE_NOT_ALLOWED");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1_572_864, 11 * 1024 * 1024})
+    @DisplayName("Una parte multipart de más de 1 MiB responde 413 con su código propio, en WARN y sin archivos temporales")
+    void register_shouldReturn413_whenMultipartPartIsTooLarge(int bytes, CapturedOutput output) throws IOException {
+        long before = filesInUploadTempDir();
+
+        RawHttpClient.Reply reply = raw().send("POST", "/api/v1/users", List.of(MULTIPART), multipart(1, bytes));
+
+        assertCommonShape(reply, 413, "REQUEST_BODY_TOO_LARGE");
+        assertThat((String) JsonPath.read(reply.body(), "$.detail")).isEqualTo("Cuerpo de la petición demasiado grande.");
+        assertThat(reply.body()).doesNotContain("1048576").doesNotContain("10485760").doesNotContain("xxxx");
+        assertThat(output.getAll()).contains("WARN", "status=413", "code=REQUEST_BODY_TOO_LARGE")
+                .doesNotContain("ERROR").doesNotContain("xxxx");
+        assertThat(filesInUploadTempDir()).isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("El tope por parte es exacto: 1 MiB pasa a la ruta y 1 MiB más un byte responde 413")
+    void register_shouldAcceptExactlyOneMebibyte_andRejectOneByteMore() throws IOException {
+        assertCommonShape(raw().send("POST", "/api/v1/users", List.of(MULTIPART), multipart(1, 1_048_576)),
+                415, "MEDIA_TYPE_NOT_ALLOWED");
+        assertCommonShape(raw().send("POST", "/api/v1/users", List.of(MULTIPART), multipart(1, 1_048_577)),
+                413, "REQUEST_BODY_TOO_LARGE");
+    }
+
+    @Test
+    @DisplayName("Un multipart de más de 10 MiB en total, con partes de menos de 1 MiB, responde 413")
+    void register_shouldReturn413_whenMultipartRequestIsTooLarge() throws IOException {
+        long before = filesInUploadTempDir();
+
+        RawHttpClient.Reply reply = raw().send("POST", "/api/v1/users", List.of(MULTIPART),
+                multipart(11, 996_147));
+
+        assertCommonShape(reply, 413, "REQUEST_BODY_TOO_LARGE");
+        assertThat(filesInUploadTempDir()).isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("Un cuerpo troceado mal formado responde 422 con la ruta original en instance y un solo registro")
+    void register_shouldAnswerOnceWithOriginalPath_whenChunkedBodyIsMalformed(CapturedOutput output)
+            throws IOException {
+        String requestId = "cm335-chunk-" + System.nanoTime();
+
+        RawHttpClient.Reply reply = raw().send("POST", "/api/v1/users",
+                List.of("Content-Type: application/json", "Transfer-Encoding: chunked", "X-Request-Id: " + requestId),
+                "zz\r\nabc\r\n0\r\n\r\n");
+
+        assertCommonShape(reply, 422, "REQUEST_BODY_INVALID_FORMAT");
+        assertThat((String) JsonPath.read(reply.body(), "$.instance")).isEqualTo("/api/v1/users");
+        assertThat((String) JsonPath.read(reply.body(), "$.requestId")).isEqualTo(requestId);
+        assertThat(output.getAll().lines().filter(line -> line.contains("requestId=" + requestId)).count())
+                .isEqualTo(1);
+    }
+
     @Test
     @DisplayName("Un Accept ilegible responde 406 con cuerpo")
     void accept_shouldReturn406WithBody_whenAcceptIsUnreadable() throws IOException {
@@ -270,6 +360,7 @@ class ProtocolErrorsEndToEndTest {
 
         assertCommonShape(reply, 405, "METHOD_NOT_ALLOWED");
         assertThat(reply.headers()).containsKey("x-request-id");
+        assertThat((String) JsonPath.read(reply.body(), "$.instance")).isEqualTo("/api/v1/users/me");
     }
 
     @Test

@@ -48,7 +48,8 @@ final class RawHttpClient {
      * @param method  método HTTP, por ejemplo {@code PATCH}
      * @param target  ruta y consulta tal como se escriben en la línea de petición, sin validar
      * @param headers encabezados completos {@code Nombre: valor}; se escriben en ISO-8859-1
-     * @param body    cuerpo (cada carácter es un byte, ISO-8859-1) o {@code null}
+     * @param body    cuerpo (cada carácter es un byte, ISO-8859-1) o {@code null}; con un encabezado
+     *                {@code Transfer-Encoding} se escribe tal cual, sin {@code Content-Length}
      * @return la respuesta leída hasta el cierre de la conexión
      * @throws IOException si el socket falla
      */
@@ -61,7 +62,8 @@ final class RawHttpClient {
         for (String header : headers) {
             head.append(header).append(CRLF);
         }
-        if (body != null) {
+        boolean chunked = headers.stream().anyMatch(h -> h.toLowerCase(Locale.ROOT).startsWith("transfer-encoding:"));
+        if (body != null && !chunked) {
             head.append("Content-Length: ").append(payload.length).append(CRLF);
         }
         head.append(CRLF);

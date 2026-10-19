@@ -45,6 +45,11 @@ class HealthController {
 			 "detail":"Tipo de contenido no admitido.","instance":"/api/v1/users/health",
 			 "code":"MEDIA_TYPE_NOT_ALLOWED","requestId":"3f1c9a52-7d0e-4b57-9a38-52c1e4d8a601"}""";
 
+	private static final String EJEMPLO_413 = """
+			{"type":"about:blank","title":"Cuerpo demasiado grande","status":413,
+			 "detail":"Cuerpo de la petición demasiado grande.","instance":"/api/v1/users/health",
+			 "code":"REQUEST_BODY_TOO_LARGE","requestId":"3f1c9a52-7d0e-4b57-9a38-52c1e4d8a601"}""";
+
 	/**
 	 * Confirma que la aplicación está atendiendo peticiones HTTP.
 	 *
@@ -65,7 +70,11 @@ class HealthController {
 				+ "REQUEST_MULTIPART_INVALID_FORMAT: un multipart/* que no se pudo leer, por ejemplo sin boundary",
 				content = @Content(mediaType = "application/problem+json",
 						schema = @Schema(implementation = ProblemDetail.class),
-						examples = @ExampleObject(name = "tipoNoAdmitido", value = EJEMPLO_415)))
+						examples = @ExampleObject(name = "tipoNoAdmitido", value = EJEMPLO_415))),
+		@ApiResponse(responseCode = "413", description = "REQUEST_BODY_TOO_LARGE: un multipart, o el cuerpo, supera el tamaño admitido (1 MiB por parte y 10 MiB por petición)",
+				content = @Content(mediaType = "application/problem+json",
+						schema = @Schema(implementation = ProblemDetail.class),
+						examples = @ExampleObject(name = "cuerpoDemasiadoGrande", value = EJEMPLO_413)))
 	})
 	@GetMapping("/api/v1/users/health")
 	ResponseEntity<HealthResponse> health() {
