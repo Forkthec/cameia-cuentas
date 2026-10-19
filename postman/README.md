@@ -5,6 +5,7 @@ Esta carpeta trae la colección de Postman del microservicio de Cuentas y el ent
 | Archivo | Contenido |
 |---|---|
 | `cameia-cuentas.postman_collection.json` | Colección v2.1: carpeta `Registro` (8 peticiones), carpeta `Firebase no disponible (manual)` (1 petición), carpeta `Eventos de cuenta (local)` (10 peticiones), carpeta `Mi cuenta` (12 peticiones), carpeta `Activación` (18 peticiones), carpeta `Cerrar sesión en todos los dispositivos` (12 peticiones) y carpeta `Errores de protocolo` (7 peticiones) |
+| `cameia-cuentas-base-de-datos-no-disponible.postman_collection.json` | Colección aparte con la carpeta `Base de datos no disponible (manual)` (2 peticiones). Se corre sola, con la base detenida; no se mezcla con la colección principal porque sus peticiones esperan una base caída y fallarían en una corrida normal |
 | `local.postman_environment.json` | Entorno local: `baseUrl` (`http://localhost:8081`, el puerto de `SERVER_PORT`) y los datos del broker de compose (`rabbitManagementUrl`, `rabbitUser` y `rabbitPassword`, esta última vacía) y el emulador de Firebase Auth (`firebaseEmulatorUrl`, `http://localhost:9099`, y `firebaseProjectId`, `demo-cameia`). No lleva secretos |
 
 ## Qué verifica
@@ -108,6 +109,8 @@ La respuesta 503 `DEPENDENCY_UNAVAILABLE` (Firebase caído al revocar) y la 500 
 
 La carpeta `Firebase no disponible (manual)` tiene una sola petición: 503 `DEPENDENCY_UNAVAILABLE` en menos de 9 s.
 
+La colección `cameia-cuentas-base-de-datos-no-disponible.postman_collection.json` tiene una carpeta, `Base de datos no disponible (manual)`, con dos peticiones que se corren con la base de datos detenida: D-01 (`GET /api/v1/users/me`) responde 503 `DATABASE_UNAVAILABLE` en menos de 8 s y D-02 (`GET /api/v1/users/health`, que no consulta la base) responde 200.
+
 Carpeta `Errores de protocolo` (peticiones que un navegador normal no produce):
 
 | # | Petición | Resultado esperado |
@@ -149,6 +152,12 @@ Debe correrse aparte, con Firebase inaccesible, para no afectar a las demás. Do
 
 1. Detener el emulador de Firebase Auth y correr `--folder "Firebase no disponible (manual)"`. El emulador es compartido con los demás servicios: se vuelve a levantar al terminar.
 2. Sin detener el emulador: arrancar otra instancia de la aplicación en otro puerto con `FIREBASE_AUTH_EMULATOR_HOST` apuntando a un puerto cerrado (por ejemplo `localhost:9`) y correr la petición con `--env-var baseUrl=http://localhost:<puerto>`.
+
+### Las peticiones de base de datos no disponible (manual)
+
+1. Con la aplicación y la base levantadas (`docker compose up -d`), detener la base con `docker compose stop db`.
+2. Correr `npx newman run postman/cameia-cuentas-base-de-datos-no-disponible.postman_collection.json -e postman/local.postman_environment.json --reporters cli,junit --reporter-junit-export target/newman-base-de-datos.xml`. Hikari tarda hasta 5 s en rendirse, por eso D-01 admite hasta 8 s.
+3. Volver a encender la base con `docker compose start db`: la primera petición a `GET /api/v1/users/me` vuelve a responder 404 `ACCOUNT_NOT_FOUND`.
 
 ## Datos de prueba
 
