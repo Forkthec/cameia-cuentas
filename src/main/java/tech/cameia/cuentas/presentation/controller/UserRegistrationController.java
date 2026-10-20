@@ -74,6 +74,11 @@ class UserRegistrationController {
              "detail":"Ocurrió un error. Inténtalo de nuevo.","instance":"/api/v1/users",
              "code":"DEPENDENCY_UNAVAILABLE","requestId":"3f1c9a52-7d0e-4b57-9a38-52c1e4d8a601"}""";
 
+    private static final String EJEMPLO_503_BASE = """
+            {"type":"about:blank","title":"Servicio no disponible","status":503,
+             "detail":"Ocurrió un error. Inténtalo de nuevo.","instance":"/api/v1/users",
+             "code":"DATABASE_UNAVAILABLE","requestId":"3f1c9a52-7d0e-4b57-9a38-52c1e4d8a601"}""";
+
     private final RegisterUserService servicio;
 
     UserRegistrationController(RegisterUserService servicio) {
@@ -135,10 +140,14 @@ class UserRegistrationController {
                 content = @Content(mediaType = "application/problem+json",
                         schema = @Schema(implementation = ProblemDetail.class),
                         examples = @ExampleObject(name = "falloInterno", value = EJEMPLO_500))),
-        @ApiResponse(responseCode = "503", description = "DEPENDENCY_UNAVAILABLE: Firebase no respondió; se puede "
-                + "reintentar", content = @Content(mediaType = "application/problem+json",
+        @ApiResponse(responseCode = "503", description = "DEPENDENCY_UNAVAILABLE: Firebase no respondió. "
+                + "DATABASE_UNAVAILABLE: la base de datos no está disponible. En ambos casos se puede reintentar",
+                content = @Content(mediaType = "application/problem+json",
                         schema = @Schema(implementation = ProblemDetail.class),
-                        examples = @ExampleObject(name = "firebaseNoDisponible", value = EJEMPLO_503)))
+                        examples = {
+                            @ExampleObject(name = "firebaseNoDisponible", value = EJEMPLO_503),
+                            @ExampleObject(name = "baseNoDisponible", value = EJEMPLO_503_BASE)
+                        }))
     })
     @PostMapping("/api/v1/users")
     ResponseEntity<RegisteredUserResponse> register(@Valid @RequestBody RegisterUserRequest request,

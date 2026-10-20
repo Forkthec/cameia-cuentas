@@ -344,6 +344,22 @@ class BusinessExceptionHandler {
     }
 
     /**
+     * La base de datos no está disponible: es un fallo del servicio y pasajero, así que responde
+     * {@code 503} y se registra en {@code ERROR} con la traza, el SQLState y la clase más específica.
+     * El mensaje de la excepción (puede citar el servidor o el usuario de la base) no llega al cliente.
+     */
+    private ProblemDetail baseNoDisponible(Exception error) {
+        ProblemDetail problema = problema(HttpStatus.SERVICE_UNAVAILABLE, "Servicio no disponible", DETALLE_INTERNO,
+                ErrorCode.DATABASE_UNAVAILABLE);
+        if (primerRegistro()) {
+            logger.error("Base de datos no disponible [code={}, requestId={}, sqlState={}, causa={}]",
+                    ErrorCode.DATABASE_UNAVAILABLE, problema.getProperties().get("requestId"),
+                    DatabaseUnavailability.sqlState(error), claseMasEspecifica(error), error);
+        }
+        return problema;
+    }
+
+    /**
      * Violación de una restricción de la base de datos.
      *
      * <p>Ninguna restricción de la tabla de cuentas es alcanzable por una entrada de la
@@ -472,11 +488,13 @@ class BusinessExceptionHandler {
      * Cualquier otro fallo, salvo un formulario mal codificado.
      *
      * <p>Un parámetro con una codificación inválida ({@code %zz}) en el cuerpo de un formulario es un
-     * dato del cliente: se responde como el formulario bien formado, {@code 415}, y no como un fallo.</p>
+     * dato del cliente: se responde como el formulario bien formado, {@code 415}, y no como un fallo.
+     * Una base de datos no disponible (caída, conexión cortada, pool agotado o consulta sin respuesta
+     * a tiempo) responde {@code 503} con {@code DATABASE_UNAVAILABLE}.</p>
      *
      * @param error excepción no prevista
      * @param request petición, de la que se toman el método y el tipo de contenido
-     * @return {@code 500 Internal Server Error} con un mensaje genérico
+     * @return {@code 500 Internal Server Error} con un mensaje genérico, o {@code 503} si la base no está disponible
      */
     @ExceptionHandler(Exception.class)
     ProblemDetail falloInterno(Exception error, HttpServletRequest request) {
@@ -485,6 +503,9 @@ class BusinessExceptionHandler {
             return rechazo(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Tipo de contenido no admitido",
                     "Tipo de contenido no admitido.", ErrorCode.MEDIA_TYPE_NOT_ALLOWED,
                     "causa=formulario-mal-codificado");
+        }
+        if (DatabaseUnavailability.matches(error)) {
+            return baseNoDisponible(error);
         }
         ProblemDetail problema = problema(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno", DETALLE_INTERNO,
                 ErrorCode.INTERNAL_ERROR);

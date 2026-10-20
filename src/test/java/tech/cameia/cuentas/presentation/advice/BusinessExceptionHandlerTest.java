@@ -40,6 +40,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -51,6 +52,7 @@ import org.springframework.web.multipart.MultipartException;
 
 import tech.cameia.cuentas.domain.exception.AccountConflictException;
 import tech.cameia.cuentas.domain.exception.AccountDisabledException;
+import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.model.EmailAddress;
@@ -223,6 +225,62 @@ class BusinessExceptionHandlerTest {
 
         assertThat(problema.getStatus()).isEqualTo(500);
         assertThat(problema.getProperties()).containsEntry("code", "INTERNAL_ERROR");
+    }
+
+    @Test
+    @DisplayName("Una base de datos no disponible responde 503 DATABASE_UNAVAILABLE sin el mensaje de la librería")
+    void databaseUnavailable_shouldReturn503_whenAvailabilityProblem() {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/users/me");
+
+        ProblemDetail problema = manejador.falloInterno(
+                new DataAccessResourceFailureException("host=10.0.0.5 password=x"), request);
+
+        assertThat(problema.getStatus()).isEqualTo(503);
+        assertThat(problema.getTitle()).isEqualTo("Servicio no disponible");
+        assertThat(problema.getDetail()).isEqualTo("Ocurrió un error. Inténtalo de nuevo.");
+        assertThat(problema.getProperties()).containsEntry("code", "DATABASE_UNAVAILABLE")
+                .containsKey("requestId");
+        assertThat(problema.toString()).doesNotContain("10.0.0.5").doesNotContain("password");
+    }
+
+    @Test
+    @DisplayName("Una base de datos no disponible se registra una vez en ERROR con código, requestId y SQLState")
+    void databaseUnavailable_shouldLogOnce_whenAvailabilityProblem(CapturedOutput salida) {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/users/me");
+
+        ProblemDetail problema = manejador.falloInterno(new DataAccessResourceFailureException("x",
+                new SQLException("FATAL", "57P01")), request);
+
+        String requestId = (String) problema.getProperties().get("requestId");
+        assertThat(salida.getOut())
+                .contains("ERROR")
+                .contains("code=DATABASE_UNAVAILABLE, requestId=" + requestId + ", sqlState=57P01");
+        assertThat(salida.getOut().split("Base de datos no disponible", -1)).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Una violación de restricción y un estado ilegal siguen respondiendo 500 INTERNAL_ERROR")
+    void databaseUnavailable_shouldKeepOtherCodes_whenNotAvailabilityProblem() {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/users/me");
+
+        ProblemDetail integridad = manejador.integridadDeDatos(
+                new DataIntegrityViolationException("x", new SQLException("x", "23502")));
+        ProblemDetail ilegal = manejador.falloInterno(new IllegalStateException("x"), request);
+
+        assertThat(integridad.getStatus()).isEqualTo(500);
+        assertThat(integridad.getProperties()).containsEntry("code", "INTERNAL_ERROR");
+        assertThat(ilegal.getStatus()).isEqualTo(500);
+        assertThat(ilegal.getProperties()).containsEntry("code", "INTERNAL_ERROR");
+    }
+
+    @Test
+    @DisplayName("Firebase caído sigue respondiendo 503 DEPENDENCY_UNAVAILABLE")
+    void databaseUnavailable_shouldKeepDependencyCode_whenFirebaseFails() {
+        ProblemDetail problema = manejador.dependenciaNoDisponible(
+                new DependencyUnavailableException(new RuntimeException()));
+
+        assertThat(problema.getStatus()).isEqualTo(503);
+        assertThat(problema.getProperties()).containsEntry("code", "DEPENDENCY_UNAVAILABLE");
     }
 
     @Test
