@@ -1,0 +1,29 @@
+# Artefactos de build locales: la imagen compila desde cero en su propia etapa.
+target/
+build/
+.gradle/
+
+# Secretos: nunca deben entrar en una capa de la imagen.
+.env
+.env.*
+!.env.example
+
+# Historial y metadatos que no afectan la compilación.
+.git/
+.github/
+.vscode/
+.idea/
+*.iml
+
+# Documentación.
+docs/
+*.md
+
+# El wrapper no se usa dentro de la imagen; la etapa de build trae Maven propio.
+mvnw
+mvnw.cmd
+.mvn/
+
+Dockerfile
+.dockerignore
+docker-compose.yml

@@ -1,0 +1,118 @@
+# Entorno local completo del microservicio de Cuentas: aplicación y su propia base
+# de datos PostgreSQL. Las variables se leen del archivo .env de la raíz; los
+# valores por defecto de este archivo permiten levantar el entorno sin editarlo,
+# salvo DB_PASSWORD, que es obligatoria.
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: cameia-cuentas-db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-DB-cuentas}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD en el archivo .env}
+    ports:
+      # DB_PORT_HOST es el puerto publicado en la máquina del desarrollador y existe
+      # para no chocar con un PostgreSQL local que ya ocupe el 5432. Por dentro el
+      # contenedor sigue escuchando en 5432, así que cambiarlo no afecta a la
+      # aplicación: solo cambia por dónde se conecta un cliente externo como DBeaver.
+      - "${DB_PORT_HOST:-5433}:5432"
+    volumes:
+      - cuentas-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-DB-cuentas}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  rabbitmq:
+    # Broker donde Cuentas publica sus eventos. El usuario y la contraseña salen del .env: no se
+    # dejan credenciales por defecto, igual que la contraseña de la base de datos.
+    image: rabbitmq:3.13-management-alpine
+    container_name: cameia-cuentas-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${SPRING_RABBITMQ_USERNAME:-cameia}
+      RABBITMQ_DEFAULT_PASS: ${SPRING_RABBITMQ_PASSWORD:?Defina SPRING_RABBITMQ_PASSWORD en el archivo .env}
+    ports:
+      # Puertos publicados en la máquina del desarrollador; por dentro el broker escucha en 5672 y 15672.
+      - "${RABBITMQ_PORT_HOST:-5673}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT_HOST:-15673}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - default
+      - cameia-net
+
+  cuentas:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cameia/cuentas:local
+    container_name: cameia-cuentas
+    depends_on:
+      db:
+        # La aplicación no arranca hasta que PostgreSQL acepta conexiones; de lo
+        # contrario Hibernate falla al validar el esquema.
+        condition: service_healthy
+      rabbitmq:
+        # La aplicación publica al registrar; el broker debe estar listo antes de la primera petición.
+        condition: service_healthy
+    environment:
+      SERVER_PORT: ${SERVER_PORT:-8081}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      # Documentación de la API. Solo tiene efecto fuera del perfil prod, que la
+      # deja apagada de forma rígida.
+      API_DOCUMENTATION_ENABLED: ${API_DOCUMENTATION_ENABLED:-true}
+      # DB_HOST y DB_PORT apuntan al nombre de servicio y al puerto interno de la
+      # red de Compose, no al puerto publicado en el host.
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-DB-cuentas}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD en el archivo .env}
+      # Broker de eventos: nombre de servicio y puerto interno de la red de Compose.
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${SPRING_RABBITMQ_USERNAME:-cameia}
+      SPRING_RABBITMQ_PASSWORD: ${SPRING_RABBITMQ_PASSWORD:?Defina SPRING_RABBITMQ_PASSWORD en el archivo .env}
+      # Firebase custodia las credenciales de los usuarios. La ruta es la del archivo
+      # dentro del contenedor, no la del host: el volumen de abajo monta ahí el JSON que
+      # indica FIREBASE_KEY_PATH en el .env.
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-true}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:?Defina FIREBASE_PROJECT_ID en el archivo .env}
+      FIREBASE_KEY_PATH: /run/secrets/firebase-service-account.json
+      # Emulador de Firebase Auth. Sin valor a propósito: Compose la pasa al contenedor solo si
+      # está definida en el entorno o en .env, y si no lo está, el contenedor no la recibe. Con ella
+      # la aplicación arranca sin llave de cuenta de servicio (ignora la ruta de arriba) y acepta
+      # tokens sin firma, por eso se niega a arrancar si la ve en un despliegue.
+      # Ejemplo: cameia-firebase-emulator:9099
+      FIREBASE_AUTH_EMULATOR_HOST:
+    volumes:
+      # Solo lectura, y con /dev/null como valor de respaldo: si el .env no declara la
+      # ruta, la aplicación falla al arrancar en vez de quedar a medias sin credenciales.
+      - ${FIREBASE_KEY_PATH:-/dev/null}:/run/secrets/firebase-service-account.json:ro
+    ports:
+      - "${SERVER_PORT:-8081}:${SERVER_PORT:-8081}"
+    restart: unless-stopped
+    # Red externa compartida entre varios microservicios en el entorno local: permite
+    # que otro servicio alcance a este por nombre, en vez de por IP, al levantarlos
+    # juntos para probar integración. Solo la app se conecta a ella; la base de datos
+    # se queda en la red por defecto de este archivo.
+    networks:
+      - default
+      - cameia-net
+
+volumes:
+  cuentas-db-data:
+
+networks:
+  # Creada una sola vez fuera de este archivo: docker network create cameia-net.
+  cameia-net:
+    external: true

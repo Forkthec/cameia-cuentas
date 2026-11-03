@@ -1,0 +1,3368 @@
+{
+  "info": {
+    "name": "cameia-cuentas",
+    "description": "Pruebas de API del microservicio de Cuentas. Cada petición verifica su estado y el cuerpo; el script de la colección verifica en todas el Content-Type con charset y, en los errores, application/problem+json, requestId igual al encabezado X-Request-Id y ausencia de detalle interno.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const deOtroSistema = ['rabbitManagementUrl', 'firebaseEmulatorUrl'].some((nombre) =>",
+          "    pm.request.url.toString().indexOf(pm.environment.get(nombre) || '\\u0000') === 0);",
+          "if (!deOtroSistema) {",
+          "    const tipo = (pm.response.headers.get('Content-Type') || '').toLowerCase();",
+          "    if (pm.response.code !== 204) {",
+          "        pm.test('Content-Type con charset utf-8', () => pm.expect(tipo).to.include('charset=utf-8'));",
+          "    }",
+          "    if (pm.response.code >= 400) {",
+          "        pm.test('Error: application/problem+json', () => pm.expect(tipo).to.include('application/problem+json'));",
+          "        pm.test('Error: requestId igual a X-Request-Id', () =>",
+          "            pm.expect(pm.response.json().requestId).to.eql(pm.response.headers.get('X-Request-Id')));",
+          "        pm.test('Error: sin detalle interno', () => {",
+          "            const texto = pm.response.text();",
+          "            ['Exception', 'SQL', 'org.', 'tech.cameia'].forEach((marca) => pm.expect(texto).to.not.include(marca));",
+          "        });",
+          "    } else if (pm.response.code !== 204) {",
+          "        pm.test('Éxito: JSON', () => pm.expect(tipo).to.include('application/json'));",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "email",
+      "value": ""
+    },
+    {
+      "key": "emailMayusculas",
+      "value": ""
+    },
+    {
+      "key": "accountId",
+      "value": ""
+    },
+    {
+      "key": "firebaseUid",
+      "value": ""
+    },
+    {
+      "key": "emailActiva",
+      "value": ""
+    },
+    {
+      "key": "uidActiva",
+      "value": ""
+    },
+    {
+      "key": "emailCaido",
+      "value": ""
+    },
+    {
+      "key": "eventEmail",
+      "value": ""
+    },
+    {
+      "key": "eventRequestId",
+      "value": ""
+    },
+    {
+      "key": "eventFirebaseUid",
+      "value": ""
+    },
+    {
+      "key": "meEmail",
+      "value": ""
+    },
+    {
+      "key": "otraEmail",
+      "value": ""
+    },
+    {
+      "key": "meUid",
+      "value": ""
+    },
+    {
+      "key": "meId",
+      "value": ""
+    },
+    {
+      "key": "uidOtra",
+      "value": ""
+    },
+    {
+      "key": "idOtra",
+      "value": ""
+    },
+    {
+      "key": "actEmail",
+      "value": ""
+    },
+    {
+      "key": "actUid",
+      "value": ""
+    },
+    {
+      "key": "actId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Registro",
+      "description": "POST /api/v1/users: registro nuevo, repetido con cuenta pendiente y errores previsibles.",
+      "item": [
+        {
+          "name": "1 · 201 registro nuevo",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Una marca de tiempo en milisegundos y el número de iteración evitan colisiones entre vueltas rápidas.",
+                  "pm.collectionVariables.set('email', 'prueba+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('Trae id y firebaseUid de 32 caracteres', () => {",
+                  "    pm.expect(cuerpo.id).to.be.a('string').and.not.empty;",
+                  "    pm.expect(cuerpo.firebaseUid).to.match(/^[0-9a-f]{32}$/);",
+                  "});",
+                  "pm.test('Cuenta pendiente de verificación y plan FREE', () => {",
+                  "    pm.expect(cuerpo.status).to.eql('PENDING_VERIFICATION');",
+                  "    pm.expect(cuerpo.plan).to.eql('FREE');",
+                  "});",
+                  "pm.collectionVariables.set('accountId', cuerpo.id);",
+                  "pm.collectionVariables.set('firebaseUid', cuerpo.firebaseUid);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{email}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2 · 200 el mismo registro otra vez",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve la misma cuenta', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.id).to.eql(pm.collectionVariables.get('accountId'));",
+                  "    pm.expect(cuerpo.firebaseUid).to.eql(pm.collectionVariables.get('firebaseUid'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{email}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "3 · 200 el mismo correo con mayúsculas y espacios",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('emailMayusculas', '  ' + pm.collectionVariables.get('email').toUpperCase() + ' ');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve la misma cuenta', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('accountId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{emailMayusculas}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "4 · 200 con otros datos y otra contraseña",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve la misma cuenta; el reintento ignora los datos nuevos', () =>",
+                  "    pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('accountId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Luz\",\n  \"lastName\": \"Gómez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{email}}\",\n  \"password\": \"otra frase muy distinta\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"HE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "5 · 422 cuerpo inválido con el correo existente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 422', () => pm.response.to.have.status(422));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('VALIDATION_FAILED con el campo password', () => {",
+                  "    pm.expect(cuerpo.code).to.eql('VALIDATION_FAILED');",
+                  "    pm.expect(cuerpo.errors.map((e) => e.field)).to.include('password');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{email}}\",\n  \"password\": \"123\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "6a · 201 registro de la cuenta que se activará",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Una marca de tiempo en milisegundos y el número de iteración evitan colisiones entre vueltas rápidas.",
+                  "pm.collectionVariables.set('emailActiva', 'activa+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('uidActiva', pm.response.json().firebaseUid);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{emailActiva}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "6b · 200 activación de la cuenta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{uidActiva}}"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "6c · 409 correo de una cuenta ya activa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 409', () => pm.response.to.have.status(409));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('EMAIL_ALREADY_REGISTERED con el mensaje en errors[email]', () => {",
+                  "    pm.expect(cuerpo.code).to.eql('EMAIL_ALREADY_REGISTERED');",
+                  "    pm.expect(cuerpo.errors[0].field).to.eql('email');",
+                  "    pm.expect(cuerpo.errors[0].message).to.eql('Ese correo ya tiene una cuenta.');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{emailActiva}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Firebase no disponible (manual)",
+      "description": "Se corre aparte, con el emulador de Firebase Auth detenido. No forma parte de la corrida automática.",
+      "item": [
+        {
+          "name": "7 · 503 Firebase no disponible",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Una marca de tiempo en milisegundos y el número de iteración evitan colisiones entre vueltas rápidas.",
+                  "pm.collectionVariables.set('emailCaido', 'caido+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 503', () => pm.response.to.have.status(503));",
+                  "pm.test('DEPENDENCY_UNAVAILABLE', () => pm.expect(pm.response.json().code).to.eql('DEPENDENCY_UNAVAILABLE'));",
+                  "pm.test('Responde en menos de 9 s', () => pm.expect(pm.response.responseTime).to.be.below(9000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{emailCaido}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Eventos de cuenta (local)",
+      "description": "Requiere el broker de compose levantado y la contraseña del .env en rabbitPassword. Comprueba que un registro nuevo publica exactamente un evento cuenta.creada con la carga del contrato.",
+      "item": [
+        {
+          "name": "E-00 — 201 o 204 exchange de eventos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201 o 204', () => pm.expect(pm.response.code).to.be.oneOf([201, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{rabbitManagementUrl}}/api/exchanges/%2F/cuentas.events",
+              "host": [
+                "{{rabbitManagementUrl}}"
+              ],
+              "path": [
+                "api",
+                "exchanges",
+                "%2F",
+                "cuentas.events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"topic\",\n  \"durable\": true,\n  \"auto_delete\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-01a — 201 o 204 cola de prueba",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201 o 204', () => pm.expect(pm.response.code).to.be.oneOf([201, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{rabbitManagementUrl}}/api/queues/%2F/qa.cuenta-creada",
+              "host": [
+                "{{rabbitManagementUrl}}"
+              ],
+              "path": [
+                "api",
+                "queues",
+                "%2F",
+                "qa.cuenta-creada"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"durable\": false,\n  \"auto_delete\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-01b — 201 enlace de la cola con cuenta.creada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201 o 204', () => pm.expect(pm.response.code).to.be.oneOf([201, 204]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{rabbitManagementUrl}}/api/bindings/%2F/e/cuentas.events/q/qa.cuenta-creada",
+              "host": [
+                "{{rabbitManagementUrl}}"
+              ],
+              "path": [
+                "api",
+                "bindings",
+                "%2F",
+                "e",
+                "cuentas.events",
+                "q",
+                "qa.cuenta-creada"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routing_key\": \"cuenta.creada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-02 — 201 registro que publica el evento",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// La marca de tiempo evita colisiones entre vueltas; el mismo identificador de petición viaja al evento.",
+                  "const marca = Date.now();",
+                  "pm.collectionVariables.set('eventEmail', 'evento+' + marca + '@ejemplo.test');",
+                  "pm.collectionVariables.set('eventRequestId', 'pm-' + marca);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('eventFirebaseUid', pm.response.json().firebaseUid);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{eventRequestId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"15/03/2008\",\n  \"email\": \"{{eventEmail}}\",\n  \"password\": \"una frase muy larga 2026\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "E-03 — un mensaje con la carga del contrato",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "const mensajes = pm.response.json();",
+                  "pm.test('Hay exactamente un mensaje', () => pm.expect(mensajes).to.have.lengthOf(1));",
+                  "const carga = JSON.parse(mensajes[0].payload);",
+                  "pm.test('La carga tiene exactamente las cuatro claves del contrato', () =>",
+                  "    pm.expect(Object.keys(carga).sort()).to.eql(['creadaEn', 'email', 'fechaNacimiento', 'usuarioId']));",
+                  "pm.test('usuarioId es el firebaseUid del registro', () =>",
+                  "    pm.expect(carga.usuarioId).to.eql(pm.collectionVariables.get('eventFirebaseUid')));",
+                  "pm.test('email en minúsculas', () =>",
+                  "    pm.expect(carga.email).to.eql(pm.collectionVariables.get('eventEmail').toLowerCase()));",
+                  "pm.test('fechaNacimiento 2008-03-15', () => pm.expect(carga.fechaNacimiento).to.eql('2008-03-15'));",
+                  "pm.test('creadaEn con milisegundos y Z', () =>",
+                  "    pm.expect(carga.creadaEn).to.match(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/));",
+                  "const propiedades = mensajes[0].properties;",
+                  "pm.test('Propiedades AMQP del contrato', () => {",
+                  "    pm.expect(propiedades.type).to.eql('cuenta.creada');",
+                  "    pm.expect(propiedades.app_id).to.eql('cameia-cuentas');",
+                  "    pm.expect(propiedades.correlation_id).to.eql(pm.collectionVariables.get('eventRequestId'));",
+                  "    pm.expect(propiedades.headers['x-event-version']).to.eql(1);",
+                  "    pm.expect(propiedades.content_type).to.eql('application/json');",
+                  "    pm.expect(propiedades.message_id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);",
+                  "    pm.expect(propiedades.delivery_mode).to.eql(2);",
+                  "    pm.expect(propiedades.content_encoding).to.eql('UTF-8');",
+                  "    pm.expect(propiedades.headers['x-causation-id']).to.eql(pm.collectionVariables.get('eventRequestId'));",
+                  "    pm.expect(propiedades.timestamp).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{rabbitManagementUrl}}/api/queues/%2F/qa.cuenta-creada/get",
+              "host": [
+                "{{rabbitManagementUrl}}"
+              ],
+              "path": [
+                "api",
+                "queues",
+                "%2F",
+                "qa.cuenta-creada",
+                "get"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 10,\n  \"ackmode\": \"ack_requeue_false\",\n  \"encoding\": \"auto\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-04 — 200 el mismo registro no publica otra vez",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{eventRequestId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"15/03/2008\",\n  \"email\": \"{{eventEmail}}\",\n  \"password\": \"una frase muy larga 2026\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "E-05 — la cola sigue vacía",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No hubo un segundo evento', () => pm.expect(pm.response.json()).to.eql([]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{rabbitManagementUrl}}/api/queues/%2F/qa.cuenta-creada/get",
+              "host": [
+                "{{rabbitManagementUrl}}"
+              ],
+              "path": [
+                "api",
+                "queues",
+                "%2F",
+                "qa.cuenta-creada",
+                "get"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 1,\n  \"ackmode\": \"ack_requeue_false\",\n  \"encoding\": \"auto\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-07 — 201 registro con X-Request-Id de 65 caracteres",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('hostileEmail', 'hostil+' + Date.now() + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"15/03/2008\",\n  \"email\": \"{{hostileEmail}}\",\n  \"password\": \"una frase muy larga 2026\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "E-08 — el identificador inválido se reemplaza por el message_id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "const mensajes = pm.response.json();",
+                  "pm.test('Hay exactamente un mensaje', () => pm.expect(mensajes).to.have.lengthOf(1));",
+                  "const propiedades = mensajes[0].properties;",
+                  "pm.test('correlation_id y x-causation-id son el message_id, no el identificador inválido', () => {",
+                  "    pm.expect(propiedades.correlation_id).to.eql(propiedades.message_id);",
+                  "    pm.expect(propiedades.headers['x-causation-id']).to.eql(propiedades.message_id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{rabbitManagementUrl}}/api/queues/%2F/qa.cuenta-creada/get",
+              "host": [
+                "{{rabbitManagementUrl}}"
+              ],
+              "path": [
+                "api",
+                "queues",
+                "%2F",
+                "qa.cuenta-creada",
+                "get"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 10,\n  \"ackmode\": \"ack_requeue_false\",\n  \"encoding\": \"auto\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-06 — 204 borrar la cola de prueba",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{rabbitManagementUrl}}/api/queues/%2F/qa.cuenta-creada",
+              "host": [
+                "{{rabbitManagementUrl}}"
+              ],
+              "path": [
+                "api",
+                "queues",
+                "%2F",
+                "qa.cuenta-creada"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mi cuenta",
+      "description": "GET /api/v1/users/me: la cuenta de quien llama, sin correo; la identidad sale solo de X-User-Id. M-09 exige API_DOCUMENTATION_ENABLED=true.",
+      "item": [
+        {
+          "name": "M-00 · 201 registro de la cuenta que se consultará",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('meEmail', 'mi-cuenta+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('meUid', pm.response.json().firebaseUid);",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{meEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "M-00b · 201 segunda cuenta",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('otraEmail', 'otra-cuenta+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('uidOtra', pm.response.json().firebaseUid);",
+                  "pm.collectionVariables.set('idOtra', pm.response.json().id);",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Beatriz\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{otraEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "M-01 · 200 mi cuenta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Cache-Control no-store', () => pm.expect(pm.response.headers.get('Cache-Control')).to.eql('no-store'));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('Exactamente los ocho campos de la historia', () =>",
+                  "    pm.expect(Object.keys(cuerpo).sort()).to.eql([\"birthDate\",\"firstName\",\"id\",\"lastName\",\"phoneNumber\",\"plan\",\"pronoun\",\"status\"]));",
+                  "pm.test('Datos registrados, estado pendiente y plan FREE', () => {",
+                  "    pm.expect(cuerpo.firstName).to.eql('Ana');",
+                  "    pm.expect(cuerpo.lastName).to.eql('Pérez');",
+                  "    pm.expect(cuerpo.birthDate).to.eql('1995-04-12');",
+                  "    pm.expect(cuerpo.pronoun).to.eql('SHE');",
+                  "    pm.expect(cuerpo.status).to.eql('PENDING_VERIFICATION');",
+                  "    pm.expect(cuerpo.plan).to.eql('FREE');",
+                  "});",
+                  "pm.test('Sin correo ni identificadores internos', () => {",
+                  "    const texto = pm.response.text();",
+                  "    pm.expect(texto).to.not.include('@ejemplo.test');",
+                  "    pm.expect(texto).to.not.include(pm.collectionVariables.get('meUid'));",
+                  "});",
+                  "pm.collectionVariables.set('meId', cuerpo.id);",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{meUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-02 · 200 sin celular",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('phoneNumber presente y nulo', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property('phoneNumber');",
+                  "    pm.expect(cuerpo.phoneNumber).to.eql(null);",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{meUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-03 · 200 ignora firebase_uid de otra cuenta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve la cuenta propia y nunca la de la otra', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.id).to.eql(pm.collectionVariables.get('meId'));",
+                  "    pm.expect(cuerpo.id).to.not.eql(pm.collectionVariables.get('idOtra'));",
+                  "    pm.expect(cuerpo.firstName).to.eql('Ana');",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{meUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me?firebase_uid={{uidOtra}}&id={{idOtra}}&uid={{uidOtra}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ],
+              "query": [
+                {
+                  "key": "firebase_uid",
+                  "value": "{{uidOtra}}"
+                },
+                {
+                  "key": "id",
+                  "value": "{{idOtra}}"
+                },
+                {
+                  "key": "uid",
+                  "value": "{{uidOtra}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-04 · 404 sin cuenta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 404', () => pm.response.to.have.status(404));",
+                  "pm.test('ACCOUNT_NOT_FOUND con su mensaje', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('ACCOUNT_NOT_FOUND');",
+                  "    pm.expect(cuerpo.detail).to.eql('No encontramos una cuenta para este usuario.');",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "uid-inexistente-{{$timestamp}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-05 · 400 sin X-User-Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('IDENTITY_REQUIRED con su mensaje', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('IDENTITY_REQUIRED');",
+                  "    pm.expect(cuerpo.detail).to.eql('La petición no incluye los datos que exige esta ruta.');",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-06 · 400 X-User-Id en blanco",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('IDENTITY_REQUIRED', () => pm.expect(pm.response.json().code).to.eql('IDENTITY_REQUIRED'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "   "
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-06b · 400 X-User-Id de 129 caracteres",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('IDENTITY_REQUIRED', () => pm.expect(pm.response.json().code).to.eql('IDENTITY_REQUIRED'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-06c · 404 X-User-Id con forma de inyección SQL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 404', () => pm.response.to.have.status(404));",
+                  "pm.test('ACCOUNT_NOT_FOUND sin eco del valor', () => {",
+                  "    pm.expect(pm.response.json().code).to.eql('ACCOUNT_NOT_FOUND');",
+                  "    pm.expect(pm.response.text()).to.not.include('OR 1=1');",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "' OR 1=1 --"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-08 · 406 si solo acepta XML",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 406', () => pm.response.to.have.status(406));",
+                  "pm.test('MEDIA_TYPE_NOT_ACCEPTABLE', () => pm.expect(pm.response.json().code).to.eql('MEDIA_TYPE_NOT_ACCEPTABLE'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{meUid}}"
+              },
+              {
+                "key": "Accept",
+                "value": "application/xml"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "M-09 · 200 OpenAPI publica GET /api/v1/users/me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Publica GET /api/v1/users/me con sus respuestas', () => {",
+                  "    const operacion = pm.response.json().paths['/api/v1/users/me'].get;",
+                  "    pm.expect(operacion).to.be.an('object');",
+                  "    ['200', '400', '404', '406', '500'].forEach((estado) => pm.expect(operacion.responses).to.have.property(estado));",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v3/api-docs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v3",
+                "api-docs"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Activación",
+      "description": "POST /api/v1/users/me/verification: la cuenta se activa solo cuando el Gateway afirma la verificación con X-User-Email-Verified: true. Las peticiones corren en este orden: primero los rechazos con la cuenta aún pendiente, después la activación y la repetición. Los 403 ACCOUNT_DISABLED y los 409 ACCOUNT_CONFLICT no se pueden provocar por HTTP sin tocar la base y quedan en las pruebas automáticas. A-11 exige API_DOCUMENTATION_ENABLED=true.",
+      "item": [
+        {
+          "name": "A-00 · 201 registro de la cuenta que se activará",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('actEmail', 'activacion+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('actUid', pm.response.json().firebaseUid);",
+                  "pm.collectionVariables.set('actId', pm.response.json().id);",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{actEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "A-03 · 403 encabezado en false",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 403', () => pm.response.to.have.status(403));",
+                  "pm.test('EMAIL_NOT_VERIFIED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('EMAIL_NOT_VERIFIED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"Tu correo aún no está verificado.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "false"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-04 · 403 sin encabezado de verificación",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 403', () => pm.response.to.have.status(403));",
+                  "pm.test('EMAIL_NOT_VERIFIED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('EMAIL_NOT_VERIFIED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"Tu correo aún no está verificado.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-05 · 403 encabezado abc (nunca 500)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 403', () => pm.response.to.have.status(403));",
+                  "pm.test('EMAIL_NOT_VERIFIED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('EMAIL_NOT_VERIFIED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"Tu correo aún no está verificado.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "abc"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-06 · 403 cuerpo que afirma verificación sin encabezado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 403', () => pm.response.to.have.status(403));",
+                  "pm.test('EMAIL_NOT_VERIFIED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('EMAIL_NOT_VERIFIED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"Tu correo aún no está verificado.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"emailVerified\": true, \"status\": \"ACTIVE\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "A-06b · 403 cuerpo que no es JSON sin encabezado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 403', () => pm.response.to.have.status(403));",
+                  "pm.test('EMAIL_NOT_VERIFIED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('EMAIL_NOT_VERIFIED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"Tu correo aún no está verificado.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "no es json",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "A-12 · 403 identidad de otra cuenta sin la verificación del Gateway",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 403', () => pm.response.to.have.status(403));",
+                  "pm.test('EMAIL_NOT_VERIFIED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('EMAIL_NOT_VERIFIED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"Tu correo aún no está verificado.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-12b · 200 la cuenta sigue pendiente tras los rechazos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado PENDING_VERIFICATION', () => pm.expect(pm.response.json().status).to.eql('PENDING_VERIFICATION'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-07 · 400 sin X-User-Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('IDENTITY_REQUIRED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('IDENTITY_REQUIRED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"La petición no incluye los datos que exige esta ruta.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Email-Verified",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-08 · 400 X-User-Id en blanco",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('IDENTITY_REQUIRED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('IDENTITY_REQUIRED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"La petición no incluye los datos que exige esta ruta.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "   "
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-09 · 400 X-User-Id de 129 caracteres",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('IDENTITY_REQUIRED con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('IDENTITY_REQUIRED');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"La petición no incluye los datos que exige esta ruta.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-10 · 404 X-User-Id sin cuenta (forma de inyección SQL)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 404', () => pm.response.to.have.status(404));",
+                  "pm.test('ACCOUNT_NOT_FOUND con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('ACCOUNT_NOT_FOUND');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"No encontramos una cuenta para este usuario.\");",
+                  "});",
+                  "pm.test('Sin eco del valor', () => pm.expect(pm.response.text()).to.not.include(\"' OR '1'='1\"));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "' OR '1'='1"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-10b · 404 X-User-Id con 128 «ñ»",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 404', () => pm.response.to.have.status(404));",
+                  "pm.test('ACCOUNT_NOT_FOUND con su mensaje literal', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.code).to.eql('ACCOUNT_NOT_FOUND');",
+                  "    pm.expect(cuerpo.detail).to.eql(\"No encontramos una cuenta para este usuario.\");",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "ññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññ"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-01 · 200 activación",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Cuenta ACTIVE con su id', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.status).to.eql('ACTIVE');",
+                  "    pm.expect(cuerpo.id).to.eql(pm.collectionVariables.get('actId'));",
+                  "    pm.expect(Object.keys(cuerpo).sort()).to.eql(['id', 'status']);",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-02 · 200 activación repetida",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Mismo resultado: ACTIVE', () => {",
+                  "    pm.expect(pm.response.json().status).to.eql('ACTIVE');",
+                  "    pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('actId'));",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "true"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-02b · 200 la cuenta quedó ACTIVE",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado ACTIVE', () => pm.expect(pm.response.json().status).to.eql('ACTIVE'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-02c · 200 cuenta activa con el encabezado en false",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Sigue ACTIVE: el encabezado solo cuenta para la cuenta pendiente', () => pm.expect(pm.response.json().status).to.eql('ACTIVE'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{actUid}}"
+              },
+              {
+                "key": "X-User-Email-Verified",
+                "value": "false"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "verification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A-11 · 200 OpenAPI publica POST /api/v1/users/me/verification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Publica la operación con sus respuestas', () => {",
+                  "    const operacion = pm.response.json().paths['/api/v1/users/me/verification'].post;",
+                  "    pm.expect(operacion).to.be.an('object');",
+                  "    ['200', '400', '403', '404', '409', '500'].forEach((estado) => pm.expect(operacion.responses).to.have.property(estado));",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v3/api-docs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v3",
+                "api-docs"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cerrar sesión en todos los dispositivos",
+      "item": [
+        {
+          "name": "L-00 — 201 registro de la cuenta que cerrará sesión",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('logoutEmail', 'prueba+' + Date.now() + '-' + pm.info.iteration + '-logout@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('logoutUid', pm.response.json().firebaseUid);",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{logoutEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "L-01 — 204 cierra la sesión en todos los dispositivos",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Firebase guarda el instante de la revocación en segundos: se espera para que sea posterior a este.",
+                  "pm.collectionVariables.set('revocadoDesde', String(Math.floor(Date.now() / 1000)));",
+                  "setTimeout(() => {}, 1100);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Cuerpo vacío', () => pm.expect(pm.response.text()).to.eql(''));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{logoutUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            }
+          }
+        },
+        {
+          "name": "L-01b — 200 el emulador de Firebase registra la revocación",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('validSince es posterior al inicio de la revocación', () => {",
+                  "    const desde = pm.response.json().users[0].validSince;",
+                  "    pm.expect(Number(desde)).to.be.at.least(Number(pm.collectionVariables.get('revocadoDesde')));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer owner"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{firebaseEmulatorUrl}}/identitytoolkit.googleapis.com/v1/projects/{{firebaseProjectId}}/accounts:lookup",
+              "host": [
+                "{{firebaseEmulatorUrl}}"
+              ],
+              "path": [
+                "identitytoolkit.googleapis.com",
+                "v1",
+                "projects",
+                "{{firebaseProjectId}}",
+                "accounts:lookup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"localId\":[\"{{logoutUid}}\"]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "L-02 — 204 repetir la petición",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Cuerpo vacío', () => pm.expect(pm.response.text()).to.eql(''));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{logoutUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            }
+          }
+        },
+        {
+          "name": "L-03 — 204 usuario que no existe en Firebase",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Cuerpo vacío', () => pm.expect(pm.response.text()).to.eql(''));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "uid-que-no-existe-{{$timestamp}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            }
+          }
+        },
+        {
+          "name": "L-04 — 400 sin X-User-Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Código IDENTITY_REQUIRED', () => pm.expect(pm.response.json().code).to.eql('IDENTITY_REQUIRED'));",
+                  "pm.test('Mensaje del criterio', () => pm.expect(pm.response.json().detail).to.eql('La petición no incluye los datos que exige esta ruta.'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            }
+          }
+        },
+        {
+          "name": "L-05 — 400 X-User-Id de 129 caracteres",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Código IDENTITY_REQUIRED', () => pm.expect(pm.response.json().code).to.eql('IDENTITY_REQUIRED'));",
+                  "pm.test('Mensaje del criterio', () => pm.expect(pm.response.json().detail).to.eql('La petición no incluye los datos que exige esta ruta.'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            }
+          }
+        },
+        {
+          "name": "L-06 — 204 ignora el usuario del cuerpo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Cuerpo vacío', () => pm.expect(pm.response.text()).to.eql(''));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{logoutUid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"firebaseUid\":\"uid-ajeno\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "L-07 — 204 ignora el usuario de la consulta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Cuerpo vacío', () => pm.expect(pm.response.text()).to.eql(''));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{logoutUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all?uid=uid-ajeno&firebaseUid=uid-ajeno",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ],
+              "query": [
+                {
+                  "key": "uid",
+                  "value": "uid-ajeno"
+                },
+                {
+                  "key": "firebaseUid",
+                  "value": "uid-ajeno"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "L-08 — 204 identidad hostil sin reflejarla",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Cuerpo vacío', () => pm.expect(pm.response.text()).to.eql(''));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "' OR 1=1 --"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            }
+          }
+        },
+        {
+          "name": "L-09 — 405 GET sobre la ruta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 405', () => pm.response.to.have.status(405));",
+                  "pm.test('Código METHOD_NOT_ALLOWED', () => pm.expect(pm.response.json().code).to.eql('METHOD_NOT_ALLOWED'));",
+                  "pm.test('Allow contiene POST', () => pm.expect(pm.response.headers.get('Allow')).to.include('POST'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{logoutUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            }
+          }
+        },
+        {
+          "name": "L-10 — 200 OpenAPI publica la ruta con sus cinco respuestas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('POST /api/v1/auth/logout-all con 204, 400, 405, 500 y 503', () => {",
+                  "    const respuestas = pm.response.json().paths['/api/v1/auth/logout-all'].post.responses;",
+                  "    ['204', '400', '405', '500', '503'].forEach((estado) => pm.expect(respuestas).to.have.property(estado));",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v3/api-docs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v3",
+                "api-docs"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Errores de protocolo",
+      "item": [
+        {
+          "name": "C-01 — 405 formulario mal codificado con PATCH",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 405', () => pm.response.to.have.status(405));",
+                  "pm.test('code METHOD_NOT_ALLOWED', () => pm.expect(pm.response.json().code).to.eql('METHOD_NOT_ALLOWED'));",
+                  "pm.test('requestId presente', () => pm.expect(pm.response.json().requestId).to.be.a('string').and.not.empty);",
+                  "pm.test('Content-Type application/problem+json con charset=UTF-8', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.eql('application/problem+json;charset=UTF-8'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "a=%zz"
+            }
+          }
+        },
+        {
+          "name": "C-02 — 415 formulario mal codificado en el registro",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 415', () => pm.response.to.have.status(415));",
+                  "pm.test('code MEDIA_TYPE_NOT_ALLOWED', () => pm.expect(pm.response.json().code).to.eql('MEDIA_TYPE_NOT_ALLOWED'));",
+                  "pm.test('requestId presente', () => pm.expect(pm.response.json().requestId).to.be.a('string').and.not.empty);",
+                  "pm.test('Content-Type application/problem+json con charset=UTF-8', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.eql('application/problem+json;charset=UTF-8'));",
+                  "pm.test('El valor recibido no se repite', () => pm.expect(pm.response.text()).to.not.include('zz'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "a=%zz"
+            }
+          }
+        },
+        {
+          "name": "C-03 — 405 TRACE con la forma común",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 405', () => pm.response.to.have.status(405));",
+                  "pm.test('code METHOD_NOT_ALLOWED', () => pm.expect(pm.response.json().code).to.eql('METHOD_NOT_ALLOWED'));",
+                  "pm.test('requestId presente', () => pm.expect(pm.response.json().requestId).to.be.a('string').and.not.empty);",
+                  "pm.test('Content-Type application/problem+json con charset=UTF-8', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.eql('application/problem+json;charset=UTF-8'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "TRACE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "C-04 — 415 multipart sin boundary en el registro",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 415', () => pm.response.to.have.status(415));",
+                  "pm.test('code REQUEST_MULTIPART_INVALID_FORMAT', () => pm.expect(pm.response.json().code).to.eql('REQUEST_MULTIPART_INVALID_FORMAT'));",
+                  "pm.test('requestId presente', () => pm.expect(pm.response.json().requestId).to.be.a('string').and.not.empty);",
+                  "pm.test('Content-Type application/problem+json con charset=UTF-8', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.eql('application/problem+json;charset=UTF-8'));",
+                  "pm.test('El texto de la excepción no se repite', () => pm.expect(pm.response.text()).to.not.include('boundary'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "x"
+            }
+          }
+        },
+        {
+          "name": "C-04b — 413 multipart de más de 1 MiB en el registro",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Parte de ~1,1 MiB: pasa el tope de 1 MiB por parte y se rechaza sin guardar nada.",
+                  "const relleno = 'x'.repeat(1150000);",
+                  "const crlf = String.fromCharCode(13, 10);",
+                  "pm.request.body.update({ mode: 'raw', raw: '--cm335' + crlf + 'Content-Disposition: form-data; name=\"f\"; filename=\"f.bin\"' + crlf + 'Content-Type: application/octet-stream' + crlf + crlf + relleno + crlf + '--cm335--' + crlf });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 413', () => pm.response.to.have.status(413));",
+                  "pm.test('code REQUEST_BODY_TOO_LARGE', () => pm.expect(pm.response.json().code).to.eql('REQUEST_BODY_TOO_LARGE'));",
+                  "pm.test('requestId presente', () => pm.expect(pm.response.json().requestId).to.be.a('string').and.not.empty);",
+                  "pm.test('Content-Type application/problem+json con charset=UTF-8', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.eql('application/problem+json;charset=UTF-8'));",
+                  "pm.test('No cita el límite ni lo enviado', () => pm.expect(pm.response.text()).to.not.include('xxxx').and.not.include('1048576'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data; boundary=cm335"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "x"
+            }
+          }
+        },
+        {
+          "name": "C-05 — 406 Accept ilegible en la ruta de salud",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 406', () => pm.response.to.have.status(406));",
+                  "pm.test('code MEDIA_TYPE_NOT_ACCEPTABLE', () => pm.expect(pm.response.json().code).to.eql('MEDIA_TYPE_NOT_ACCEPTABLE'));",
+                  "pm.test('requestId presente', () => pm.expect(pm.response.json().requestId).to.be.a('string').and.not.empty);",
+                  "pm.test('Content-Type application/problem+json con charset=UTF-8', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.eql('application/problem+json;charset=UTF-8'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": ";;;"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "C-06 — 422 Accept ilegible con un registro vacío (el error conserva su cuerpo)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 422', () => pm.response.to.have.status(422));",
+                  "pm.test('code VALIDATION_FAILED', () => pm.expect(pm.response.json().code).to.eql('VALIDATION_FAILED'));",
+                  "pm.test('requestId presente', () => pm.expect(pm.response.json().requestId).to.be.a('string').and.not.empty);",
+                  "pm.test('Content-Type application/problem+json con charset=UTF-8', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.eql('application/problem+json;charset=UTF-8'));",
+                  "pm.test('errors[] presente', () => pm.expect(pm.response.json().errors).to.be.an('array').and.not.empty);",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": ";;;"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

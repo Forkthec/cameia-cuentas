@@ -1,0 +1,134 @@
+package tech.cameia.cuentas.domain.exception;
+
+/**
+ * Códigos de error estables que el servicio devuelve en el miembro {@code code} de cada
+ * respuesta de error.
+ *
+ * <p>Un código nunca se renombra ni se reutiliza una vez publicado. La forma es
+ * {@code <SUJETO>_<CAUSA>} con un vocabulario de causas cerrado; {@code VALIDATION_FAILED} e
+ * {@code INTERNAL_ERROR} son las dos excepciones, porque describen la operación entera y no
+ * una causa. Ningún fallo previsible debe terminar en uno de esos dos: cada uno tiene su
+ * código propio.</p>
+ */
+public enum ErrorCode {
+
+    /** La petición tiene campos inválidos; el detalle de cada uno va en la lista {@code errors}. */
+    VALIDATION_FAILED,
+
+    /** Falló algo imprevisto que la persona no puede corregir. */
+    INTERNAL_ERROR,
+
+    /**
+     * Una restricción del contrato sin código asignado rechazó un campo. Es un respaldo que no
+     * debe emitirse: una prueba exige que toda restricción tenga su código.
+     */
+    REQUEST_INVALID_VALUE,
+
+    /** Falta el nombre. */
+    FIRST_NAME_REQUIRED,
+
+    /** El nombre supera el máximo de caracteres. */
+    FIRST_NAME_TOO_LONG,
+
+    /** El nombre tiene caracteres que no son letras, espacios, apóstrofo ni guion. */
+    FIRST_NAME_INVALID_CHARACTERS,
+
+    /** Falta el apellido. */
+    LAST_NAME_REQUIRED,
+
+    /** El apellido supera el máximo de caracteres. */
+    LAST_NAME_TOO_LONG,
+
+    /** El apellido tiene caracteres que no son letras, espacios, apóstrofo ni guion. */
+    LAST_NAME_INVALID_CHARACTERS,
+
+    /** Falta la fecha de nacimiento. */
+    BIRTH_DATE_REQUIRED,
+
+    /** La fecha de nacimiento no es una fecha real con el formato {@code dd/MM/aaaa}. */
+    BIRTH_DATE_INVALID_FORMAT,
+
+    /** La fecha de nacimiento está en el futuro. */
+    BIRTH_DATE_IN_THE_FUTURE,
+
+    /** La persona aún no cumple la edad mínima. */
+    BIRTH_DATE_UNDERAGE,
+
+    /** La fecha implica una edad que ninguna persona alcanza. */
+    BIRTH_DATE_OUT_OF_RANGE,
+
+    /** Falta el correo. */
+    EMAIL_REQUIRED,
+
+    /** El correo supera el máximo de caracteres. */
+    EMAIL_TOO_LONG,
+
+    /** El correo no tiene forma de correo. */
+    EMAIL_INVALID_FORMAT,
+
+    /** El correo ya tiene una cuenta. */
+    EMAIL_ALREADY_REGISTERED,
+
+    /** Falta la contraseña. */
+    PASSWORD_REQUIRED,
+
+    /** La contraseña tiene menos caracteres que el mínimo. */
+    PASSWORD_TOO_SHORT,
+
+    /** La contraseña supera el máximo de caracteres. */
+    PASSWORD_TOO_LONG,
+
+    /** La contraseña figura entre las más comunes. */
+    PASSWORD_TOO_COMMON,
+
+    /** Falta elegir los pronombres. */
+    PRONOUN_REQUIRED,
+
+    /** Los pronombres no son ninguna de las opciones de la lista. */
+    PRONOUN_INVALID_VALUE,
+
+    /** El celular no es un número válido para el país de su indicativo. */
+    PHONE_NUMBER_INVALID_FORMAT,
+
+    /** El cuerpo de la petición no se puede interpretar. */
+    REQUEST_BODY_INVALID_FORMAT,
+
+    /** Un multipart de la petición no se pudo leer (por ejemplo, sin boundary). */
+    REQUEST_MULTIPART_INVALID_FORMAT,
+
+    /** El cuerpo de la petición, o un multipart, supera el tamaño que el servicio admite. */
+    REQUEST_BODY_TOO_LARGE,
+
+    /** Falta el encabezado de identidad que pone el Gateway. */
+    IDENTITY_REQUIRED,
+
+    /** El usuario no tiene cuenta local. */
+    ACCOUNT_NOT_FOUND,
+
+    /** El correo aún no está verificado. */
+    EMAIL_NOT_VERIFIED,
+
+    /** La cuenta está deshabilitada y no se puede activar. */
+    ACCOUNT_DISABLED,
+
+    /** Otra petición cambió la cuenta al mismo tiempo; la persona puede reintentar. */
+    ACCOUNT_CONFLICT,
+
+    /** Firebase no está disponible; la persona puede reintentar. */
+    DEPENDENCY_UNAVAILABLE,
+
+    /** La base de datos no está disponible; la persona puede reintentar. */
+    DATABASE_UNAVAILABLE,
+
+    /** La ruta solicitada no existe. */
+    ROUTE_NOT_FOUND,
+
+    /** El método HTTP no está permitido en esa ruta. */
+    METHOD_NOT_ALLOWED,
+
+    /** El tipo de contenido de la petición no se admite. */
+    MEDIA_TYPE_NOT_ALLOWED,
+
+    /** Ninguno de los tipos de respuesta que acepta quien llama ({@code Accept}) se puede producir. */
+    MEDIA_TYPE_NOT_ACCEPTABLE
+}

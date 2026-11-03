@@ -1,0 +1,17 @@
+package tech.cameia.cuentas.domain.exception;
+
+/**
+ * Señala que la operación exige un correo ya verificado y el del usuario no lo está.
+ *
+ * <p>La verificación la certifica el token de Firebase, nunca la palabra del navegador.</p>
+ */
+public class EmailNotVerifiedException extends BusinessException {
+
+    private static final String MENSAJE =
+            "Tu correo aún no está verificado.";
+
+    /** Crea la excepción con el mensaje que ve la persona. */
+    public EmailNotVerifiedException() {
+        super(ErrorCode.EMAIL_NOT_VERIFIED, MENSAJE);
+    }
+}

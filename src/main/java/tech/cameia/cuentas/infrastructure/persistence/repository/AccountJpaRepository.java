@@ -1,0 +1,109 @@
+package tech.cameia.cuentas.infrastructure.persistence.repository;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.data.domain.Limit;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import tech.cameia.cuentas.infrastructure.persistence.entity.AccountEntity;
+
+/**
+ * Repositorio de Spring Data sobre la tabla {@code cuenta}.
+ *
+ * <p>Es una pieza interna de la infraestructura: el resto del microservicio usa el puerto
+ * {@code AccountRepository}, no esta interfaz.</p>
+ */
+public interface AccountJpaRepository extends JpaRepository<AccountEntity, UUID> {
+
+    /**
+     * Busca la fila de un usuario de Firebase.
+     *
+     * @param firebaseUid identificador del usuario en Firebase Auth
+     * @return la fila, o vacío si no existe
+     */
+    Optional<AccountEntity> findByFirebaseUid(String firebaseUid);
+
+    /**
+     * Lista las cuentas que no tienen evento de cuenta creada, la más antigua primero.
+     *
+     * <p>Excluye las anonimizadas y las que no tienen fecha de nacimiento, porque el evento las exige. La consulta es nativa
+     * para nombrar el esquema y expresar la ausencia con {@code NOT EXISTS}, que usa el índice único de la tabla de salida.</p>
+     *
+     * @param limit cantidad máxima de filas
+     * @return proyecciones con los tres datos que necesita el evento
+     */
+    @Query(value = """
+            SELECT c.firebase_uid AS firebaseUid, c.fecha_nacimiento AS fechaNacimiento, c.fecha_creacion AS fechaCreacion
+            FROM microcuentas.cuenta c
+            WHERE c.estado <> 'ANONYMIZED' AND c.fecha_nacimiento IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM microcuentas.evento_saliente e
+                              WHERE e.tipo = 'cuenta.creada' AND e.agregado_id = c.firebase_uid)
+            ORDER BY c.fecha_creacion, c.id
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<UnannouncedProjection> findUnannounced(@Param("limit") int limit);
+
+    /**
+     * Borra la fila del usuario solo si su estado sigue siendo {@code PENDING_VERIFICATION}.
+     *
+     * <p>La condición de estado va en el mismo {@code DELETE}: si alguien activó la cuenta entre la decisión y el borrado, la
+     * sentencia no toca ninguna fila.</p>
+     *
+     * @param firebaseUid identificador del usuario en Firebase Auth
+     * @return filas borradas: 1 o 0
+     */
+    @Modifying
+    @Query("delete from AccountEntity a where a.firebaseUid = :firebaseUid "
+            + "and a.estado = tech.cameia.cuentas.domain.model.AccountStatus.PENDING_VERIFICATION")
+    int deletePendingByFirebaseUid(@Param("firebaseUid") String firebaseUid);
+
+    /**
+     * Lista los usuarios de las cuentas sin verificar creadas antes de un instante, la más antigua primero.
+     *
+     * <p>Usa el índice parcial de cuentas pendientes por fecha de creación.</p>
+     *
+     * @param limite instante, exclusivo
+     * @param cantidad máximo de filas
+     * @return los {@code firebaseUid}
+     */
+    @Query("select a.firebaseUid from AccountEntity a "
+            + "where a.estado = tech.cameia.cuentas.domain.model.AccountStatus.PENDING_VERIFICATION "
+            + "and a.fechaCreacion < :limite order by a.fechaCreacion asc, a.id asc")
+    List<String> findPendingFirebaseUids(@Param("limite") Instant limite, Limit cantidad);
+
+    /**
+     * Devuelve cuáles de los usuarios indicados tienen fila, en cualquier estado.
+     *
+     * @param uids identificadores a comprobar (nunca vacío: una lista vacía no genera una consulta válida)
+     * @return los {@code firebaseUid} que existen
+     */
+    @Query("select a.firebaseUid from AccountEntity a where a.firebaseUid in :uids")
+    List<String> findExistingFirebaseUids(@Param("uids") Collection<String> uids);
+
+    /** Proyección de la consulta de cuentas sin evento. */
+    interface UnannouncedProjection {
+
+        /**
+         * @return identificador del usuario en Firebase Auth
+         */
+        String getFirebaseUid();
+
+        /**
+         * @return fecha de nacimiento de la cuenta
+         */
+        LocalDate getFechaNacimiento();
+
+        /**
+         * @return instante de creación de la cuenta
+         */
+        Instant getFechaCreacion();
+    }
+}

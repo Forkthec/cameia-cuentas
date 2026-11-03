@@ -1,0 +1,629 @@
+package tech.cameia.cuentas;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.resttestclient.TestRestTemplate;
+import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+
+import tech.cameia.cuentas.domain.model.Pronoun;
+import tech.cameia.cuentas.infrastructure.client.InMemoryFirebaseUserDirectory;
+
+/**
+ * Prueba de extremo a extremo del registro descrito en
+ * {@code specs/CM-14-RegistroUsuario/spec.md}.
+ *
+ * <p>Recorre el camino completo por HTTP: controlador, caso de uso, políticas del dominio,
+ * directorio de usuarios y PostgreSQL real. Lo único simulado es Firebase, que se sustituye
+ * por el doble en memoria para no necesitar credenciales.</p>
+ *
+ * <p>Las pruebas anteriores verifican cada pieza por separado; esta comprueba que
+ * encajan: el JSON del formulario, el estado inicial en la tabla y la activación posterior
+ * con los encabezados que emite el Gateway.</p>
+ */
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureTestRestTemplate
+@Testcontainers(disabledWithoutDocker = true)
+class AccountRegistrationEndToEndTest {
+
+    @Container
+    @ServiceConnection
+    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16-alpine");
+
+    @Autowired
+    private TestRestTemplate cliente;
+
+    @Autowired
+    private InMemoryFirebaseUserDirectory directorio;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @BeforeEach
+    void limpiarEstado() {
+        directorio.limpiar();
+        jdbcTemplate.update("DELETE FROM microcuentas.cuenta");
+    }
+
+    @Test
+    void registraLaCuentaYLuegoLaActivaAlVerificarElCorreo() {
+        ResponseEntity<String> registro = registrar(cuerpoValido());
+
+        assertThat(registro.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(registro.getBody()).contains("PENDING_VERIFICATION").contains("FREE");
+        assertThat(registro.getHeaders().getContentType().toString()).containsIgnoringCase("charset=UTF-8");
+
+        String uid = uidGuardado();
+        assertThat(estadoGuardado()).isEqualTo("PENDING_VERIFICATION");
+        assertThat(directorio.planDe(uid)).isEqualTo("FREE");
+
+        HttpHeaders encabezados = new HttpHeaders();
+        encabezados.add("X-User-Id", uid);
+        encabezados.add("X-User-Email-Verified", "true");
+        ResponseEntity<String> activacion = cliente.exchange("/api/v1/users/me/verification",
+                HttpMethod.POST, new HttpEntity<>(encabezados), String.class);
+
+        assertThat(activacion.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(estadoGuardado()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void elSegundoRegistroConElMismoCorreoDevuelveLaCuentaPendiente() {
+        ResponseEntity<String> creado = registrar(cuerpoValido());
+
+        ResponseEntity<String> repetido = registrar(cuerpoValido());
+
+        assertThat(repetido.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(repetido.getBody()).isEqualTo(creado.getBody());
+        assertThat(repetido.getHeaders().getContentType().toString()).containsIgnoringCase("charset=UTF-8");
+        assertThat(cuentasGuardadas()).isEqualTo(1);
+        assertThat(directorio.cantidadDeUsuarios()).isEqualTo(1);
+    }
+
+    @Test
+    void elReintentoNoCambiaLasFechasNiLaVersion() {
+        registrar(cuerpoValido());
+        Map<String, Object> antes = filaGuardada();
+
+        registrar(cuerpoValido());
+
+        assertThat(filaGuardada()).isEqualTo(antes);
+    }
+
+    @Test
+    void veinteRepeticionesDelMismoRegistroNoProducenEfectosAdicionales() {
+        ResponseEntity<String> creado = registrar(cuerpoValido());
+        Map<String, Object> antes = filaGuardada();
+
+        for (int repeticion = 0; repeticion < 20; repeticion++) {
+            ResponseEntity<String> repetido = registrar(cuerpoValido());
+            assertThat(repetido.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(repetido.getBody()).isEqualTo(creado.getBody());
+        }
+
+        assertThat(cuentasGuardadas()).isEqualTo(1);
+        assertThat(directorio.cantidadDeUsuarios()).isEqualTo(1);
+        assertThat(filaGuardada()).isEqualTo(antes);
+    }
+
+    @Test
+    void unCorreoConCuentaActivaDaConflictoSinRevelarElEstado() {
+        registrar(cuerpoValido());
+        HttpHeaders encabezados = new HttpHeaders();
+        encabezados.add("X-User-Id", uidGuardado());
+        encabezados.add("X-User-Email-Verified", "true");
+        cliente.exchange("/api/v1/users/me/verification", HttpMethod.POST, new HttpEntity<>(encabezados),
+                String.class);
+        assertThat(estadoGuardado()).isEqualTo("ACTIVE");
+
+        ResponseEntity<String> conCuentaActiva = registrar(cuerpoValido());
+        jdbcTemplate.update("UPDATE microcuentas.cuenta SET estado = 'DISABLED'");
+        ResponseEntity<String> conCuentaBloqueada = registrar(cuerpoValido());
+
+        assertThat(conCuentaActiva.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(conCuentaActiva.getBody()).contains("Ese correo ya tiene una cuenta.")
+                .contains("\"code\":\"EMAIL_ALREADY_REGISTERED\"")
+                .contains("\"field\":\"email\"");
+        assertThat(conCuentaActiva.getHeaders().getContentType().toString())
+                .startsWith("application/problem+json").containsIgnoringCase("charset=UTF-8");
+        assertThat(conCuentaActiva.getHeaders().getFirst("X-Request-Id")).isNotBlank();
+        assertThat(conCuentaBloqueada.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(sinRequestId(conCuentaBloqueada.getBody())).isEqualTo(sinRequestId(conCuentaActiva.getBody()));
+    }
+
+    @Test
+    void unaCredencialSinCuentaLocalDaConflicto() {
+        directorio.crearSinCuentaLocal("ana@cameia.tech", Instant.now().minusSeconds(600));
+
+        ResponseEntity<String> respuesta = registrar(cuerpoValido());
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(respuesta.getBody()).contains("\"code\":\"EMAIL_ALREADY_REGISTERED\"");
+        assertThat(cuentasGuardadas()).isZero();
+    }
+
+    @Test
+    void unUsuarioDeshabilitadoDaConflicto() {
+        registrar(cuerpoValido());
+        directorio.deshabilitar(uidGuardado());
+
+        ResponseEntity<String> respuesta = registrar(cuerpoValido());
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(estadoGuardado()).isEqualTo("PENDING_VERIFICATION");
+    }
+
+    @Test
+    void siFirebaseNoRespondeAlConsultarRespondeServicioNoDisponible() {
+        directorio.fallarAlConsultar();
+
+        ResponseEntity<String> respuesta = registrar(cuerpoValido());
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(respuesta.getBody()).contains("\"code\":\"DEPENDENCY_UNAVAILABLE\"")
+                .contains("Ocurrió un error. Inténtalo de nuevo.")
+                .doesNotContain("Firebase no respondió");
+        assertThat(cuentasGuardadas()).isZero();
+    }
+
+    @Test
+    void elSegundoRegistroConOtrosDatosNoCambiaLaFila() {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+        Map<String, Object> antes = filaGuardada();
+        String otrosDatos = cuerpoValido().replace("Ana", "Luz").replace("12/04/1995", "01/01/1990")
+                .replace("frase secreta larga", "otra frase muy distinta");
+
+        ResponseEntity<String> respuesta = registrar(otrosDatos);
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(filaGuardada()).isEqualTo(antes);
+        assertThat(directorio.contrasenaDe(uid)).isEqualTo("frase secreta larga");
+    }
+
+    @Test
+    void unMenorDeEdadNoDejaRastroNiEnFirebaseNiEnLaBase() {
+        String menor = cuerpoValido().replace("12/04/1995", "12/04/2015");
+
+        ResponseEntity<String> respuesta = registrar(menor);
+
+        // Se compara el número y no la constante: Spring tiene dos para el 422, la nueva
+        // UNPROCESSABLE_CONTENT y la antigua UNPROCESSABLE_ENTITY, y no son el mismo objeto.
+        assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
+        assertThat(respuesta.getBody()).contains("Debes ser mayor de edad.");
+        assertThat(cuentasGuardadas()).isZero();
+    }
+
+    @Test
+    void unaContrasenaConEspaciosYEmojiLlegaAFirebaseSinCambios() {
+        // 16 puntos de código: el emoji ocupa dos unidades de UTF-16 y cuenta como uno.
+        String contrasena = "mi clave larga 🙂";
+
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("frase secreta larga", contrasena));
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(directorio.contrasenaDe(uidGuardado())).isEqualTo(contrasena);
+    }
+
+    @Test
+    void elEstadoYElPlanDelCuerpoSeIgnoranYLaCuentaNacePendienteYGratis() {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido()
+                .replace("\"pronoun\":\"SHE\"", "\"pronoun\":\"SHE\",\"status\":\"ACTIVE\",\"estado\":\"ACTIVE\","
+                        + "\"plan\":\"PREMIUM\",\"id\":\"00000000-0000-0000-0000-000000000000\",\"otro\":1"));
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(respuesta.getBody()).contains("PENDING_VERIFICATION").contains("FREE")
+                .doesNotContain("00000000-0000-0000-0000-000000000000");
+        assertThat(estadoGuardado()).isEqualTo("PENDING_VERIFICATION");
+        assertThat(directorio.planDe(uidGuardado())).isEqualTo("FREE");
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {"1", "true", "\"OTRO\"", "\"she\""})
+    void unPronombreFueraDeLaListaNoDejaRastroNiEnFirebaseNiEnLaBase(String valor) {
+        // Comprueba la configuración real de Jackson: un número no se lee como la posición del valor.
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("\"SHE\"", valor));
+
+        assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
+        assertThat(respuesta.getBody()).contains("\"field\":\"pronoun\"").contains("\"code\":\"PRONOUN_INVALID_VALUE\"")
+                .contains("Selecciona una opción.");
+        assertThat(cuentasGuardadas()).isZero();
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
+    }
+
+    @Test
+    void unCorreoSinFormaNoDejaRastroYNoRepiteElValor() {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("ana@cameia.tech", "ana@correo..co"));
+
+        assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
+        assertThat(respuesta.getBody()).contains("\"field\":\"email\"").contains("\"code\":\"EMAIL_INVALID_FORMAT\"")
+                .doesNotContain("ana@correo..co");
+        assertThat(cuentasGuardadas()).isZero();
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
+    }
+
+    @Test
+    void unaFechaImposibleNoDejaRastroNiEnFirebaseNiEnLaBase() {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("12/04/1995", "31/02/2000"));
+
+        assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
+        assertThat(respuesta.getBody()).contains("\"code\":\"BIRTH_DATE_INVALID_FORMAT\"")
+                .contains("\"field\":\"birthDate\"");
+        assertThat(cuentasGuardadas()).isZero();
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
+    }
+
+    @Test
+    void sinPronombreNoDejaRastroNiEnFirebaseNiEnLaBase() {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace(",\"pronoun\":\"SHE\"", ""));
+
+        assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
+        assertThat(respuesta.getBody()).contains("\"code\":\"PRONOUN_REQUIRED\"").contains("\"field\":\"pronoun\"");
+        assertThat(cuentasGuardadas()).isZero();
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
+    }
+
+    @Test
+    void unPronombreVacioSeTrataComoAusenteDePuntaAPunta() {
+        // Comprueba que la aplicación real lee "" como ausente, no solo el MockMvc de las pruebas.
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("\"SHE\"", "\"\""));
+
+        assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
+        assertThat(respuesta.getBody()).contains("\"code\":\"PRONOUN_REQUIRED\"");
+        assertThat(cuentasGuardadas()).isZero();
+    }
+
+    @ParameterizedTest
+    @EnumSource(Pronoun.class)
+    void cadaPronombreSeGuardaTalCual(Pronoun pronombre) {
+        String cuerpo = cuerpoValido()
+                .replace("\"SHE\"", "\"" + pronombre.name() + "\"")
+                .replace("ana@cameia.tech", pronombre.name().toLowerCase(java.util.Locale.ROOT) + "@cameia.tech");
+
+        ResponseEntity<String> respuesta = registrar(cuerpo);
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(jdbcTemplate.queryForObject("SELECT pronombres FROM microcuentas.cuenta", String.class))
+                .isEqualTo(pronombre.name());
+    }
+
+    @Test
+    void unCorreoConEspaciosYMayusculasSeGuardaNormalizadoYElSiguienteDevuelveLaMismaCuenta() {
+        ResponseEntity<String> primero = registrar(cuerpoValido().replace("ana@cameia.tech", "  Ana@Correo.CO "));
+        ResponseEntity<String> segundo = registrar(cuerpoValido().replace("ana@cameia.tech", "ana@correo.co"));
+
+        assertThat(primero.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(segundo.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(segundo.getBody()).isEqualTo(primero.getBody());
+        assertThat(directorio.cantidadDeUsuarios()).isEqualTo(1);
+        assertThat(cuentasGuardadas()).isEqualTo(1);
+    }
+
+    @Test
+    void unNombreDe120CaracteresSeGuardaCompleto() {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("\"Ana\"", "\"" + "ñ".repeat(120) + "\""));
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(jdbcTemplate.queryForObject("SELECT char_length(nombre) FROM microcuentas.cuenta", Integer.class))
+                .isEqualTo(120);
+    }
+
+    @Test
+    void unNombreEnNfdSeGuardaEnNfcYSinEspaciosSobrantes() {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido()
+                .replace("\"Ana\"", "\"  Jose\u0301  Luis \"")
+                .replace("\"Pérez\"", "\"\u00A0Pe\u0301rez\u00A0\""));
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(jdbcTemplate.queryForObject("SELECT nombre FROM microcuentas.cuenta", String.class))
+                .isEqualTo("José Luis");
+        assertThat(jdbcTemplate.queryForObject("SELECT apellido FROM microcuentas.cuenta", String.class))
+                .isEqualTo("Pérez");
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}/{1} -> {2}")
+    @CsvSource(delimiter = '|', value = {
+        "Ana3|Pérez|firstName|FIRST_NAME_INVALID_CHARACTERS",
+        "Ana|Pérez_|lastName|LAST_NAME_INVALID_CHARACTERS",
+        "<script>|Pérez|firstName|FIRST_NAME_INVALID_CHARACTERS"})
+    void unNombreOApellidoConCaracteresNoAdmitidosNoDejaRastro(String nombre, String apellido, String campo,
+            String codigo) {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido()
+                .replace("\"Ana\"", "\"" + nombre + "\"")
+                .replace("\"Pérez\"", "\"" + apellido + "\""));
+
+        assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
+        assertThat(respuesta.getBody()).contains("\"field\":\"" + campo + "\"").contains("\"code\":\"" + codigo + "\"")
+                .doesNotContain("<script>");
+        assertThat(cuentasGuardadas()).isZero();
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
+    }
+
+    @ParameterizedTest(name = "[{index}] {0} {1}")
+    @CsvSource(delimiter = '|', quoteCharacter = '"', value = {"María José|Gómez-Ruiz", "O'Neill|Müller", "A|B"})
+    void unNombreSoloConLetrasSeGuardaTalCual(String nombre, String apellido) {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido()
+                .replace("\"Ana\"", "\"" + nombre + "\"")
+                .replace("\"Pérez\"", "\"" + apellido + "\""));
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(jdbcTemplate.queryForObject("SELECT nombre FROM microcuentas.cuenta", String.class)).isEqualTo(nombre);
+        assertThat(jdbcTemplate.queryForObject("SELECT apellido FROM microcuentas.cuenta", String.class))
+                .isEqualTo(apellido);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"+573000000000", "+34612345678", "+6903101"})
+    void unCelularValidoSeGuardaTalCual(String celular) {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("+573001234567", celular));
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(jdbcTemplate.queryForObject("SELECT telefono FROM microcuentas.cuenta", String.class))
+                .isEqualTo(celular);
+    }
+
+    @Test
+    void unCelularInvalidoNoDejaRastro() {
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("+573001234567", "12345"));
+
+        assertThat(respuesta.getStatusCode().value()).isEqualTo(422);
+        assertThat(respuesta.getBody()).contains("\"code\":\"PHONE_NUMBER_INVALID_FORMAT\"")
+                .contains("\"field\":\"phoneNumber\"").doesNotContain("12345");
+        assertThat(cuentasGuardadas()).isZero();
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {"\"phoneNumber\":\"\",", "\"phoneNumber\":\"   \",", "\"phoneNumber\":null,",
+        "''"})
+    void sinCelularLaCuentaSeCreaConElTelefonoNulo(String fragmento) {
+        // La última fila quita el campo entero: ausente es lo mismo que vacío.
+        ResponseEntity<String> respuesta = registrar(cuerpoValido().replace("\"phoneNumber\":\"+573001234567\",",
+                fragmento));
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(jdbcTemplate.queryForObject("SELECT telefono FROM microcuentas.cuenta", String.class)).isNull();
+    }
+
+    @Test
+    void sinVerificarElCorreoLaActivacionSeRechazaYLaCuentaSigueIgual() {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+
+        HttpHeaders encabezados = new HttpHeaders();
+        encabezados.add("X-User-Id", uid);
+        ResponseEntity<String> activacion = cliente.exchange("/api/v1/users/me/verification",
+                HttpMethod.POST, new HttpEntity<>(encabezados), String.class);
+
+        assertThat(activacion.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(estadoGuardado()).isEqualTo("PENDING_VERIFICATION");
+    }
+
+    @Test
+    @DisplayName("Activar una cuenta pendiente cambia el estado, la fecha de actualización y la versión")
+    void activate_shouldChangeStatusAndUpdateDate_whenPending() {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+        Map<String, Object> antes = filaGuardada();
+
+        ResponseEntity<String> activacion = activar(uid, "true");
+
+        Map<String, Object> despues = filaGuardada();
+        assertThat(activacion.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(despues.get("estado")).isEqualTo("ACTIVE");
+        assertThat(instante(despues, "fecha_actualizacion")).isAfter(instante(antes, "fecha_actualizacion"));
+        assertThat((Long) despues.get("version")).isEqualTo((Long) antes.get("version") + 1);
+    }
+
+    @Test
+    @DisplayName("Activar una cuenta ya activa responde 200 igual y no escribe en la base")
+    void activate_shouldNotWrite_whenAlreadyActive() {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+        ResponseEntity<String> primera = activar(uid, "true");
+        Map<String, Object> trasLaPrimera = filaGuardada();
+
+        for (int repeticion = 0; repeticion < 20; repeticion++) {
+            ResponseEntity<String> otra = activar(uid, "true");
+
+            assertThat(otra.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(otra.getBody()).isEqualTo(primera.getBody());
+        }
+        Map<String, Object> alFinal = filaGuardada();
+        assertThat(alFinal.get("version")).isEqualTo(trasLaPrimera.get("version"));
+        assertThat(instante(alFinal, "fecha_actualizacion")).isEqualTo(instante(trasLaPrimera, "fecha_actualizacion"));
+    }
+
+    @Test
+    @DisplayName("Una cuenta deshabilitada se rechaza con 403 ACCOUNT_DISABLED y sigue deshabilitada")
+    void activate_shouldReturn403_whenAccountIsDisabled() {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+        jdbcTemplate.update("UPDATE microcuentas.cuenta SET estado = 'DISABLED' WHERE firebase_uid = ?", uid);
+
+        ResponseEntity<String> activacion = activar(uid, "true");
+
+        assertThat(activacion.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(activacion.getBody()).contains("ACCOUNT_DISABLED").contains("Esta cuenta está deshabilitada.");
+        assertThat(estadoGuardado()).isEqualTo("DISABLED");
+    }
+
+    @Test
+    @DisplayName("Una cuenta anonimizada responde igual que un usuario sin cuenta")
+    void activate_shouldAnswerLikeMissingAccount_whenAnonymized() {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+        jdbcTemplate.update("UPDATE microcuentas.cuenta SET estado = 'ANONYMIZED', fecha_eliminacion = now() "
+                + "WHERE firebase_uid = ?", uid);
+
+        ResponseEntity<String> anonimizada = activar(uid, "true");
+        ResponseEntity<String> sinCuenta = activar("uid-que-nunca-existio", "true");
+
+        assertThat(anonimizada.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(sinRequestId(anonimizada.getBody())).isEqualTo(sinRequestId(sinCuenta.getBody()));
+        assertThat(anonimizada.getBody()).contains("ACCOUNT_NOT_FOUND");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"false", "", "abc"})
+    @DisplayName("Una cuenta anonimizada responde 404 igual que una inexistente aunque el encabezado no sea «true»")
+    void activate_shouldAnswerLikeMissingAccount_whenAnonymizedAndHeaderIsNotTrue(String verificado) {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+        jdbcTemplate.update("UPDATE microcuentas.cuenta SET estado = 'ANONYMIZED', fecha_eliminacion = now() "
+                + "WHERE firebase_uid = ?", uid);
+
+        ResponseEntity<String> anonimizada = activar(uid, verificado);
+        ResponseEntity<String> sinCuenta = activar("uid-que-nunca-existio", verificado);
+
+        assertThat(anonimizada.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(sinRequestId(anonimizada.getBody())).isEqualTo(sinRequestId(sinCuenta.getBody()));
+    }
+
+    @Test
+    @DisplayName("Repetir la activación de una cuenta activa con el encabezado en false responde 200 y no escribe")
+    void activate_shouldReturn200WithoutWriting_whenAlreadyActiveAndHeaderIsFalse() {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+        activar(uid, "true");
+        Map<String, Object> trasLaPrimera = filaGuardada();
+
+        ResponseEntity<String> repetida = activar(uid, "false");
+
+        assertThat(repetida.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(filaGuardada().get("version")).isEqualTo(trasLaPrimera.get("version"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"false", "", "abc"})
+    @DisplayName("Sin la afirmación exacta «true» del Gateway se rechaza con 403 y la cuenta sigue pendiente")
+    void activate_shouldReturn403AndKeepPending_whenHeaderIsNotTrue(String verificado) {
+        registrar(cuerpoValido());
+
+        ResponseEntity<String> activacion = activar(uidGuardado(), verificado);
+
+        assertThat(activacion.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(activacion.getBody()).contains("EMAIL_NOT_VERIFIED");
+        assertThat(estadoGuardado()).isEqualTo("PENDING_VERIFICATION");
+    }
+
+    @Test
+    @DisplayName("Con el encabezado «true» la activación no necesita a Firebase")
+    void activate_shouldNotNeedFirebase_whenHeaderIsTrue() {
+        registrar(cuerpoValido());
+        String uid = uidGuardado();
+        directorio.fallarAlConsultar();
+
+        ResponseEntity<String> activacion = activar(uid, "true");
+
+        assertThat(activacion.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    @DisplayName("Dos activaciones simultáneas de la misma cuenta responden 200 y escriben una sola vez")
+    void activate_shouldSucceedOnce_whenTwoRequestsRace() throws Exception {
+        ExecutorService hilos = Executors.newFixedThreadPool(2);
+        try {
+            for (int ronda = 0; ronda < 10; ronda++) {
+                directorio.limpiar();
+                jdbcTemplate.update("DELETE FROM microcuentas.cuenta");
+                registrar(cuerpoValido().replace("ana@cameia.tech", "ana" + ronda + "@cameia.tech"));
+                String uid = uidGuardado();
+                Long versionAntes = (Long) filaGuardada().get("version");
+                CountDownLatch salida = new CountDownLatch(1);
+                Callable<HttpStatusCode> peticion = () -> {
+                    salida.await();
+                    return activar(uid, "true").getStatusCode();
+                };
+                Future<HttpStatusCode> primera = hilos.submit(peticion);
+                Future<HttpStatusCode> segunda = hilos.submit(peticion);
+                salida.countDown();
+
+                assertThat(primera.get(30, TimeUnit.SECONDS)).isEqualTo(HttpStatus.OK);
+                assertThat(segunda.get(30, TimeUnit.SECONDS)).isEqualTo(HttpStatus.OK);
+                assertThat(estadoGuardado()).isEqualTo("ACTIVE");
+                assertThat((Long) filaGuardada().get("version")).isEqualTo(versionAntes + 1);
+            }
+        } finally {
+            hilos.shutdownNow();
+        }
+    }
+
+    private ResponseEntity<String> activar(String uid, String verificado) {
+        HttpHeaders encabezados = new HttpHeaders();
+        encabezados.add("X-User-Id", uid);
+        if (verificado != null) {
+            encabezados.add("X-User-Email-Verified", verificado);
+        }
+        return cliente.exchange("/api/v1/users/me/verification", HttpMethod.POST, new HttpEntity<>(encabezados),
+                String.class);
+    }
+
+    private static Instant instante(Map<String, Object> fila, String columna) {
+        Object valor = fila.get(columna);
+        return valor instanceof java.time.OffsetDateTime fecha ? fecha.toInstant() : ((java.sql.Timestamp) valor).toInstant();
+    }
+
+    private ResponseEntity<String> registrar(String cuerpo) {
+        HttpHeaders encabezados = new HttpHeaders();
+        encabezados.setContentType(MediaType.APPLICATION_JSON);
+        return cliente.postForEntity("/api/v1/users", new HttpEntity<>(cuerpo, encabezados), String.class);
+    }
+
+    private Map<String, Object> filaGuardada() {
+        return jdbcTemplate.queryForMap("SELECT * FROM microcuentas.cuenta");
+    }
+
+    private static String sinRequestId(String cuerpo) {
+        return cuerpo.replaceAll("\"requestId\":\"[^\"]*\"", "");
+    }
+
+    private String uidGuardado() {
+        return jdbcTemplate.queryForObject("SELECT firebase_uid FROM microcuentas.cuenta", String.class);
+    }
+
+    private String estadoGuardado() {
+        return jdbcTemplate.queryForObject("SELECT estado FROM microcuentas.cuenta", String.class);
+    }
+
+    private Integer cuentasGuardadas() {
+        return jdbcTemplate.queryForObject("SELECT count(*) FROM microcuentas.cuenta", Integer.class);
+    }
+
+    private String cuerpoValido() {
+        return """
+                {"firstName":"Ana","lastName":"Pérez","birthDate":"12/04/1995",
+                 "email":"ana@cameia.tech","password":"frase secreta larga",
+                 "phoneNumber":"+573001234567","pronoun":"SHE"}
+                """;
+    }
+}

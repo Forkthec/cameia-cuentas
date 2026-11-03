@@ -1,0 +1,111 @@
+{
+  "info": {
+    "name": "cameia-cuentas-base-de-datos-no-disponible",
+    "description": "Pruebas manuales de Cuentas con la base de datos detenida (docker compose stop db). No forma parte de la colección principal: sus peticiones esperan una base caída y fallarían en una corrida normal. El script de la colección verifica en todas el Content-Type con charset y, en los errores, application/problem+json, requestId igual al encabezado X-Request-Id y ausencia de detalle interno.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const deOtroSistema = ['rabbitManagementUrl', 'firebaseEmulatorUrl'].some((nombre) =>",
+          "    pm.request.url.toString().indexOf(pm.environment.get(nombre) || '\\u0000') === 0);",
+          "if (!deOtroSistema) {",
+          "    const tipo = (pm.response.headers.get('Content-Type') || '').toLowerCase();",
+          "    if (pm.response.code !== 204) {",
+          "        pm.test('Content-Type con charset utf-8', () => pm.expect(tipo).to.include('charset=utf-8'));",
+          "    }",
+          "    if (pm.response.code >= 400) {",
+          "        pm.test('Error: application/problem+json', () => pm.expect(tipo).to.include('application/problem+json'));",
+          "        pm.test('Error: requestId igual a X-Request-Id', () =>",
+          "            pm.expect(pm.response.json().requestId).to.eql(pm.response.headers.get('X-Request-Id')));",
+          "        pm.test('Error: sin detalle interno', () => {",
+          "            const texto = pm.response.text();",
+          "            ['Exception', 'SQL', 'org.', 'tech.cameia'].forEach((marca) => pm.expect(texto).to.not.include(marca));",
+          "        });",
+          "    } else if (pm.response.code !== 204) {",
+          "        pm.test('Éxito: JSON', () => pm.expect(tipo).to.include('application/json'));",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Base de datos no disponible (manual)",
+      "description": "Se corre aparte, con la base de datos detenida (docker compose stop db). No forma parte de la corrida automática.",
+      "item": [
+        {
+          "name": "D-01 · 503 base de datos no disponible",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 503', () => pm.response.to.have.status(503));",
+                  "pm.test('DATABASE_UNAVAILABLE', () => pm.expect(pm.response.json().code).to.eql('DATABASE_UNAVAILABLE'));",
+                  "pm.test('Responde en menos de 8 s', () => pm.expect(pm.response.responseTime).to.be.below(8000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "uid-cm290-newman"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "D-02 · 200 salud con la base detenida",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "health"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
