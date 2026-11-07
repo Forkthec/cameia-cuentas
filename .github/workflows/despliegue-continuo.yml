@@ -129,6 +129,11 @@ jobs:
       # permiso para cambiar quien puede invocar el servicio, y no se le da ese permiso
       # solo para esto -- mantiene acotado el radio de lo que esa identidad puede hacer
       # si se ve comprometida.
+      #
+      # SPRING_DATASOURCE_HIKARI_*: la base de datos admite pocas conexiones simultáneas y
+      # Spring abre 10 por instancia si no se le indica otra cosa; con varios servicios
+      # encendidos se agotan y lo que arranca después no puede conectarse. Con 2 como máximo
+      # y 1 cuando no hay tráfico caben todos los servicios y los procesos programados.
       - name: Desplegar a Cloud Run
         run: |
           gcloud run deploy "${{ env.SERVICE }}" \
@@ -144,7 +149,7 @@ jobs:
             --network="${{ env.VPC_NETWORK }}" \
             --subnet="${{ env.VPC_SUBNET }}" \
             --vpc-egress=all-traffic \
-            --set-env-vars="SPRING_PROFILES_ACTIVE=prod,DB_HOST=10.20.0.3,DB_PORT=5432,DB_NAME=cameia_cuentas,DB_USERNAME=cameia_cuentas,FIREBASE_PROJECT_ID=${{ vars.GCP_PROJECT_ID }}" \
+            --set-env-vars="SPRING_PROFILES_ACTIVE=prod,DB_HOST=10.20.0.3,DB_PORT=5432,DB_NAME=cameia_cuentas,DB_USERNAME=cameia_cuentas,FIREBASE_PROJECT_ID=${{ vars.GCP_PROJECT_ID }},SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=2,SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=1" \
             --set-secrets="DB_PASSWORD=cloudsql-staging-cuentas-password:latest,SPRING_RABBITMQ_ADDRESSES=rabbitmq-amqps-url:latest"
 
       - name: URL del servicio desplegado
@@ -354,6 +359,11 @@ jobs:
       # --port=8081: la aplicación escucha en ese puerto y no lee la variable PORT de Cloud
       # Run. FIREBASE_PROJECT_ID toma el proyecto del environment porque en producción los
       # usuarios viven en el Firebase Auth de ese mismo proyecto.
+      #
+      # SPRING_DATASOURCE_HIKARI_*: la base de datos admite pocas conexiones simultáneas y
+      # Spring abre 10 por instancia si no se le indica otra cosa; con varios servicios
+      # encendidos se agotan y lo que arranca después no puede conectarse. Con 2 como máximo
+      # y 1 cuando no hay tráfico caben todos los servicios y los procesos programados.
       - name: Desplegar a Cloud Run
         env:
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
@@ -374,7 +384,7 @@ jobs:
             --network="$VPC_NETWORK" \
             --subnet="$VPC_SUBNET" \
             --vpc-egress=all-traffic \
-            --set-env-vars="SPRING_PROFILES_ACTIVE=prod,DB_HOST=${DB_HOST},DB_PORT=5432,DB_NAME=cameia_cuentas,DB_USERNAME=cameia_cuentas,FIREBASE_PROJECT_ID=${GCP_PROJECT_ID}" \
+            --set-env-vars="SPRING_PROFILES_ACTIVE=prod,DB_HOST=${DB_HOST},DB_PORT=5432,DB_NAME=cameia_cuentas,DB_USERNAME=cameia_cuentas,FIREBASE_PROJECT_ID=${GCP_PROJECT_ID},SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=2,SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=1" \
             --set-secrets="DB_PASSWORD=cloudsql-production-cuentas-password:latest,SPRING_RABBITMQ_ADDRESSES=rabbitmq-amqps-url:latest"
 
       - name: URL del servicio desplegado
