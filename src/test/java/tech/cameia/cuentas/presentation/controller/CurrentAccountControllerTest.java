@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -29,6 +30,8 @@ import tech.cameia.cuentas.domain.exception.IdentityRequiredException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
+import tech.cameia.cuentas.domain.model.CurrentPolicy;
+import tech.cameia.cuentas.domain.model.PolicyAcceptance;
 import tech.cameia.cuentas.domain.model.PhoneNumber;
 import tech.cameia.cuentas.domain.model.Pronoun;
 import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
@@ -45,7 +48,7 @@ class CurrentAccountControllerTest {
 
     private final GetCurrentAccountService service = mock(GetCurrentAccountService.class);
     private final MockMvc mockMvc = MockMvcBuilders
-            .standaloneSetup(new CurrentAccountController(service))
+            .standaloneSetup(new CurrentAccountController(service, new CurrentPolicy("2026-11-v1")))
             .setControllerAdvice(ProblemDetailTestSupport.manejadorDeErrores())
             .build();
 
@@ -55,7 +58,7 @@ class CurrentAccountControllerTest {
     }
 
     @Test
-    @DisplayName("Devuelve los ocho campos de la cuenta")
+    @DisplayName("Devuelve los nueve campos de la cuenta")
     void getMe_shouldReturnAccountFields_whenAccountExists() throws Exception {
         when(service.find(UID)).thenReturn(fullAccount());
 
@@ -70,6 +73,35 @@ class CurrentAccountControllerTest {
                 .andExpect(jsonPath("$.pronoun").value("SHE"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.plan").value("FREE"));
+    }
+
+    @Test
+    @DisplayName("Incluye la aceptación de la política con la versión aceptada, su fecha y la vigente")
+    void me_shouldIncludePolicyAcceptance_whenAccepted() throws Exception {
+        when(service.find(UID)).thenReturn(fullAccount());
+
+        mockMvc.perform(get(ROUTE).header("X-User-Id", UID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.policyAcceptance.acceptedVersion").value("2026-11-v1"))
+                .andExpect(jsonPath("$.policyAcceptance.acceptedAt").value("2026-11-01T00:00:00Z"))
+                .andExpect(jsonPath("$.policyAcceptance.currentVersion").value("2026-11-v1"));
+    }
+
+    @Test
+    @DisplayName("Devuelve la fecha de aceptación en null cuando la cuenta nunca aceptó una versión")
+    void me_shouldReturnNullAcceptedAt_whenNotAccepted() throws Exception {
+        Account sinAceptar = Account.rebuild(ID, UID, "María José", "Gómez-Ruiz",
+                new BirthDate(LocalDate.of(1995, 4, 12)), null, null,
+                new PolicyAcceptance(PolicyAcceptance.NOT_ACCEPTED_VERSION, Instant.parse("2026-11-01T00:00:00Z")),
+                AccountStatus.ACTIVE);
+        when(service.find(UID)).thenReturn(sinAceptar);
+
+        mockMvc.perform(get(ROUTE).header("X-User-Id", UID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.policyAcceptance.acceptedVersion").value("sin-aceptar"))
+                .andExpect(jsonPath("$.policyAcceptance").value(hasKey("acceptedAt")))
+                .andExpect(jsonPath("$.policyAcceptance.acceptedAt").value(nullValue()))
+                .andExpect(jsonPath("$.policyAcceptance.currentVersion").value("2026-11-v1"));
     }
 
     @Test
@@ -89,7 +121,7 @@ class CurrentAccountControllerTest {
 
         mockMvc.perform(get(ROUTE).header("X-User-Id", UID))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.*", hasSize(8)))
+                .andExpect(jsonPath("$.*", hasSize(9)))
                 .andExpect(jsonPath("$.email").doesNotExist())
                 .andExpect(jsonPath("$.password").doesNotExist())
                 .andExpect(jsonPath("$.firebaseUid").doesNotExist())
