@@ -29,15 +29,18 @@ import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException;
 import tech.cameia.cuentas.domain.exception.InvalidPersonNameException;
+import tech.cameia.cuentas.domain.exception.PolicyVersionOutdatedException;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
+import tech.cameia.cuentas.domain.model.CurrentPolicy;
 import tech.cameia.cuentas.domain.model.DirectoryUser;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.Pronoun;
 import tech.cameia.cuentas.domain.model.RawPassword;
 import tech.cameia.cuentas.domain.model.UnannouncedAccount;
+import tech.cameia.cuentas.domain.model.PolicyAcceptance;
 import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.domain.policy.AgePolicy;
 import tech.cameia.cuentas.domain.policy.PasswordPolicy;
@@ -81,7 +84,8 @@ class RegisterUserServiceTest {
         Clock reloj = Clock.fixed(AHORA, ZoneOffset.UTC);
         return new RegisterUserService(directorioDePrueba, repositorio,
                 new AccountRecordingService(repositorio, outbox, reloj), relay, new AgePolicy(),
-                new PasswordPolicy(Set.of("123456789012", "password1234", "qwertyuiop123")), reloj);
+                new PasswordPolicy(Set.of("123456789012", "password1234", "qwertyuiop123")),
+                new CurrentPolicy(PolicyAcceptanceFixture.VERSION), reloj);
     }
 
     @Test
@@ -198,6 +202,43 @@ class RegisterUserServiceTest {
 
         assertThat(directorio.borrados()).isEqualTo(1);
         assertThat(directorio.cantidadDeUsuarios()).isZero();
+    }
+
+    @Test
+    @DisplayName("Guarda la versión de la política y el instante del reloj cuando crea la cuenta")
+    void register_shouldStorePolicyAcceptance_whenAccountIsCreated() {
+        Instant instante = Instant.parse("2026-11-14T15:30:00Z");
+        Clock reloj = Clock.fixed(instante, ZoneOffset.UTC);
+        RegisterUserService conRelojDeAceptacion = new RegisterUserService(directorio, repositorio,
+                new AccountRecordingService(repositorio, outbox, reloj),
+                new OutboxRelayService(outbox, publisher, reloj), new AgePolicy(),
+                new PasswordPolicy(Set.of("123456789012")),
+                new CurrentPolicy(PolicyAcceptanceFixture.VERSION), reloj);
+
+        RegisterUserResult resultado = conRelojDeAceptacion.register(comando());
+
+        assertThat(resultado.account().getPolicyAcceptance().version()).isEqualTo("2026-11-v1");
+        assertThat(resultado.account().getPolicyAcceptance().acceptedAtIfAccepted()).contains(instante);
+        assertThat(repositorio.guardadas.get(resultado.account().getFirebaseUid()).getPolicyAcceptance().version())
+                .isEqualTo("2026-11-v1");
+    }
+
+    @Test
+    @DisplayName("No cambia la aceptación guardada cuando devuelve la cuenta pendiente")
+    void register_shouldKeepStoredAcceptance_whenPendingAccountIsReturned() {
+        RegisterUserResult primero = servicio.register(comando());
+        Account pendiente = primero.account();
+        Account sinAceptar = Account.rebuild(pendiente.getId(), pendiente.getFirebaseUid(),
+                pendiente.getFirstName(), pendiente.getLastName(), pendiente.getBirthDate().orElse(null),
+                pendiente.getPhoneNumber().orElse(null), pendiente.getPronoun().orElse(null),
+                new PolicyAcceptance(PolicyAcceptance.NOT_ACCEPTED_VERSION, AHORA), pendiente.getStatus());
+        repositorio.guardadas.put(pendiente.getFirebaseUid(), sinAceptar);
+
+        RegisterUserResult segundo = servicio.register(comando());
+
+        assertThat(segundo.created()).isFalse();
+        assertThat(segundo.account().getPolicyAcceptance().version())
+                .isEqualTo(PolicyAcceptance.NOT_ACCEPTED_VERSION);
     }
 
     @Test
@@ -445,6 +486,21 @@ class RegisterUserServiceTest {
         assertThat(directorio.existe(cuenta.getFirebaseUid())).isTrue();
         assertThat(directorio.planDe(cuenta.getFirebaseUid())).isEqualTo("FREE");
         assertThat(repositorio.guardadas).hasSize(1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"2026-10-v1", "2026-11-V1", "sin-aceptar", "2026-11-v1 "})
+    @DisplayName("No toca Firebase ni guarda nada cuando la versión de la política no es la vigente")
+    void register_shouldNotTouchFirebase_whenPolicyVersionIsNotCurrent(String version) {
+        RegisterUserCommand desactualizado = new RegisterUserCommand("Ana", "Pérez", LocalDate.of(1995, 4, 12),
+                CORREO, "frase secreta larga", null, null, version, null);
+
+        assertThatThrownBy(() -> servicio.register(desactualizado))
+                .isInstanceOf(PolicyVersionOutdatedException.class);
+
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
+        assertThat(repositorio.guardadas).isEmpty();
+        assertThat(outbox.appended()).isEmpty();
     }
 
     @Test

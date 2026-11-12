@@ -73,7 +73,7 @@ class CurrentAccountEndToEndTest {
         register("""
                 {"firstName":"María José","lastName":"Gómez-Ruiz","birthDate":"12/04/1995",
                  "email":"maria@cameia.tech","password":"frase secreta larga",
-                 "phoneNumber":"+573001234567","pronoun":"SHE"}""");
+                 "phoneNumber":"+573001234567","pronoun":"SHE","dataAuthorization":true,"policyVersion":"2026-11-v1"}""");
         String uid = jdbc.queryForObject("SELECT firebase_uid FROM microcuentas.cuenta", String.class);
 
         ResponseEntity<String> response = getMe(uid, "");

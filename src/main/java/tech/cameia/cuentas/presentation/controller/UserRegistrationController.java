@@ -47,7 +47,8 @@ class UserRegistrationController {
              "detail":"Revisa los campos marcados.","instance":"/api/v1/users",
              "code":"VALIDATION_FAILED","requestId":"3f1c9a52-7d0e-4b57-9a38-52c1e4d8a601",
              "errors":[{"field":"email","code":"EMAIL_INVALID_FORMAT","message":"Ingresa un correo electrónico válido."},
-                       {"field":"password","code":"PASSWORD_TOO_SHORT","message":"La contraseña debe tener al menos 12 caracteres."}]}""";
+                       {"field":"password","code":"PASSWORD_TOO_SHORT","message":"La contraseña debe tener al menos 12 caracteres."},
+                       {"field":"dataAuthorization","code":"DATA_AUTHORIZATION_REQUIRED","message":"Acepta la política de tratamiento de datos para continuar."}]}""";
 
     private static final String EJEMPLO_406 = """
             {"type":"about:blank","title":"Tipo de respuesta no admitido","status":406,
@@ -118,7 +119,8 @@ class UserRegistrationController {
                 + "BIRTH_DATE_INVALID_FORMAT, BIRTH_DATE_IN_THE_FUTURE, BIRTH_DATE_UNDERAGE, BIRTH_DATE_OUT_OF_RANGE, "
                 + "EMAIL_REQUIRED, EMAIL_TOO_LONG, EMAIL_INVALID_FORMAT, PASSWORD_REQUIRED, PASSWORD_TOO_SHORT, "
                 + "PASSWORD_TOO_LONG, PASSWORD_TOO_COMMON, "
-                + "PRONOUN_REQUIRED, PRONOUN_INVALID_VALUE, PHONE_NUMBER_INVALID_FORMAT; o REQUEST_BODY_INVALID_FORMAT sin "
+                + "PRONOUN_REQUIRED, PRONOUN_INVALID_VALUE, PHONE_NUMBER_INVALID_FORMAT, DATA_AUTHORIZATION_REQUIRED, "
+                + "POLICY_VERSION_REQUIRED, POLICY_VERSION_OUTDATED; o REQUEST_BODY_INVALID_FORMAT sin "
                 + "errors cuando el cuerpo no se puede interpretar",
                 content = @Content(mediaType = "application/problem+json",
                         schema = @Schema(implementation = ProblemDetail.class),
