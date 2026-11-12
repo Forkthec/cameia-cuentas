@@ -92,7 +92,7 @@ Una ruta nueva no se suma a esta lista sin una spec que lo justifique.
 
 ## 5. Datos
 
-Base PostgreSQL propia, esquema `microcuentas`, migraciones Flyway en `src/main/resources/db/migration` (`V1__esquema_inicial_cuenta.sql`, `V2__ajustar_version_inicial_cuenta.sql`, `V3__restringir_pronombres.sql`, `V4__relajar_minimo_telefono_e164.sql`, `V5__evento_saliente.sql`, `V6__indice_cuenta_pendiente_fecha_creacion.sql` y `V7__evento_cuenta_eliminada.sql`).
+Base PostgreSQL propia, esquema `microcuentas`, migraciones Flyway en `src/main/resources/db/migration` (`V1__esquema_inicial_cuenta.sql`, `V2__ajustar_version_inicial_cuenta.sql`, `V3__restringir_pronombres.sql`, `V4__relajar_minimo_telefono_e164.sql`, `V5__evento_saliente.sql`, `V6__indice_cuenta_pendiente_fecha_creacion.sql`, `V7__evento_cuenta_eliminada.sql` y `V8__aceptacion_politica_cuenta.sql`).
 
 Flyway corre al arrancar la aplicación y anota cada migración aplicada en `microcuentas.flyway_schema_history`: reiniciar o
 recrear el contenedor no vuelve a aplicar nada ni toca las filas, y una migración nueva se aplica una sola vez, dentro de una
@@ -112,6 +112,8 @@ Tabla `microcuentas.cuenta`:
 | `fecha_nacimiento` | `date` | Opcional |
 | `telefono` | `varchar(16)` | Opcional; formato E.164 de 6 a 15 dígitos (`ck_cuenta_telefono_e164`) |
 | `pronombres` | `varchar(60)` | `HE`, `SHE` o `THEY` (`ck_cuenta_pronombres_valor`); nulo solo tras la anonimización |
+| `politica_version` | `varchar(20)` | No nula y no vacía (`ck_cuenta_politica_version_no_vacia`); versión de la política aceptada o `sin-aceptar` en las cuentas anteriores a la aceptación ([ADR 0006](docs/adr/0006-aceptacion-de-la-politica.md)) |
+| `politica_aceptada_en` | `timestamptz` | No nula, en UTC; en las cuentas `sin-aceptar` es la fecha de creación |
 | `estado` | `varchar(24)` | `PENDING_VERIFICATION` (por defecto), `ACTIVE`, `DISABLED` o `ANONYMIZED` |
 | `version` | `bigint` | Control de concurrencia; ≥ 0 |
 | `fecha_creacion`, `fecha_actualizacion` | `timestamptz` | No nulas, en UTC |
