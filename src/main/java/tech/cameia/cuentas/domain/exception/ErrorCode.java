@@ -90,6 +90,15 @@ public enum ErrorCode {
     /** El celular no es un número válido para el país de su indicativo. */
     PHONE_NUMBER_INVALID_FORMAT,
 
+    /** La persona no autorizó el tratamiento de sus datos. */
+    DATA_AUTHORIZATION_REQUIRED,
+
+    /** Falta la versión de la política que se acepta. */
+    POLICY_VERSION_REQUIRED,
+
+    /** La versión aceptada no es la vigente. */
+    POLICY_VERSION_OUTDATED,
+
     /** El cuerpo de la petición no se puede interpretar. */
     REQUEST_BODY_INVALID_FORMAT,
 

@@ -2,6 +2,7 @@ package tech.cameia.cuentas.infrastructure.persistence.mapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -11,7 +12,9 @@ import org.junit.jupiter.api.Test;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
+import tech.cameia.cuentas.domain.model.PolicyAcceptance;
 import tech.cameia.cuentas.domain.model.Pronoun;
+import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.infrastructure.persistence.entity.AccountEntity;
 
 /**
@@ -27,7 +30,7 @@ class AccountMapperTest {
     @DisplayName("Una fila sin fecha de nacimiento se lee como cuenta con fecha desconocida")
     void toDomain_shouldAcceptUnknownBirthDate_whenColumnIsNull() {
         AccountEntity row = new AccountEntity(ID, "uid-legacy-1", "María José", "Gómez-Ruiz",
-                null, null, null, AccountStatus.ACTIVE);
+                null, null, null, AccountStatus.ACTIVE, "2026-11-v1", PolicyAcceptanceFixture.ACCEPTED_AT);
 
         Account account = mapper.toDomain(row);
 
@@ -39,7 +42,7 @@ class AccountMapperTest {
     @DisplayName("Una cuenta con fecha de nacimiento conocida se lee con esa fecha")
     void toDomain_shouldKeepBirthDate_whenColumnHasValue() {
         AccountEntity row = new AccountEntity(ID, "uid-1", "María José", "Gómez-Ruiz",
-                LocalDate.of(1995, 4, 12), null, Pronoun.SHE, AccountStatus.ACTIVE);
+                LocalDate.of(1995, 4, 12), null, Pronoun.SHE, AccountStatus.ACTIVE, "2026-11-v1", PolicyAcceptanceFixture.ACCEPTED_AT);
 
         Account account = mapper.toDomain(row);
 
@@ -47,10 +50,36 @@ class AccountMapperTest {
     }
 
     @Test
+    @DisplayName("La aceptación de la política viaja de la fila al dominio")
+    void toDomain_shouldKeepPolicyAcceptance_whenRowHasIt() {
+        Instant aceptadaEn = Instant.parse("2026-11-14T15:30:00Z");
+        AccountEntity row = new AccountEntity(ID, "uid-1", "María José", "Gómez-Ruiz",
+                LocalDate.of(1995, 4, 12), null, Pronoun.SHE, AccountStatus.ACTIVE, "2026-11-v1", aceptadaEn);
+
+        Account account = mapper.toDomain(row);
+
+        assertThat(account.getPolicyAcceptance().version()).isEqualTo("2026-11-v1");
+        assertThat(account.getPolicyAcceptance().acceptedAt()).isEqualTo(aceptadaEn);
+    }
+
+    @Test
+    @DisplayName("La aceptación de la política viaja del dominio a la fila")
+    void toEntity_shouldWritePolicyAcceptance_whenAccountHasIt() {
+        Instant aceptadaEn = Instant.parse("2026-11-14T15:30:00Z");
+        Account account = Account.rebuild(ID, "uid-1", "María José", "Gómez-Ruiz", null, null, null,
+                new PolicyAcceptance("sin-aceptar", aceptadaEn), AccountStatus.ACTIVE);
+
+        AccountEntity row = mapper.toEntity(account);
+
+        assertThat(row.getPoliticaVersion()).isEqualTo("sin-aceptar");
+        assertThat(row.getPoliticaAceptadaEn()).isEqualTo(aceptadaEn);
+    }
+
+    @Test
     @DisplayName("Una cuenta con fecha desconocida se guarda con la columna en nulo")
     void toEntity_shouldWriteNullBirthDate_whenUnknown() {
         Account account = Account.rebuild(ID, "uid-legacy-1", "María José", "Gómez-Ruiz",
-                null, null, null, AccountStatus.ACTIVE);
+                null, null, null, PolicyAcceptanceFixture.ACCEPTED, AccountStatus.ACTIVE);
 
         AccountEntity row = mapper.toEntity(account);
 

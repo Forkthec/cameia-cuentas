@@ -216,8 +216,9 @@ class CurrentAccountEndToEndTest {
         boolean anonymized = "ANONYMIZED".equals(status);
         jdbc.update("""
                 INSERT INTO microcuentas.cuenta
-                    (id, firebase_uid, nombre, apellido, fecha_nacimiento, pronombres, estado, fecha_eliminacion)
-                VALUES (?, ?, ?, ?, CAST(? AS date), ?, ?, CASE WHEN ? THEN now() END)""",
+                    (id, firebase_uid, nombre, apellido, fecha_nacimiento, pronombres, estado, fecha_eliminacion,
+                     politica_version, politica_aceptada_en)
+                VALUES (?, ?, ?, ?, CAST(? AS date), ?, ?, CASE WHEN ? THEN now() END, '2026-11-v1', now())""",
                 id, uid, firstName, lastName, birthDate, anonymized ? null : "THEY", status, anonymized);
         return id;
     }

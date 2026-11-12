@@ -38,6 +38,7 @@ import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.Pronoun;
 import tech.cameia.cuentas.domain.model.RawPassword;
 import tech.cameia.cuentas.domain.model.UnannouncedAccount;
+import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.domain.policy.AgePolicy;
 import tech.cameia.cuentas.domain.policy.PasswordPolicy;
 import tech.cameia.cuentas.domain.port.AccountRepository;
@@ -118,7 +119,7 @@ class RegisterUserServiceTest {
     void register_shouldNotRecordEvent_whenEmailBelongsToActiveAccount() {
         String uid = directorio.crearSinCuentaLocal(CORREO, AHORA.minusSeconds(5));
         repositorio.guardadas.put(uid, Account.rebuild(UUID.randomUUID(), uid, "Ana", "Pérez",
-                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, AccountStatus.ACTIVE));
+                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, PolicyAcceptanceFixture.ACCEPTED, AccountStatus.ACTIVE));
 
         assertThatThrownBy(() -> servicio.register(comando())).isInstanceOf(EmailAlreadyRegisteredException.class);
 
@@ -227,7 +228,7 @@ class RegisterUserServiceTest {
     void unaCuentaActivaBloqueadaOAnonimizadaDaElMismoConflicto(AccountStatus estado) {
         String uid = directorio.crearSinCuentaLocal(CORREO, AHORA.minusSeconds(5));
         repositorio.guardadas.put(uid, Account.rebuild(UUID.randomUUID(), uid, "Ana", "Pérez",
-                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, estado));
+                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, PolicyAcceptanceFixture.ACCEPTED, estado));
 
         assertThatThrownBy(() -> servicio.register(comando()))
                 .isInstanceOf(EmailAlreadyRegisteredException.class)
@@ -335,7 +336,7 @@ class RegisterUserServiceTest {
     void elConflictoDeUnaCuentaNoPendienteNoDejaSuEstadoEnElLog(CapturedOutput salida) {
         String uid = directorio.crearSinCuentaLocal(CORREO, AHORA.minusSeconds(5));
         repositorio.guardadas.put(uid, Account.rebuild(UUID.randomUUID(), uid, "Ana", "Pérez",
-                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, AccountStatus.DISABLED));
+                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, PolicyAcceptanceFixture.ACCEPTED, AccountStatus.DISABLED));
 
         assertThatThrownBy(() -> servicio.register(comando())).isInstanceOf(EmailAlreadyRegisteredException.class);
 
@@ -395,7 +396,7 @@ class RegisterUserServiceTest {
     void elRegistroRepetidoIgnoraLosOtrosDatosYNoUsaLaContrasenia(CapturedOutput salida) {
         RegisterUserResult primero = servicio.register(comando());
         RegisterUserCommand otrosDatos = new RegisterUserCommand("Luz", "Gómez", LocalDate.of(1990, 1, 1), CORREO,
-                "otra frase muy distinta", "+573009876543", Pronoun.HE, null);
+                "otra frase muy distinta", "+573009876543", Pronoun.HE, "2026-11-v1", null);
 
         RegisterUserResult segundo = servicio.register(otrosDatos);
 
@@ -432,7 +433,7 @@ class RegisterUserServiceTest {
 
     private Account cuentaPendiente(String uid) {
         return Account.rebuild(UUID.randomUUID(), uid, "Ana", "Pérez", new BirthDate(LocalDate.of(1995, 4, 12)),
-                null, null, AccountStatus.PENDING_VERIFICATION);
+                null, null, PolicyAcceptanceFixture.ACCEPTED, AccountStatus.PENDING_VERIFICATION);
     }
 
     @Test
@@ -450,7 +451,7 @@ class RegisterUserServiceTest {
     void noTocaFirebaseCuandoLaFechaDeNacimientoNoPermiteRegistrarse() {
         RegisterUserCommand menorDeEdad = new RegisterUserCommand("Ana", "Pérez",
                 LocalDate.now().minusYears(15), "ana@cameia.tech", "frase secreta larga",
-                null, null, null);
+                null, null, "2026-11-v1", null);
 
         assertThatThrownBy(() -> servicio.register(menorDeEdad))
                 .isInstanceOf(InvalidBirthDateException.class);
@@ -460,7 +461,7 @@ class RegisterUserServiceTest {
     @Test
     void noTocaFirebaseCuandoLaContraseniaEsDebil() {
         RegisterUserCommand contraseniaCorta = new RegisterUserCommand("Ana", "Pérez",
-                LocalDate.of(1995, 4, 12), "ana@cameia.tech", "corta", null, null, null);
+                LocalDate.of(1995, 4, 12), "ana@cameia.tech", "corta", null, null, "2026-11-v1", null);
 
         assertThatThrownBy(() -> servicio.register(contraseniaCorta))
                 .isInstanceOf(WeakPasswordException.class);
@@ -470,7 +471,7 @@ class RegisterUserServiceTest {
     @Test
     void unNombreConNumerosNoCreaCredencialNiCuenta() {
         RegisterUserCommand nombreInvalido = new RegisterUserCommand("Ana3", "Pérez", LocalDate.of(1995, 4, 12),
-                "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE, null);
+                "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE, "2026-11-v1", null);
 
         assertThatThrownBy(() -> servicio.register(nombreInvalido))
                 .isInstanceOf(InvalidPersonNameException.class)
@@ -483,7 +484,7 @@ class RegisterUserServiceTest {
     @Test
     void unApellidoConGuionBajoNoCreaCredencialNiCuenta() {
         RegisterUserCommand apellidoInvalido = new RegisterUserCommand("Ana", "Pérez_", LocalDate.of(1995, 4, 12),
-                "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE, null);
+                "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE, "2026-11-v1", null);
 
         assertThatThrownBy(() -> servicio.register(apellidoInvalido))
                 .isInstanceOf(InvalidPersonNameException.class)
@@ -496,7 +497,7 @@ class RegisterUserServiceTest {
     @Test
     void unNombreConTildesYGuionSeGuardaNormalizado() {
         RegisterUserCommand conTildes = new RegisterUserCommand("María  José", "Gómez-Ruiz",
-                LocalDate.of(1995, 4, 12), "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE, null);
+                LocalDate.of(1995, 4, 12), "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE, "2026-11-v1", null);
 
         Account cuenta = servicio.register(conTildes).account();
 
@@ -569,7 +570,7 @@ class RegisterUserServiceTest {
     @Test
     void unaContraseniaDebilNoQuedaEnElLog(CapturedOutput salida) {
         RegisterUserCommand comun = new RegisterUserCommand("Ana", "Pérez", LocalDate.of(1995, 4, 12),
-                "ana@cameia.tech", "password1234", null, Pronoun.SHE, null);
+                "ana@cameia.tech", "password1234", null, Pronoun.SHE, "2026-11-v1", null);
 
         assertThatThrownBy(() -> servicio.register(comun)).isInstanceOf(WeakPasswordException.class);
 
@@ -582,7 +583,7 @@ class RegisterUserServiceTest {
 
     private RegisterUserCommand comando(String correo, String contrasenia) {
         return new RegisterUserCommand("Ana", "Pérez", LocalDate.of(1995, 4, 12),
-                correo, contrasenia, "+573001234567", Pronoun.SHE, "req-1");
+                correo, contrasenia, "+573001234567", Pronoun.SHE, "2026-11-v1", "req-1");
     }
 
     /** Repositorio en memoria que puede simular un fallo de la base de datos. */

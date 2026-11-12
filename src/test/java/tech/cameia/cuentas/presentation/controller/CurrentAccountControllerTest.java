@@ -31,6 +31,7 @@ import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
 import tech.cameia.cuentas.domain.model.PhoneNumber;
 import tech.cameia.cuentas.domain.model.Pronoun;
+import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.presentation.advice.ProblemDetailTestSupport;
 
 /**
@@ -50,7 +51,7 @@ class CurrentAccountControllerTest {
 
     private static Account fullAccount() {
         return Account.rebuild(ID, UID, "María José", "Gómez-Ruiz", new BirthDate(LocalDate.of(1995, 4, 12)),
-                new PhoneNumber("+573001234567"), Pronoun.SHE, AccountStatus.ACTIVE);
+                new PhoneNumber("+573001234567"), Pronoun.SHE, PolicyAcceptanceFixture.ACCEPTED, AccountStatus.ACTIVE);
     }
 
     @Test
@@ -99,7 +100,7 @@ class CurrentAccountControllerTest {
     @DisplayName("El celular y el pronombre sin valor van presentes con null")
     void getMe_shouldReturnNullPhone_whenAccountHasNoPhone() throws Exception {
         when(service.find(UID)).thenReturn(Account.rebuild(ID, UID, "María José", "Gómez-Ruiz",
-                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, AccountStatus.PENDING_VERIFICATION));
+                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, PolicyAcceptanceFixture.ACCEPTED, AccountStatus.PENDING_VERIFICATION));
 
         mockMvc.perform(get(ROUTE).header("X-User-Id", UID))
                 .andExpect(status().isOk())
@@ -114,6 +115,7 @@ class CurrentAccountControllerTest {
     @DisplayName("Una fecha de nacimiento desconocida va como null y no como error")
     void getMe_shouldReturnNullBirthDate_whenUnknown() throws Exception {
         when(service.find(UID)).thenReturn(Account.rebuild(ID, UID, "María José", "Gómez-Ruiz", null, null, null,
+                PolicyAcceptanceFixture.ACCEPTED,
                 AccountStatus.ACTIVE));
 
         mockMvc.perform(get(ROUTE).header("X-User-Id", UID))

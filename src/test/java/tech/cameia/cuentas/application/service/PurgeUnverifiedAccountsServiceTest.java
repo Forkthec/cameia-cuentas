@@ -22,6 +22,7 @@ import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
 import tech.cameia.cuentas.domain.model.PurgeSummary;
+import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.infrastructure.client.InMemoryFirebaseUserDirectory;
 import tech.cameia.cuentas.infrastructure.persistence.InMemoryAccountRepository;
 import tech.cameia.cuentas.infrastructure.persistence.InMemoryOutboxRepository;
@@ -53,7 +54,7 @@ class PurgeUnverifiedAccountsServiceTest {
     /** Crea la credencial y una cuenta pendiente con la antigüedad indicada; devuelve el uid. */
     private String pendingAccount(String email, Instant createdAt) {
         String uid = directory.crearSinCuentaLocal(email, createdAt);
-        accounts.save(Account.register(uid, "Ana", "Pérez", new BirthDate(LocalDate.of(1995, 4, 12)), null, null));
+        accounts.save(Account.register(uid, "Ana", "Pérez", new BirthDate(LocalDate.of(1995, 4, 12)), null, null, PolicyAcceptanceFixture.ACCEPTED));
         accounts.seedCreatedAt(uid, createdAt);
         return uid;
     }
@@ -215,7 +216,7 @@ class PurgeUnverifiedAccountsServiceTest {
             }
         };
         String uid = directory.crearSinCuentaLocal("ana@correo.co", OLD);
-        failing.save(Account.register(uid, "Ana", "Pérez", new BirthDate(LocalDate.of(1995, 4, 12)), null, null));
+        failing.save(Account.register(uid, "Ana", "Pérez", new BirthDate(LocalDate.of(1995, 4, 12)), null, null, PolicyAcceptanceFixture.ACCEPTED));
         failing.seedCreatedAt(uid, OLD);
         PurgeUnverifiedAccountsService service = new PurgeUnverifiedAccountsService(failing, directory,
                 new PendingAccountDeletionService(failing, outbox, Clock.fixed(NOW, ZoneOffset.UTC)), 10,
@@ -282,7 +283,7 @@ class PurgeUnverifiedAccountsServiceTest {
     void purge_shouldKeepCredential_whenAccountExists() {
         String uid = directory.crearSinCuentaLocal("con-cuenta@correo.co", OLD);
         accounts.save(Account.rebuild(java.util.UUID.randomUUID(), uid, "Ana", "Pérez",
-                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, AccountStatus.DISABLED));
+                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, PolicyAcceptanceFixture.ACCEPTED, AccountStatus.DISABLED));
 
         PurgeSummary summary = service(10).purge();
 
@@ -340,7 +341,7 @@ class PurgeUnverifiedAccountsServiceTest {
             }
         };
         String uid = directory.crearSinCuentaLocal("ana@correo.co", OLD);
-        vanishing.save(Account.register(uid, "Ana", "Pérez", new BirthDate(LocalDate.of(1995, 4, 12)), null, null));
+        vanishing.save(Account.register(uid, "Ana", "Pérez", new BirthDate(LocalDate.of(1995, 4, 12)), null, null, PolicyAcceptanceFixture.ACCEPTED));
         vanishing.seedCreatedAt(uid, OLD);
         directory.marcarCorreoVerificado(uid);
         PurgeUnverifiedAccountsService service = new PurgeUnverifiedAccountsService(vanishing, directory,

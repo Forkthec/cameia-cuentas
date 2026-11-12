@@ -27,6 +27,8 @@ import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
 import tech.cameia.cuentas.domain.model.PhoneNumber;
 import tech.cameia.cuentas.domain.model.Pronoun;
+import tech.cameia.cuentas.domain.model.PolicyAcceptance;
+import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.domain.port.AccountRepository;
 import tech.cameia.cuentas.infrastructure.persistence.repository.AccountJpaRepository;
 
@@ -75,6 +77,21 @@ class AccountRepositoryAdapterTest {
     }
 
     @Test
+    void save_shouldUpdatePolicyAcceptance_whenAccountExists() {
+        repositorio.save(cuentaDe("uid-politica"));
+        Account leida = repositorio.findByFirebaseUid("uid-politica").orElseThrow();
+        PolicyAcceptance nueva = new PolicyAcceptance("2026-12-v2", Instant.parse("2026-12-01T10:00:00Z"));
+        leida.acceptPolicy(nueva);
+
+        repositorio.save(leida);
+
+        Account recuperada = repositorio.findByFirebaseUid("uid-politica").orElseThrow();
+        assertThat(recuperada.getPolicyAcceptance()).isEqualTo(nueva);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM microcuentas.cuenta WHERE firebase_uid = 'uid-politica'",
+                Integer.class)).isEqualTo(1);
+    }
+
+    @Test
     void unaCuentaNuevaSeGuardaEsperandoLaVerificacionDelCorreo() {
         repositorio.save(cuentaDe("uid-pendiente"));
 
@@ -92,7 +109,7 @@ class AccountRepositoryAdapterTest {
     @Test
     void elCelularYLosPronombresSeGuardanVaciosCuandoNoSeDeclaran() {
         Account sinOpcionales = Account.register("uid-minimo", "Luis", "Gómez",
-                new BirthDate(LocalDate.of(1990, 1, 1)), null, null);
+                new BirthDate(LocalDate.of(1990, 1, 1)), null, null, PolicyAcceptanceFixture.ACCEPTED);
 
         repositorio.save(sinOpcionales);
 
@@ -126,7 +143,8 @@ class AccountRepositoryAdapterTest {
         assertThatThrownBy(() -> {
             repositorioJpa.saveAndFlush(new tech.cameia.cuentas.infrastructure.persistence.entity.AccountEntity(
                     otra.getId(), otra.getFirebaseUid(), otra.getFirstName(), otra.getLastName(),
-                    otra.getBirthDate().orElseThrow().value(), null, null, otra.getStatus()));
+                    otra.getBirthDate().orElseThrow().value(), null, null, otra.getStatus(),
+                    otra.getPolicyAcceptance().version(), otra.getPolicyAcceptance().acceptedAt()));
         }).isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -223,14 +241,16 @@ class AccountRepositoryAdapterTest {
         // fecha_actualizacion debe ser >= fecha_creacion (ck_cuenta_fecha_actualizacion)
         jdbc.update("""
                 INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido, estado, pronombres,
-                                                 fecha_creacion, fecha_actualizacion)
-                VALUES (gen_random_uuid(), ?, 'Ana', 'Perez', ?, 'SHE', ?, ?)
-                """, firebaseUid, status, Timestamp.from(createdAt), Timestamp.from(createdAt));
+                                                 fecha_creacion, fecha_actualizacion,
+                                                 politica_version, politica_aceptada_en)
+                VALUES (gen_random_uuid(), ?, 'Ana', 'Perez', ?, 'SHE', ?, ?, '2026-11-v1', ?)
+                """, firebaseUid, status, Timestamp.from(createdAt), Timestamp.from(createdAt),
+                Timestamp.from(createdAt));
     }
 
     private Account cuentaDe(String firebaseUid) {
         return Account.register(firebaseUid, "Ana", "Pérez",
                 new BirthDate(LocalDate.of(1995, 4, 12)),
-                new PhoneNumber("+573001234567"), Pronoun.SHE);
+                new PhoneNumber("+573001234567"), Pronoun.SHE, PolicyAcceptanceFixture.ACCEPTED);
     }
 }

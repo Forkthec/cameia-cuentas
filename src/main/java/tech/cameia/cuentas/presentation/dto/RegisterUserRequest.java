@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
 import jakarta.validation.constraints.NotBlank;
 
 import tech.cameia.cuentas.application.command.RegisterUserCommand;
+import tech.cameia.cuentas.domain.model.PolicyAcceptance;
 import tech.cameia.cuentas.domain.model.Pronoun;
 import tech.cameia.cuentas.domain.model.SingleLineText;
 
@@ -120,6 +121,6 @@ public record RegisterUserRequest(
         String declaredPhoneNumber =
                 trimmedPhoneNumber == null || trimmedPhoneNumber.isEmpty() ? null : trimmedPhoneNumber;
         return new RegisterUserCommand(firstName, lastName, parsedBirthDate, email, password, declaredPhoneNumber,
-                Pronoun.of(pronoun), requestId);
+                Pronoun.of(pronoun), PolicyAcceptance.NOT_ACCEPTED_VERSION, requestId);
     }
 }

@@ -27,11 +27,13 @@ public class Account {
     private final BirthDate birthDate;
     private final PhoneNumber phoneNumber;
     private final Pronoun pronoun;
+    private PolicyAcceptance policyAcceptance;
     private AccountStatus status;
     private final Long version;
 
     private Account(UUID id, String firebaseUid, String firstName, String lastName,
-            BirthDate birthDate, PhoneNumber phoneNumber, Pronoun pronoun, AccountStatus status, Long version) {
+            BirthDate birthDate, PhoneNumber phoneNumber, Pronoun pronoun, PolicyAcceptance policyAcceptance,
+            AccountStatus status, Long version) {
         this.id = id;
         this.firebaseUid = firebaseUid;
         this.firstName = firstName;
@@ -39,6 +41,7 @@ public class Account {
         this.birthDate = birthDate;
         this.phoneNumber = phoneNumber;
         this.pronoun = pronoun;
+        this.policyAcceptance = policyAcceptance;
         this.status = status;
         this.version = version;
     }
@@ -52,15 +55,19 @@ public class Account {
      * @param birthDate fecha de nacimiento ya validada por la política de edad
      * @param phoneNumber celular, o {@code null} si no lo declaró
      * @param pronoun pronombres, o {@code null} si no los declaró
+     * @param policyAcceptance versión de la política que la persona acepta al registrarse y el instante de la aceptación
      * @return cuenta nueva en estado {@code PENDING_VERIFICATION}
      * @throws IllegalArgumentException si falta el identificador de Firebase, los nombres,
-     *                                  los apellidos o la fecha de nacimiento
+     *                                  los apellidos, la fecha de nacimiento o la aceptación de la política
      */
     public static Account register(String firebaseUid, String firstName, String lastName,
-            BirthDate birthDate, PhoneNumber phoneNumber, Pronoun pronoun) {
+            BirthDate birthDate, PhoneNumber phoneNumber, Pronoun pronoun, PolicyAcceptance policyAcceptance) {
         // El registro siempre exige la fecha: solo las cuentas antiguas pueden carecer de ella al reconstruirse.
         if (birthDate == null) {
             throw new IllegalArgumentException("La fecha de nacimiento es obligatoria al registrarse");
+        }
+        if (policyAcceptance == null) {
+            throw new IllegalArgumentException("La aceptación de la política es obligatoria al registrarse");
         }
         return new Account(
                 UUID.randomUUID(),
@@ -70,6 +77,7 @@ public class Account {
                 birthDate,
                 phoneNumber,
                 pronoun,
+                policyAcceptance,
                 AccountStatus.PENDING_VERIFICATION,
                 null);
     }
@@ -87,12 +95,15 @@ public class Account {
      * @param birthDate fecha de nacimiento, o {@code null} si la cuenta es anterior a que el registro la exigiera
      * @param phoneNumber celular, o {@code null}
      * @param pronoun pronombres, o {@code null}
+     * @param policyAcceptance política aceptada y cuándo; la versión {@code sin-aceptar} marca a las cuentas anteriores
      * @param status estado almacenado
      * @return cuenta con el estado que tenía en la base de datos
      */
     public static Account rebuild(UUID id, String firebaseUid, String firstName, String lastName,
-            BirthDate birthDate, PhoneNumber phoneNumber, Pronoun pronoun, AccountStatus status) {
-        return new Account(id, firebaseUid, firstName, lastName, birthDate, phoneNumber, pronoun, status, null);
+            BirthDate birthDate, PhoneNumber phoneNumber, Pronoun pronoun, PolicyAcceptance policyAcceptance,
+            AccountStatus status) {
+        return new Account(id, firebaseUid, firstName, lastName, birthDate, phoneNumber, pronoun, policyAcceptance,
+                status, null);
     }
 
     /**
@@ -108,13 +119,41 @@ public class Account {
      * @param birthDate fecha de nacimiento, o {@code null} si la cuenta es anterior a que el registro la exigiera
      * @param phoneNumber celular, o {@code null}
      * @param pronoun pronombres, o {@code null}
+     * @param policyAcceptance política aceptada y cuándo; la versión {@code sin-aceptar} marca a las cuentas anteriores
      * @param status estado almacenado
      * @param version versión de la fila en el momento de leerla
      * @return cuenta con el estado y la versión que tenía en la base de datos
      */
     public static Account rebuild(UUID id, String firebaseUid, String firstName, String lastName,
-            BirthDate birthDate, PhoneNumber phoneNumber, Pronoun pronoun, AccountStatus status, Long version) {
-        return new Account(id, firebaseUid, firstName, lastName, birthDate, phoneNumber, pronoun, status, version);
+            BirthDate birthDate, PhoneNumber phoneNumber, Pronoun pronoun, PolicyAcceptance policyAcceptance,
+            AccountStatus status, Long version) {
+        return new Account(id, firebaseUid, firstName, lastName, birthDate, phoneNumber, pronoun, policyAcceptance,
+                status, version);
+    }
+
+    /**
+     * Guarda la aceptación de una versión de la política.
+     *
+     * <p>Aceptar la versión que ya tiene no cambia nada: la fecha de la primera aceptación se conserva.</p>
+     *
+     * @param acceptance versión vigente y el instante actual
+     * @return {@code true} si la aceptación cambió y hay que guardar la cuenta
+     * @throws AccountDisabledException si la cuenta está deshabilitada
+     * @throws AccountNotFoundException si la cuenta está anonimizada
+     */
+    public boolean acceptPolicy(PolicyAcceptance acceptance) {
+        if (status == AccountStatus.DISABLED) {
+            throw new AccountDisabledException();
+        }
+        if (status == AccountStatus.ANONYMIZED) {
+            // No se revela que la cuenta existió: se responde igual que si no hubiera cuenta
+            throw new AccountNotFoundException();
+        }
+        if (policyAcceptance.version().equals(acceptance.version())) {
+            return false;
+        }
+        policyAcceptance = acceptance;
+        return true;
     }
 
     /**
@@ -184,6 +223,11 @@ public class Account {
     /** @return pronombres declarados, vacíos si no los dio */
     public Optional<Pronoun> getPronoun() {
         return Optional.ofNullable(pronoun);
+    }
+
+    /** @return política aceptada y cuándo; la versión {@code sin-aceptar} indica que la persona no aceptó ninguna */
+    public PolicyAcceptance getPolicyAcceptance() {
+        return policyAcceptance;
     }
 
     /** @return estado actual de la cuenta */

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -32,7 +33,7 @@ class AccountTest {
 
     @Test
     void elCelularYLosPronombresSonOpcionales() {
-        Account cuenta = Account.register("uid-firebase", "Ana", "Pérez", MAYOR_DE_EDAD, null, null);
+        Account cuenta = Account.register("uid-firebase", "Ana", "Pérez", MAYOR_DE_EDAD, null, null, PolicyAcceptanceFixture.ACCEPTED);
 
         assertThat(cuenta.getPhoneNumber()).isEmpty();
         assertThat(cuenta.getPronoun()).isEmpty();
@@ -52,18 +53,18 @@ class AccountTest {
 
     @Test
     void register_shouldReject_whenBirthDateIsMissing() {
-        assertThatThrownBy(() -> Account.register("uid", "Ana", "Pérez", null, null, null))
+        assertThatThrownBy(() -> Account.register("uid", "Ana", "Pérez", null, null, null, PolicyAcceptanceFixture.ACCEPTED))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("La fecha de nacimiento es obligatoria al registrarse");
     }
 
     @Test
     void exigeNombresYApellidos() {
-        assertThatThrownBy(() -> Account.register("uid", "  ", "Pérez", MAYOR_DE_EDAD, null, null))
+        assertThatThrownBy(() -> Account.register("uid", "  ", "Pérez", MAYOR_DE_EDAD, null, null, PolicyAcceptanceFixture.ACCEPTED))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Los nombres son obligatorios");
 
-        assertThatThrownBy(() -> Account.register("uid", "Ana", null, MAYOR_DE_EDAD, null, null))
+        assertThatThrownBy(() -> Account.register("uid", "Ana", null, MAYOR_DE_EDAD, null, null, PolicyAcceptanceFixture.ACCEPTED))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Los apellidos son obligatorios");
     }
@@ -107,13 +108,83 @@ class AccountTest {
         assertThat(anonimizada.getStatus()).isEqualTo(AccountStatus.ANONYMIZED);
     }
 
+    @Test
+    @DisplayName("El registro conserva la aceptación de la política que recibe")
+    void register_shouldKeepPolicyAcceptance() {
+        Account cuenta = registrar();
+
+        assertThat(cuenta.getPolicyAcceptance()).isEqualTo(PolicyAcceptanceFixture.ACCEPTED);
+    }
+
+    @Test
+    @DisplayName("El registro exige la aceptación de la política")
+    void register_shouldReject_whenPolicyAcceptanceIsNull() {
+        assertThatThrownBy(() -> Account.register("uid", "Ana", "Pérez", MAYOR_DE_EDAD, null, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("La aceptación de la política es obligatoria al registrarse");
+    }
+
+    @Test
+    @DisplayName("Aceptar la versión que ya tiene no cambia nada y conserva la fecha de la primera aceptación")
+    void acceptPolicy_shouldReturnFalseAndKeepDate_whenSameVersion() {
+        Account cuenta = registrar();
+
+        boolean cambio = cuenta.acceptPolicy(new PolicyAcceptance("2026-11-v1", Instant.parse("2026-12-01T00:00:00Z")));
+
+        assertThat(cambio).isFalse();
+        assertThat(cuenta.getPolicyAcceptance()).isEqualTo(PolicyAcceptanceFixture.ACCEPTED);
+    }
+
+    @Test
+    @DisplayName("Aceptar una versión distinta reemplaza la aceptación guardada")
+    void acceptPolicy_shouldReplace_whenDifferentVersion() {
+        Account cuenta = Account.rebuild(UUID.randomUUID(), "uid-firebase", "Ana", "Pérez", MAYOR_DE_EDAD, null, null,
+                new PolicyAcceptance(PolicyAcceptance.NOT_ACCEPTED_VERSION, Instant.parse("2026-10-01T00:00:00Z")),
+                AccountStatus.ACTIVE);
+        PolicyAcceptance nueva = new PolicyAcceptance("2026-11-v1", Instant.parse("2026-11-14T15:30:00Z"));
+
+        boolean cambio = cuenta.acceptPolicy(nueva);
+
+        assertThat(cambio).isTrue();
+        assertThat(cuenta.getPolicyAcceptance()).isEqualTo(nueva);
+    }
+
+    @Test
+    @DisplayName("Una cuenta pendiente de verificar puede aceptar la política")
+    void acceptPolicy_shouldAccept_whenAccountIsPending() {
+        Account cuenta = reconstruirCon(AccountStatus.PENDING_VERIFICATION);
+        PolicyAcceptance nueva = new PolicyAcceptance("2026-12-v2", Instant.parse("2026-12-01T00:00:00Z"));
+
+        assertThat(cuenta.acceptPolicy(nueva)).isTrue();
+        assertThat(cuenta.getPolicyAcceptance()).isEqualTo(nueva);
+    }
+
+    @Test
+    @DisplayName("Una cuenta deshabilitada no puede aceptar la política")
+    void acceptPolicy_shouldThrowDisabled_whenAccountIsDisabled() {
+        Account deshabilitada = reconstruirCon(AccountStatus.DISABLED);
+
+        assertThatThrownBy(() -> deshabilitada.acceptPolicy(PolicyAcceptanceFixture.ACCEPTED))
+                .isInstanceOf(AccountDisabledException.class);
+        assertThat(deshabilitada.getPolicyAcceptance()).isEqualTo(PolicyAcceptanceFixture.ACCEPTED);
+    }
+
+    @Test
+    @DisplayName("Una cuenta anonimizada responde como si no existiera al aceptar la política")
+    void acceptPolicy_shouldThrowNotFound_whenAccountIsAnonymized() {
+        Account anonimizada = reconstruirCon(AccountStatus.ANONYMIZED);
+
+        assertThatThrownBy(() -> anonimizada.acceptPolicy(PolicyAcceptanceFixture.ACCEPTED))
+                .isInstanceOf(AccountNotFoundException.class);
+    }
+
     private Account registrar() {
         return Account.register("uid-firebase", "Ana", "Pérez", MAYOR_DE_EDAD,
-                new PhoneNumber("+573001234567"), Pronoun.SHE);
+                new PhoneNumber("+573001234567"), Pronoun.SHE, PolicyAcceptanceFixture.ACCEPTED);
     }
 
     private Account reconstruirCon(AccountStatus estado) {
         return Account.rebuild(UUID.randomUUID(), "uid-firebase", "Ana", "Pérez", MAYOR_DE_EDAD,
-                null, null, estado);
+                null, null, PolicyAcceptanceFixture.ACCEPTED, estado);
     }
 }

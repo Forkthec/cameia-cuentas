@@ -63,6 +63,12 @@ public class AccountEntity {
     @Column(name = "estado", nullable = false, length = 24)
     private AccountStatus estado;
 
+    @Column(name = "politica_version", nullable = false, length = 20)
+    private String politicaVersion;
+
+    @Column(name = "politica_aceptada_en", nullable = false)
+    private Instant politicaAceptadaEn;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
@@ -91,9 +97,12 @@ public class AccountEntity {
      * @param telefono celular en formato E.164, o {@code null}
      * @param pronombres pronombres declarados, o {@code null}
      * @param estado estado de la cuenta
+     * @param politicaVersion versión de la política aceptada, o {@code sin-aceptar}
+     * @param politicaAceptadaEn instante UTC de la aceptación
      */
     public AccountEntity(UUID id, String firebaseUid, String nombre, String apellido,
-            LocalDate fechaNacimiento, String telefono, Pronoun pronombres, AccountStatus estado) {
+            LocalDate fechaNacimiento, String telefono, Pronoun pronombres, AccountStatus estado,
+            String politicaVersion, Instant politicaAceptadaEn) {
         this.id = id;
         this.firebaseUid = firebaseUid;
         this.nombre = nombre;
@@ -102,6 +111,19 @@ public class AccountEntity {
         this.telefono = telefono;
         this.pronombres = pronombres;
         this.estado = estado;
+        this.politicaVersion = politicaVersion;
+        this.politicaAceptadaEn = politicaAceptadaEn;
+    }
+
+    /**
+     * Cambia la política aceptada de la fila.
+     *
+     * @param version versión que decidió el dominio
+     * @param aceptadaEn instante UTC de la aceptación
+     */
+    public void setAceptacionPolitica(String version, Instant aceptadaEn) {
+        this.politicaVersion = version;
+        this.politicaAceptadaEn = aceptadaEn;
     }
 
     /**
@@ -165,6 +187,16 @@ public class AccountEntity {
     /** @return estado de la cuenta */
     public AccountStatus getEstado() {
         return estado;
+    }
+
+    /** @return versión de la política aceptada, o {@code sin-aceptar} */
+    public String getPoliticaVersion() {
+        return politicaVersion;
+    }
+
+    /** @return instante UTC de la aceptación de la política */
+    public Instant getPoliticaAceptadaEn() {
+        return politicaAceptadaEn;
     }
 
     /** @return versión para el bloqueo optimista */

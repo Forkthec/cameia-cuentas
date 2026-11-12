@@ -48,6 +48,7 @@ import tech.cameia.cuentas.domain.exception.WeakPasswordException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.BirthDate;
 import tech.cameia.cuentas.domain.model.Pronoun;
+import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.presentation.advice.ProblemDetailTestSupport;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -740,6 +741,7 @@ class UserRegistrationControllerTest {
     private Account cuentaCreada() {
         return Account.rebuild(UUID.randomUUID(), "uid-firebase", "Ana", "Pérez",
                 new BirthDate(LocalDate.of(1995, 4, 12)), null, null,
+                PolicyAcceptanceFixture.ACCEPTED,
                 tech.cameia.cuentas.domain.model.AccountStatus.PENDING_VERIFICATION);
     }
 

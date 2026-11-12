@@ -19,6 +19,7 @@ import tech.cameia.cuentas.domain.model.DirectoryUser;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.PersonName;
 import tech.cameia.cuentas.domain.model.PhoneNumber;
+import tech.cameia.cuentas.domain.model.PolicyAcceptance;
 import tech.cameia.cuentas.domain.model.Pronoun;
 import tech.cameia.cuentas.domain.model.RawPassword;
 import tech.cameia.cuentas.domain.policy.AgePolicy;
@@ -136,7 +137,8 @@ public class RegisterUserService {
 
     /** Datos del formulario ya validados; agrupa los valores para no pasar más de tres parámetros. */
     private record ValidRegistration(EmailAddress email, RawPassword password, BirthDate birthDate,
-            PhoneNumber phoneNumber, PersonName firstName, PersonName lastName, Pronoun pronoun, String requestId) { }
+            PhoneNumber phoneNumber, PersonName firstName, PersonName lastName, Pronoun pronoun,
+            String policyVersion, String requestId) { }
 
     /** Aplica las reglas del dominio a los datos del formulario antes de tocar ningún sistema externo. */
     private ValidRegistration validar(RegisterUserCommand command) {
@@ -152,7 +154,7 @@ public class RegisterUserService {
         politicaDeEdad.verify(birthDate);
         politicaDeContrasenia.verify(password);
         return new ValidRegistration(email, password, birthDate, phoneNumber, firstName, lastName,
-                command.pronoun(), command.requestId());
+                command.pronoun(), command.policyVersion(), command.requestId());
     }
 
     /**
@@ -212,7 +214,7 @@ public class RegisterUserService {
 
             Account cuenta = Account.register(firebaseUid, registro.firstName().value(),
                     registro.lastName().value(), registro.birthDate(), registro.phoneNumber(),
-                    registro.pronoun());
+                    registro.pronoun(), new PolicyAcceptance(registro.policyVersion(), clock.instant()));
             // La fila de la cuenta y el evento cuenta.creada se guardan en una sola transacción; un fallo aquí sigue
             // compensando la credencial.
             RecordedAccount guardada = accountRecorder.recordNewAccount(cuenta, registro.email(), registro.requestId());

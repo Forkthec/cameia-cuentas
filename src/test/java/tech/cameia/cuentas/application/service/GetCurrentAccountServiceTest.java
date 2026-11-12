@@ -24,6 +24,7 @@ import tech.cameia.cuentas.domain.exception.IdentityRequiredException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
+import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.infrastructure.persistence.InMemoryAccountRepository;
 
 /**
@@ -38,7 +39,7 @@ class GetCurrentAccountServiceTest {
 
     private static Account accountWith(String firebaseUid, AccountStatus status) {
         return Account.rebuild(UUID.fromString("3f0c2c1e-8a47-4d5b-9a63-5b1d6e2f7a10"), firebaseUid, "María José",
-                "Gómez-Ruiz", new BirthDate(LocalDate.of(1995, 4, 12)), null, null, status);
+                "Gómez-Ruiz", new BirthDate(LocalDate.of(1995, 4, 12)), null, null, PolicyAcceptanceFixture.ACCEPTED, status);
     }
 
     @Test

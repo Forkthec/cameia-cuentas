@@ -21,6 +21,7 @@ import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
 import tech.cameia.cuentas.domain.model.Pronoun;
+import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.domain.port.AccountRepository;
 
 /**
@@ -54,7 +55,7 @@ class PendingAccountDeletionTransactionTest {
 
     private void saveAccount(AccountStatus status) {
         accounts.save(Account.rebuild(UUID.randomUUID(), UID, "Ana", "Pérez", new BirthDate(LocalDate.of(1995, 4, 12)),
-                null, Pronoun.SHE, status));
+                null, Pronoun.SHE, PolicyAcceptanceFixture.ACCEPTED, status));
     }
 
     private int accountRows() {

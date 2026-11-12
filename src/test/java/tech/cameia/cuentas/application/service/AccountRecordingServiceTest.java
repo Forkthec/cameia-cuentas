@@ -18,6 +18,7 @@ import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.Pronoun;
+import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.infrastructure.persistence.InMemoryAccountRepository;
 import tech.cameia.cuentas.infrastructure.persistence.InMemoryOutboxRepository;
 
@@ -33,7 +34,7 @@ class AccountRecordingServiceTest {
     private final AccountRecordingService service = new AccountRecordingService(accounts, outbox, CLOCK);
 
     private static Account account(String uid) {
-        return Account.register(uid, "Ana", "Pérez", new BirthDate(LocalDate.of(2008, 3, 15)), null, Pronoun.SHE);
+        return Account.register(uid, "Ana", "Pérez", new BirthDate(LocalDate.of(2008, 3, 15)), null, Pronoun.SHE, PolicyAcceptanceFixture.ACCEPTED);
     }
 
     @Test
@@ -76,7 +77,7 @@ class AccountRecordingServiceTest {
     @DisplayName("Falla sin agregar evento cuando la cuenta guardada no trae fecha de nacimiento")
     void recordNewAccount_shouldThrow_whenSavedAccountHasNoBirthDate() {
         Account withoutBirthDate = Account.rebuild(UUID.randomUUID(), "uid-sin-fecha", "Ana", "Pérez", null, null,
-                null, AccountStatus.PENDING_VERIFICATION);
+                null, PolicyAcceptanceFixture.ACCEPTED, AccountStatus.PENDING_VERIFICATION);
 
         assertThatThrownBy(() -> service.recordNewAccount(withoutBirthDate, EMAIL, "req-1"))
                 .isInstanceOf(IllegalStateException.class)
