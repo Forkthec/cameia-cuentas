@@ -29,15 +29,19 @@ import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException;
 import tech.cameia.cuentas.domain.exception.InvalidPersonNameException;
+import tech.cameia.cuentas.domain.exception.PolicyVersionOutdatedException;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
+import tech.cameia.cuentas.domain.model.CurrentPolicy;
 import tech.cameia.cuentas.domain.model.DirectoryUser;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.Pronoun;
 import tech.cameia.cuentas.domain.model.RawPassword;
 import tech.cameia.cuentas.domain.model.UnannouncedAccount;
+import tech.cameia.cuentas.domain.model.PolicyAcceptance;
+import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.domain.policy.AgePolicy;
 import tech.cameia.cuentas.domain.policy.PasswordPolicy;
 import tech.cameia.cuentas.domain.port.AccountRepository;
@@ -80,7 +84,8 @@ class RegisterUserServiceTest {
         Clock reloj = Clock.fixed(AHORA, ZoneOffset.UTC);
         return new RegisterUserService(directorioDePrueba, repositorio,
                 new AccountRecordingService(repositorio, outbox, reloj), relay, new AgePolicy(),
-                new PasswordPolicy(Set.of("123456789012", "password1234", "qwertyuiop123")), reloj);
+                new PasswordPolicy(Set.of("123456789012", "password1234", "qwertyuiop123")),
+                new CurrentPolicy(PolicyAcceptanceFixture.VERSION), reloj);
     }
 
     @Test
@@ -118,7 +123,7 @@ class RegisterUserServiceTest {
     void register_shouldNotRecordEvent_whenEmailBelongsToActiveAccount() {
         String uid = directorio.crearSinCuentaLocal(CORREO, AHORA.minusSeconds(5));
         repositorio.guardadas.put(uid, Account.rebuild(UUID.randomUUID(), uid, "Ana", "Pérez",
-                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, AccountStatus.ACTIVE));
+                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, PolicyAcceptanceFixture.ACCEPTED, AccountStatus.ACTIVE));
 
         assertThatThrownBy(() -> servicio.register(comando())).isInstanceOf(EmailAlreadyRegisteredException.class);
 
@@ -200,6 +205,43 @@ class RegisterUserServiceTest {
     }
 
     @Test
+    @DisplayName("Guarda la versión de la política y el instante del reloj cuando crea la cuenta")
+    void register_shouldStorePolicyAcceptance_whenAccountIsCreated() {
+        Instant instante = Instant.parse("2026-11-14T15:30:00Z");
+        Clock reloj = Clock.fixed(instante, ZoneOffset.UTC);
+        RegisterUserService conRelojDeAceptacion = new RegisterUserService(directorio, repositorio,
+                new AccountRecordingService(repositorio, outbox, reloj),
+                new OutboxRelayService(outbox, publisher, reloj), new AgePolicy(),
+                new PasswordPolicy(Set.of("123456789012")),
+                new CurrentPolicy(PolicyAcceptanceFixture.VERSION), reloj);
+
+        RegisterUserResult resultado = conRelojDeAceptacion.register(comando());
+
+        assertThat(resultado.account().getPolicyAcceptance().version()).isEqualTo("2026-11-v1");
+        assertThat(resultado.account().getPolicyAcceptance().acceptedAtIfAccepted()).contains(instante);
+        assertThat(repositorio.guardadas.get(resultado.account().getFirebaseUid()).getPolicyAcceptance().version())
+                .isEqualTo("2026-11-v1");
+    }
+
+    @Test
+    @DisplayName("No cambia la aceptación guardada cuando devuelve la cuenta pendiente")
+    void register_shouldKeepStoredAcceptance_whenPendingAccountIsReturned() {
+        RegisterUserResult primero = servicio.register(comando());
+        Account pendiente = primero.account();
+        Account sinAceptar = Account.rebuild(pendiente.getId(), pendiente.getFirebaseUid(),
+                pendiente.getFirstName(), pendiente.getLastName(), pendiente.getBirthDate().orElse(null),
+                pendiente.getPhoneNumber().orElse(null), pendiente.getPronoun().orElse(null),
+                new PolicyAcceptance(PolicyAcceptance.NOT_ACCEPTED_VERSION, AHORA), pendiente.getStatus());
+        repositorio.guardadas.put(pendiente.getFirebaseUid(), sinAceptar);
+
+        RegisterUserResult segundo = servicio.register(comando());
+
+        assertThat(segundo.created()).isFalse();
+        assertThat(segundo.account().getPolicyAcceptance().version())
+                .isEqualTo(PolicyAcceptance.NOT_ACCEPTED_VERSION);
+    }
+
+    @Test
     void repetirElRegistroConLaCuentaPendienteDevuelveLaMismaCuentaSinEscribirNada() {
         RegisterUserResult primero = servicio.register(comando());
 
@@ -227,7 +269,7 @@ class RegisterUserServiceTest {
     void unaCuentaActivaBloqueadaOAnonimizadaDaElMismoConflicto(AccountStatus estado) {
         String uid = directorio.crearSinCuentaLocal(CORREO, AHORA.minusSeconds(5));
         repositorio.guardadas.put(uid, Account.rebuild(UUID.randomUUID(), uid, "Ana", "Pérez",
-                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, estado));
+                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, PolicyAcceptanceFixture.ACCEPTED, estado));
 
         assertThatThrownBy(() -> servicio.register(comando()))
                 .isInstanceOf(EmailAlreadyRegisteredException.class)
@@ -335,7 +377,7 @@ class RegisterUserServiceTest {
     void elConflictoDeUnaCuentaNoPendienteNoDejaSuEstadoEnElLog(CapturedOutput salida) {
         String uid = directorio.crearSinCuentaLocal(CORREO, AHORA.minusSeconds(5));
         repositorio.guardadas.put(uid, Account.rebuild(UUID.randomUUID(), uid, "Ana", "Pérez",
-                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, AccountStatus.DISABLED));
+                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, PolicyAcceptanceFixture.ACCEPTED, AccountStatus.DISABLED));
 
         assertThatThrownBy(() -> servicio.register(comando())).isInstanceOf(EmailAlreadyRegisteredException.class);
 
@@ -395,7 +437,7 @@ class RegisterUserServiceTest {
     void elRegistroRepetidoIgnoraLosOtrosDatosYNoUsaLaContrasenia(CapturedOutput salida) {
         RegisterUserResult primero = servicio.register(comando());
         RegisterUserCommand otrosDatos = new RegisterUserCommand("Luz", "Gómez", LocalDate.of(1990, 1, 1), CORREO,
-                "otra frase muy distinta", "+573009876543", Pronoun.HE, null);
+                "otra frase muy distinta", "+573009876543", Pronoun.HE, "2026-11-v1", null);
 
         RegisterUserResult segundo = servicio.register(otrosDatos);
 
@@ -432,7 +474,7 @@ class RegisterUserServiceTest {
 
     private Account cuentaPendiente(String uid) {
         return Account.rebuild(UUID.randomUUID(), uid, "Ana", "Pérez", new BirthDate(LocalDate.of(1995, 4, 12)),
-                null, null, AccountStatus.PENDING_VERIFICATION);
+                null, null, PolicyAcceptanceFixture.ACCEPTED, AccountStatus.PENDING_VERIFICATION);
     }
 
     @Test
@@ -446,11 +488,26 @@ class RegisterUserServiceTest {
         assertThat(repositorio.guardadas).hasSize(1);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"2026-10-v1", "2026-11-V1", "sin-aceptar", "2026-11-v1 "})
+    @DisplayName("No toca Firebase ni guarda nada cuando la versión de la política no es la vigente")
+    void register_shouldNotTouchFirebase_whenPolicyVersionIsNotCurrent(String version) {
+        RegisterUserCommand desactualizado = new RegisterUserCommand("Ana", "Pérez", LocalDate.of(1995, 4, 12),
+                CORREO, "frase secreta larga", null, null, version, null);
+
+        assertThatThrownBy(() -> servicio.register(desactualizado))
+                .isInstanceOf(PolicyVersionOutdatedException.class);
+
+        assertThat(directorio.cantidadDeUsuarios()).isZero();
+        assertThat(repositorio.guardadas).isEmpty();
+        assertThat(outbox.appended()).isEmpty();
+    }
+
     @Test
     void noTocaFirebaseCuandoLaFechaDeNacimientoNoPermiteRegistrarse() {
         RegisterUserCommand menorDeEdad = new RegisterUserCommand("Ana", "Pérez",
                 LocalDate.now().minusYears(15), "ana@cameia.tech", "frase secreta larga",
-                null, null, null);
+                null, null, "2026-11-v1", null);
 
         assertThatThrownBy(() -> servicio.register(menorDeEdad))
                 .isInstanceOf(InvalidBirthDateException.class);
@@ -460,7 +517,7 @@ class RegisterUserServiceTest {
     @Test
     void noTocaFirebaseCuandoLaContraseniaEsDebil() {
         RegisterUserCommand contraseniaCorta = new RegisterUserCommand("Ana", "Pérez",
-                LocalDate.of(1995, 4, 12), "ana@cameia.tech", "corta", null, null, null);
+                LocalDate.of(1995, 4, 12), "ana@cameia.tech", "corta", null, null, "2026-11-v1", null);
 
         assertThatThrownBy(() -> servicio.register(contraseniaCorta))
                 .isInstanceOf(WeakPasswordException.class);
@@ -470,7 +527,7 @@ class RegisterUserServiceTest {
     @Test
     void unNombreConNumerosNoCreaCredencialNiCuenta() {
         RegisterUserCommand nombreInvalido = new RegisterUserCommand("Ana3", "Pérez", LocalDate.of(1995, 4, 12),
-                "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE, null);
+                "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE, "2026-11-v1", null);
 
         assertThatThrownBy(() -> servicio.register(nombreInvalido))
                 .isInstanceOf(InvalidPersonNameException.class)
@@ -483,7 +540,7 @@ class RegisterUserServiceTest {
     @Test
     void unApellidoConGuionBajoNoCreaCredencialNiCuenta() {
         RegisterUserCommand apellidoInvalido = new RegisterUserCommand("Ana", "Pérez_", LocalDate.of(1995, 4, 12),
-                "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE, null);
+                "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE, "2026-11-v1", null);
 
         assertThatThrownBy(() -> servicio.register(apellidoInvalido))
                 .isInstanceOf(InvalidPersonNameException.class)
@@ -496,7 +553,7 @@ class RegisterUserServiceTest {
     @Test
     void unNombreConTildesYGuionSeGuardaNormalizado() {
         RegisterUserCommand conTildes = new RegisterUserCommand("María  José", "Gómez-Ruiz",
-                LocalDate.of(1995, 4, 12), "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE, null);
+                LocalDate.of(1995, 4, 12), "ana@cameia.tech", "frase secreta larga", null, Pronoun.SHE, "2026-11-v1", null);
 
         Account cuenta = servicio.register(conTildes).account();
 
@@ -569,7 +626,7 @@ class RegisterUserServiceTest {
     @Test
     void unaContraseniaDebilNoQuedaEnElLog(CapturedOutput salida) {
         RegisterUserCommand comun = new RegisterUserCommand("Ana", "Pérez", LocalDate.of(1995, 4, 12),
-                "ana@cameia.tech", "password1234", null, Pronoun.SHE, null);
+                "ana@cameia.tech", "password1234", null, Pronoun.SHE, "2026-11-v1", null);
 
         assertThatThrownBy(() -> servicio.register(comun)).isInstanceOf(WeakPasswordException.class);
 
@@ -582,7 +639,7 @@ class RegisterUserServiceTest {
 
     private RegisterUserCommand comando(String correo, String contrasenia) {
         return new RegisterUserCommand("Ana", "Pérez", LocalDate.of(1995, 4, 12),
-                correo, contrasenia, "+573001234567", Pronoun.SHE, "req-1");
+                correo, contrasenia, "+573001234567", Pronoun.SHE, "2026-11-v1", "req-1");
     }
 
     /** Repositorio en memoria que puede simular un fallo de la base de datos. */

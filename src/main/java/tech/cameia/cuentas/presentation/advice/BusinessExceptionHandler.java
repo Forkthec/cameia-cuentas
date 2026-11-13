@@ -143,7 +143,9 @@ class BusinessExceptionHandler {
             Map.entry("email.NotBlank", ErrorCode.EMAIL_REQUIRED),
             Map.entry("email.CodePointSize", ErrorCode.EMAIL_TOO_LONG),
             Map.entry("password.NotBlank", ErrorCode.PASSWORD_REQUIRED),
-            Map.entry("pronoun.NotBlank", ErrorCode.PRONOUN_REQUIRED));
+            Map.entry("pronoun.NotBlank", ErrorCode.PRONOUN_REQUIRED),
+            Map.entry("dataAuthorization.ExplicitConsent", ErrorCode.DATA_AUTHORIZATION_REQUIRED),
+            Map.entry("policyVersion.NotBlank", ErrorCode.POLICY_VERSION_REQUIRED));
 
     /**
      * Un campo rechazado dentro de la lista {@code errors}.

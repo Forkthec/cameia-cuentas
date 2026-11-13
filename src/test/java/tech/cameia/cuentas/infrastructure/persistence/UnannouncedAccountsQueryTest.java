@@ -67,9 +67,10 @@ class UnannouncedAccountsQueryTest {
         insertAccount("uid-activa", "ACTIVE", "1995-04-12", "2026-10-01T08:00:00Z");
         jdbc.update("""
                 INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido, fecha_nacimiento, pronombres, estado,
-                                                 version, fecha_creacion, fecha_actualizacion, fecha_eliminacion)
+                                                 version, fecha_creacion, fecha_actualizacion, fecha_eliminacion,
+                                                 politica_version, politica_aceptada_en)
                 VALUES (gen_random_uuid(), 'uid-anonima', 'Anonimizado', 'Anonimizado', '1995-04-12', NULL, 'ANONYMIZED',
-                        0, '2026-10-01T09:00:00Z', now(), now())
+                        0, '2026-10-01T09:00:00Z', now(), now(), '2026-11-v1', now())
                 """);
 
         assertThat(accounts.findUnannounced(10)).extracting(UnannouncedAccount::firebaseUid).containsExactly("uid-activa");
@@ -120,8 +121,10 @@ class UnannouncedAccountsQueryTest {
     private void insertAccount(String uid, String status, String birthDate, String createdAt) {
         jdbc.update("""
                 INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido, fecha_nacimiento, pronombres, estado,
-                                                 version, fecha_creacion, fecha_actualizacion)
-                VALUES (gen_random_uuid(), ?, 'Ana', 'Pérez', ?::date, 'SHE', ?, 0, ?::timestamptz, now())
+                                                 version, fecha_creacion, fecha_actualizacion,
+                                                 politica_version, politica_aceptada_en)
+                VALUES (gen_random_uuid(), ?, 'Ana', 'Pérez', ?::date, 'SHE', ?, 0, ?::timestamptz, now(),
+                        '2026-11-v1', now())
                 """, uid, birthDate, status, createdAt);
     }
 

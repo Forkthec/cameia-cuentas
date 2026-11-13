@@ -48,6 +48,7 @@ import tech.cameia.cuentas.domain.exception.WeakPasswordException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.BirthDate;
 import tech.cameia.cuentas.domain.model.Pronoun;
+import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.presentation.advice.ProblemDetailTestSupport;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -68,6 +69,7 @@ class UserRegistrationControllerTest {
     private final MockMvc mockMvc = MockMvcBuilders
             .standaloneSetup(new UserRegistrationController(servicio))
             .setControllerAdvice(ProblemDetailTestSupport.manejadorDeErrores())
+            .setValidator(ProblemDetailTestSupport.validadorConPolitica("2026-11-v1"))
             .setMessageConverters(convertidorComoLaAplicacion())
             .build();
 
@@ -246,7 +248,7 @@ class UserRegistrationControllerTest {
         String valido = """
                 {"firstName":"Ana","lastName":"Pérez","birthDate":"12/04/1995",
                  "email":"ana@cameia.tech","password":"frase secreta larga",
-                 "phoneNumber":"+573001234567","pronoun":"SHE"}
+                 "phoneNumber":"+573001234567","pronoun":"SHE","dataAuthorization":true,"policyVersion":"2026-11-v1"}
                 """;
         return Stream.of(
                 Arguments.of("firstName", "FIRST_NAME_REQUIRED", "Ingresa tu nombre.",
@@ -579,6 +581,149 @@ class UserRegistrationControllerTest {
         verify(servicio, never()).register(any(RegisterUserCommand.class));
     }
 
+    private static final String AUTORIZACION_MENSAJE = "Acepta la política de tratamiento de datos para continuar.";
+    private static final String VERSION_REQUERIDA_MENSAJE = "Recarga la página y vuelve a aceptar la política.";
+    private static final String VERSION_VIEJA_MENSAJE = "La política cambió. Recarga la página y vuelve a aceptarla.";
+
+    private void esperarUnSoloError(String cuerpo, String campo, String codigo, String mensaje) throws Exception {
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value(campo))
+                .andExpect(jsonPath("$.errors[0].code").value(codigo))
+                .andExpect(jsonPath("$.errors[0].message").value(mensaje));
+        verify(servicio, never()).register(any(RegisterUserCommand.class));
+    }
+
+    private String conAutorizacion(String valorJson) {
+        return cuerpoValido().replace("\"dataAuthorization\":true", "\"dataAuthorization\":" + valorJson);
+    }
+
+    private String conVersion(String valorJson) {
+        return cuerpoValido().replace("\"policyVersion\":\"2026-11-v1\"", "\"policyVersion\":" + valorJson);
+    }
+
+    @Test
+    @DisplayName("Rechaza el registro cuando falta la autorización")
+    void register_shouldReturnDataAuthorizationRequired_whenFieldIsMissing() throws Exception {
+        esperarUnSoloError(cuerpoValido().replace(",\"dataAuthorization\":true", ""), "dataAuthorization",
+                "DATA_AUTHORIZATION_REQUIRED", AUTORIZACION_MENSAJE);
+    }
+
+    @Test
+    @DisplayName("Rechaza el registro cuando la autorización es null")
+    void register_shouldReturnDataAuthorizationRequired_whenFieldIsNull() throws Exception {
+        esperarUnSoloError(conAutorizacion("null"), "dataAuthorization", "DATA_AUTHORIZATION_REQUIRED",
+                AUTORIZACION_MENSAJE);
+    }
+
+    @Test
+    @DisplayName("Rechaza el registro cuando la autorización es false")
+    void register_shouldReturnDataAuthorizationRequired_whenFieldIsFalse() throws Exception {
+        esperarUnSoloError(conAutorizacion("false"), "dataAuthorization", "DATA_AUTHORIZATION_REQUIRED",
+                AUTORIZACION_MENSAJE);
+    }
+
+    @Test
+    @DisplayName("Rechaza el registro cuando la autorización es el texto \"true\"")
+    void register_shouldReturnDataAuthorizationRequired_whenFieldIsTextTrue() throws Exception {
+        esperarUnSoloError(conAutorizacion("\"true\""), "dataAuthorization", "DATA_AUTHORIZATION_REQUIRED",
+                AUTORIZACION_MENSAJE);
+    }
+
+    @Test
+    @DisplayName("Rechaza el registro cuando la autorización es el número 1")
+    void register_shouldReturnDataAuthorizationRequired_whenFieldIsNumberOne() throws Exception {
+        esperarUnSoloError(conAutorizacion("1"), "dataAuthorization", "DATA_AUTHORIZATION_REQUIRED",
+                AUTORIZACION_MENSAJE);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"[]", "{}"})
+    @DisplayName("Rechaza el registro cuando la autorización es un arreglo o un objeto")
+    void register_shouldReturnDataAuthorizationRequired_whenFieldIsArrayOrObject(String valor) throws Exception {
+        esperarUnSoloError(conAutorizacion(valor), "dataAuthorization", "DATA_AUTHORIZATION_REQUIRED",
+                AUTORIZACION_MENSAJE);
+    }
+
+    @Test
+    @DisplayName("Entrega la versión aceptada al caso de uso cuando la autorización es true")
+    void register_shouldStorePolicyAcceptance_whenAuthorizationIsGiven() throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(new RegisterUserResult(cuentaCreada(), true));
+        ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpoValido()))
+                .andExpect(status().isCreated());
+
+        verify(servicio).register(comando.capture());
+        assertThat(comando.getValue().policyVersion()).isEqualTo("2026-11-v1");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"null", "\"\"", "\"   \""})
+    @DisplayName("Pide la versión cuando viene nula, vacía o en blanco")
+    void register_shouldReturnPolicyVersionRequired_whenBlank(String valor) throws Exception {
+        esperarUnSoloError(conVersion(valor), "policyVersion", "POLICY_VERSION_REQUIRED",
+                VERSION_REQUERIDA_MENSAJE);
+    }
+
+    @Test
+    @DisplayName("Pide la versión cuando el campo no viene")
+    void register_shouldReturnPolicyVersionRequired_whenAbsent() throws Exception {
+        esperarUnSoloError(cuerpoValido().replace(",\"policyVersion\":\"2026-11-v1\"", ""), "policyVersion",
+                "POLICY_VERSION_REQUIRED", VERSION_REQUERIDA_MENSAJE);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\"2026-10-v1\"", "\"2026-11-V1\"", "\"sin-aceptar\"", "\"2026-11-v1aaaaaaaaaaa\"",
+        "\"<script>\"", "\"' OR 1=1 --\"", "123"})
+    @DisplayName("Rechaza una versión distinta de la vigente, sea vieja, de otra capitalización, centinela, "
+            + "demasiado larga, hostil o numérica")
+    void register_shouldReturnPolicyVersionOutdated_whenVersionIsNotCurrent(String valor) throws Exception {
+        esperarUnSoloError(conVersion(valor), "policyVersion", "POLICY_VERSION_OUTDATED", VERSION_VIEJA_MENSAJE);
+    }
+
+    @Test
+    @DisplayName("Acepta la versión vigente aunque venga con espacios alrededor")
+    void register_shouldAcceptTrimmedVersion() throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class))).thenReturn(new RegisterUserResult(cuentaCreada(), true));
+        ArgumentCaptor<RegisterUserCommand> comando = ArgumentCaptor.forClass(RegisterUserCommand.class);
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(conVersion("\" 2026-11-v1 \"")))
+                .andExpect(status().isCreated());
+
+        verify(servicio).register(comando.capture());
+        assertThat(comando.getValue().policyVersion()).isEqualTo("2026-11-v1");
+    }
+
+    @Test
+    @DisplayName("Un arreglo en la versión se responde como cuerpo ilegible, sin lista de errores")
+    void register_shouldReturnBodyInvalidFormat_whenPolicyVersionIsArray() throws Exception {
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(conVersion("[\"2026-11-v1\"]")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("REQUEST_BODY_INVALID_FORMAT"))
+                .andExpect(jsonPath("$.detail").value("Revisa el formato de los datos enviados."))
+                .andExpect(jsonPath("$.errors").doesNotExist());
+        verify(servicio, never()).register(any(RegisterUserCommand.class));
+    }
+
+    @Test
+    @DisplayName("Devuelve todos los errores a la vez cuando faltan los campos de la política y el correo es inválido")
+    void register_shouldReturnAllFieldErrorsAtOnce_whenPolicyFieldsAndEmailAreInvalid() throws Exception {
+        String cuerpo = cuerpoValido().replace(",\"dataAuthorization\":true", "")
+                .replace(",\"policyVersion\":\"2026-11-v1\"", "").replace("ana@cameia.tech", "no-es-correo");
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errors.length()").value(3))
+                .andExpect(jsonPath("$.errors[?(@.field=='dataAuthorization')].code")
+                        .value("DATA_AUTHORIZATION_REQUIRED"))
+                .andExpect(jsonPath("$.errors[?(@.field=='policyVersion')].code").value("POLICY_VERSION_REQUIRED"))
+                .andExpect(jsonPath("$.errors[?(@.field=='email')].code").value("EMAIL_INVALID_FORMAT"));
+        verify(servicio, never()).register(any(RegisterUserCommand.class));
+    }
+
     @ParameterizedTest
     @EnumSource(Pronoun.class)
     void cadaPronombreValidoLlegaAlCasoDeUso(Pronoun pronombre) throws Exception {
@@ -740,6 +885,7 @@ class UserRegistrationControllerTest {
     private Account cuentaCreada() {
         return Account.rebuild(UUID.randomUUID(), "uid-firebase", "Ana", "Pérez",
                 new BirthDate(LocalDate.of(1995, 4, 12)), null, null,
+                PolicyAcceptanceFixture.ACCEPTED,
                 tech.cameia.cuentas.domain.model.AccountStatus.PENDING_VERIFICATION);
     }
 
@@ -762,7 +908,7 @@ class UserRegistrationControllerTest {
         return """
                 {"firstName":"Ana","lastName":"Pérez","birthDate":"12/04/1995",
                  "email":"ana@cameia.tech","password":"frase secreta larga",
-                 "phoneNumber":"+573001234567","pronoun":"SHE"}
+                 "phoneNumber":"+573001234567","pronoun":"SHE","dataAuthorization":true,"policyVersion":"2026-11-v1"}
                 """;
     }
 }

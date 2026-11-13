@@ -40,7 +40,8 @@ class CuentaConstraintsClassificationTest {
             "cuenta_pkey", "uq_cuenta_firebase_uid", "ck_cuenta_nombre", "ck_cuenta_apellido",
             "ck_cuenta_estado", "ck_cuenta_version", "ck_cuenta_telefono_e164",
             "ck_cuenta_pronombres_no_vacio", "ck_cuenta_fecha_actualizacion",
-            "ck_cuenta_fecha_eliminacion", "ck_cuenta_anonimizacion", "ck_cuenta_pronombres_valor");
+            "ck_cuenta_fecha_eliminacion", "ck_cuenta_anonimizacion", "ck_cuenta_pronombres_valor",
+            "ck_cuenta_politica_version_no_vacia");
 
     @Container
     @ServiceConnection
@@ -72,8 +73,9 @@ class CuentaConstraintsClassificationTest {
         // Por Hibernate, como llega una escritura real; con parámetros, para que la línea de SQL
         // que se imprime en el perfil local no lleve los valores.
         assertThatThrownBy(() -> transaccion.executeWithoutResult(estado -> entityManager.createNativeQuery(
-                "INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido, telefono) "
-                        + "VALUES (gen_random_uuid(), ?1, ?2, ?3, ?4)")
+                "INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido, telefono, "
+                        + "politica_version, politica_aceptada_en) "
+                        + "VALUES (gen_random_uuid(), ?1, ?2, ?3, ?4, '2026-11-v1', now())")
                 .setParameter(1, "uid-restriccion")
                 .setParameter(2, "Zoraida")
                 .setParameter(3, "Quintero")

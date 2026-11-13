@@ -19,6 +19,7 @@ import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.BirthDate;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.Pronoun;
+import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 
 /**
  * Prueba de integración de la transacción del guardado conjunto: si el evento no puede guardarse, la cuenta tampoco
@@ -46,7 +47,7 @@ class AccountRecordingTransactionTest {
                 VALUES (gen_random_uuid(), 'cuenta.creada', 1, 'uid-rollback', '{}'::jsonb, 'req-0', now())
                 """);
         Account account = Account.register("uid-rollback", "Ana", "Pérez", new BirthDate(LocalDate.of(2008, 3, 15)), null,
-                Pronoun.SHE);
+                Pronoun.SHE, PolicyAcceptanceFixture.ACCEPTED);
 
         assertThatThrownBy(() -> service.recordNewAccount(account, new EmailAddress("ana.perez@ejemplo.test"), "req-1"))
                 .isInstanceOf(IllegalStateException.class);
@@ -59,7 +60,7 @@ class AccountRecordingTransactionTest {
     @DisplayName("Guarda la cuenta y su evento juntos cuando todo sale bien")
     void recordNewAccount_shouldPersistBoth_whenEventCanBeStored() {
         Account account = Account.register("uid-commit", "Ana", "Pérez", new BirthDate(LocalDate.of(2008, 3, 15)), null,
-                Pronoun.SHE);
+                Pronoun.SHE, PolicyAcceptanceFixture.ACCEPTED);
 
         service.recordNewAccount(account, new EmailAddress("ana.perez@ejemplo.test"), "req-1");
 

@@ -67,7 +67,7 @@ class AccountCreatedEventEndToEndTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String BODY = """
             {"firstName":"Ana","lastName":"Pérez","birthDate":"15/03/2008",
-             "email":"  Ana.Perez@Ejemplo.TEST ","password":"una frase muy larga 2026","pronoun":"SHE"}
+             "email":"  Ana.Perez@Ejemplo.TEST ","password":"una frase muy larga 2026","pronoun":"SHE","dataAuthorization":true,"policyVersion":"2026-11-v1"}
             """;
 
     @Container

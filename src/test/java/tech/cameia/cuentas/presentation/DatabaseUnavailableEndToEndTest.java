@@ -220,7 +220,7 @@ class DatabaseUnavailableEndToEndTest {
         return """
                 {"firstName":"Ana","lastName":"Perez","birthDate":"12/04/1995",
                  "email":"%s","password":"frase secreta larga",
-                 "phoneNumber":"+573001234567","pronoun":"SHE"}
+                 "phoneNumber":"+573001234567","pronoun":"SHE","dataAuthorization":true,"policyVersion":"2026-11-v1"}
                 """.formatted(email);
     }
 
@@ -228,12 +228,14 @@ class DatabaseUnavailableEndToEndTest {
         return List.of(
                 Arguments.of("POST", "/api/v1/users", List.of(JSON), registrationBody("cm290@cameia.tech")),
                 Arguments.of("GET", ME, List.of("X-User-Id: uid-cm290-b"), null),
-                Arguments.of("POST", "/api/v1/users/me/verification", List.of("X-User-Id: uid-cm290-b"), null));
+                Arguments.of("POST", "/api/v1/users/me/verification", List.of("X-User-Id: uid-cm290-b"), null),
+                Arguments.of("POST", "/api/v1/users/me/policy-acceptance", List.of(JSON, "X-User-Id: uid-cm290-b"),
+                        "{\"policyVersion\":\"2026-11-v1\"}"));
     }
 
     @ParameterizedTest(name = "{0} {1}")
     @MethodSource("databaseRoutes")
-    @DisplayName("Con la base caída, las tres rutas que la usan responden 503 DATABASE_UNAVAILABLE")
+    @DisplayName("Con la base caída, las cuatro rutas que la usan responden 503 DATABASE_UNAVAILABLE")
     void allDatabaseRoutes_shouldReturn503_whenDatabaseIsDown(String method, String path, List<String> headers,
             String body) throws Exception {
         pauseDatabase();

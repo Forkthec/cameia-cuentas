@@ -29,6 +29,7 @@ import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
 import tech.cameia.cuentas.domain.model.UnannouncedAccount;
+import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.domain.port.AccountRepository;
 
 /**
@@ -88,6 +89,7 @@ class ActivateAccountServiceTest {
     @DisplayName("Una cuenta sin fecha de nacimiento se activa sin error")
     void activate_shouldActivate_whenBirthDateIsUnknown() {
         repositorio.con(Account.rebuild(UUID.randomUUID(), UID, "Ana", "Pérez", null, null, null,
+                PolicyAcceptanceFixture.ACCEPTED,
                 AccountStatus.PENDING_VERIFICATION));
 
         Account activada = servicio.activate(new ActivateAccountCommand(UID, true));
@@ -222,11 +224,11 @@ class ActivateAccountServiceTest {
 
     private Account cuentaEn(AccountStatus estado) {
         return Account.rebuild(UUID.randomUUID(), UID, "Ana", "Pérez", new BirthDate(LocalDate.of(1995, 4, 12)),
-                null, null, estado);
+                null, null, PolicyAcceptanceFixture.ACCEPTED, estado);
     }
 
     private Account cuentaPendiente() {
-        return Account.register(UID, "Ana", "Pérez", new BirthDate(LocalDate.of(1995, 4, 12)), null, null);
+        return Account.register(UID, "Ana", "Pérez", new BirthDate(LocalDate.of(1995, 4, 12)), null, null, PolicyAcceptanceFixture.ACCEPTED);
     }
 
     /** Repositorio en memoria que cuenta cuántas veces se guardó. */

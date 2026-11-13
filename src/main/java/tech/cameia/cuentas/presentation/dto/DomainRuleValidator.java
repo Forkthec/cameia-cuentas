@@ -61,7 +61,7 @@ public class DomainRuleValidator implements ConstraintValidator<DomainRule, Stri
     }
 
     /** Escapa el texto para que la plantilla de mensajes no interprete llaves ni expresiones. */
-    private static String literal(String message) {
+    static String literal(String message) {
         return message.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}").replace("$", "\\$");
     }
 }

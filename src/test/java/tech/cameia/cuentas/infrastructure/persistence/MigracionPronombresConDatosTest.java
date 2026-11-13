@@ -32,6 +32,9 @@ class MigracionPronombresConDatosTest {
     @Container
     PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16-alpine");
 
+    /** Desde la migración de la política, toda fila lleva la versión aceptada y su fecha. */
+    private boolean conPolitica;
+
     @Test
     void lasFilasConPronombreValidoONuloSobrevivenALaMigracionYLuegoRigeLaRestriccion() throws SQLException {
         migrarHasta("2");
@@ -58,6 +61,7 @@ class MigracionPronombresConDatosTest {
     }
 
     private void migrarHasta(String version) {
+        conPolitica = "latest".equals(version);
         Flyway.configure()
                 .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
                 .schemas(ESQUEMA)
@@ -70,10 +74,11 @@ class MigracionPronombresConDatosTest {
 
     private void insertar(String firebaseUid, String pronombre) throws SQLException {
         try (Connection conexion = conectar();
-                PreparedStatement sentencia = conexion.prepareStatement("""
-                        INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido, pronombres)
-                        VALUES (gen_random_uuid(), ?, 'Ana', 'Perez', ?)
-                        """)) {
+                PreparedStatement sentencia = conexion.prepareStatement(
+                        "INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido, pronombres"
+                                + (conPolitica ? ", politica_version, politica_aceptada_en" : "") + ") "
+                                + "VALUES (gen_random_uuid(), ?, 'Ana', 'Perez', ?"
+                                + (conPolitica ? ", '2026-11-v1', now()" : "") + ")")) {
             sentencia.setString(1, firebaseUid);
             sentencia.setString(2, pronombre);
             sentencia.executeUpdate();
