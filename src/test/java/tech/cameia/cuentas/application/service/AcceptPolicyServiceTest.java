@@ -171,8 +171,19 @@ class AcceptPolicyServiceTest {
 
         servicio.accept(new AcceptPolicyCommand(UID, VIGENTE));
 
-        assertThat(salida.getAll()).contains(guardada.getId().toString())
+        assertThat(sinMarcaDeTiempo(salida.getAll())).contains(guardada.getId().toString())
                 .doesNotContain("2026-11-v1").doesNotContain("2026-11-14");
+    }
+
+    /**
+     * Quita la marca de tiempo con la que Spring Boot empieza cada línea del log.
+     *
+     * <p>Cuando otra prueba ya arrancó Spring Boot, cada línea empieza con la fecha en que corre la suite. Si esa
+     * fecha coincide con la del reloj fijo, la prueba fallaría sin que el servicio haya registrado la fecha de
+     * aceptación: lo que se revisa es el mensaje, no la marca de tiempo.</p>
+     */
+    private static String sinMarcaDeTiempo(String salida) {
+        return salida.replaceAll("(?m)^\\d{4}-\\d{2}-\\d{2}T\\S+\\s+", "");
     }
 
     @Test
