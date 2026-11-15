@@ -30,6 +30,7 @@ import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException;
 import tech.cameia.cuentas.domain.exception.InvalidPersonNameException;
 import tech.cameia.cuentas.domain.exception.PolicyVersionOutdatedException;
+import tech.cameia.cuentas.domain.exception.SignupNotAllowedException;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
@@ -44,6 +45,7 @@ import tech.cameia.cuentas.domain.model.PolicyAcceptance;
 import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.domain.policy.AgePolicy;
 import tech.cameia.cuentas.domain.policy.PasswordPolicy;
+import tech.cameia.cuentas.domain.policy.SignupAllowlistPolicy;
 import tech.cameia.cuentas.domain.port.AccountRepository;
 import tech.cameia.cuentas.infrastructure.client.InMemoryFirebaseUserDirectory;
 import tech.cameia.cuentas.infrastructure.messaging.InMemoryEventPublisher;
@@ -85,7 +87,64 @@ class RegisterUserServiceTest {
         return new RegisterUserService(directorioDePrueba, repositorio,
                 new AccountRecordingService(repositorio, outbox, reloj), relay, new AgePolicy(),
                 new PasswordPolicy(Set.of("123456789012", "password1234", "qwertyuiop123")),
-                new CurrentPolicy(PolicyAcceptanceFixture.VERSION), reloj);
+                new CurrentPolicy(PolicyAcceptanceFixture.VERSION), new SignupAllowlistPolicy(List.of()), reloj);
+    }
+
+    private RegisterUserService servicioConLista(String... entradas) {
+        Clock reloj = Clock.fixed(AHORA, ZoneOffset.UTC);
+        return new RegisterUserService(directorio, repositorio,
+                new AccountRecordingService(repositorio, outbox, reloj), new OutboxRelayService(outbox, publisher, reloj),
+                new AgePolicy(), new PasswordPolicy(Set.of("123456789012")),
+                new CurrentPolicy(PolicyAcceptanceFixture.VERSION), new SignupAllowlistPolicy(List.of(entradas)), reloj);
+    }
+
+    @Test
+    @DisplayName("Un correo fuera de la lista se rechaza sin consultar ni crear nada en Firebase ni en la base")
+    void register_shouldRejectBeforeFirebase_whenEmailIsNotAllowed() {
+        RegisterUserService restringido = servicioConLista("juangomezmu@unicauca.edu.co");
+
+        assertThatThrownBy(() -> restringido.register(comando()))
+                .isInstanceOf(SignupNotAllowedException.class);
+
+        assertThat(directorio.consultas()).isZero();
+        assertThat(directorio.creaciones()).isZero();
+        assertThat(repositorio.guardadas).isEmpty();
+        assertThat(outbox.appended()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("La lista responde antes que las reglas de negocio: un menor de edad fuera de la lista recibe el rechazo de la lista")
+    void register_shouldRejectByAllowlistFirst_whenOtherBusinessRulesAlsoFail() {
+        RegisterUserService restringido = servicioConLista("@unicauca.edu.co");
+        RegisterUserCommand menorConContraseniaComun = new RegisterUserCommand("Ana", "Pérez",
+                LocalDate.now().minusYears(15), CORREO, "123456789012", null, null, "2026-10-v9", null);
+
+        assertThatThrownBy(() -> restringido.register(menorConContraseniaComun))
+                .isInstanceOf(SignupNotAllowedException.class);
+        assertThat(directorio.consultas()).isZero();
+    }
+
+    @Test
+    @DisplayName("Un correo de la lista con subdirección + se registra")
+    void register_shouldCreateAccount_whenEmailIsAllowedWithPlusAddress() {
+        RegisterUserService restringido = servicioConLista("ana@cameia.tech");
+        RegisterUserCommand conSubdireccion = new RegisterUserCommand("Ana", "Pérez", LocalDate.of(1995, 4, 12),
+                "Ana+Q5A@cameia.tech", "frase secreta larga", null, Pronoun.SHE, "2026-11-v1", "req-1");
+
+        RegisterUserResult resultado = restringido.register(conSubdireccion);
+
+        assertThat(resultado.created()).isTrue();
+        assertThat(directorio.cantidadDeUsuarios()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Repetir el registro de una cuenta pendiente cuyo correo ya no está en la lista se rechaza")
+    void register_shouldReject_whenPendingAccountEmailIsNoLongerAllowed() {
+        servicio.register(comando());
+        RegisterUserService restringido = servicioConLista("otra@cameia.tech");
+
+        assertThatThrownBy(() -> restringido.register(comando()))
+                .isInstanceOf(SignupNotAllowedException.class);
     }
 
     @Test
@@ -213,7 +272,7 @@ class RegisterUserServiceTest {
                 new AccountRecordingService(repositorio, outbox, reloj),
                 new OutboxRelayService(outbox, publisher, reloj), new AgePolicy(),
                 new PasswordPolicy(Set.of("123456789012")),
-                new CurrentPolicy(PolicyAcceptanceFixture.VERSION), reloj);
+                new CurrentPolicy(PolicyAcceptanceFixture.VERSION), new SignupAllowlistPolicy(List.of()), reloj);
 
         RegisterUserResult resultado = conRelojDeAceptacion.register(comando());
 

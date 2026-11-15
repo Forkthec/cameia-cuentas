@@ -69,6 +69,9 @@ public enum ErrorCode {
     /** El correo ya tiene una cuenta. */
     EMAIL_ALREADY_REGISTERED,
 
+    /** El correo no está en la lista de correos permitidos para registrarse. */
+    SIGNUP_NOT_ALLOWED,
+
     /** Falta la contraseña. */
     PASSWORD_REQUIRED,
 

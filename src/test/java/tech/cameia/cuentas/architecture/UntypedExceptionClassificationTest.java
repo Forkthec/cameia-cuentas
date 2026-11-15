@@ -69,6 +69,7 @@ class UntypedExceptionClassificationTest {
             Map.entry(MODEL_PACKAGE + "PolicyAcceptance#<init>", DEFENSIVE_INVARIANT),
             Map.entry(MODEL_PACKAGE + "RawPassword#<init>", DEFENSIVE_INVARIANT),
             Map.entry(MODEL_PACKAGE + "SingleLineText#<init>", DEFENSIVE_INVARIANT),
+            Map.entry("tech.cameia.cuentas.domain.policy.SignupAllowlistPolicy#entradaInvalida", STARTUP),
             Map.entry("tech.cameia.cuentas.presentation.dto.RegisterUserRequest#toCommand", DEFENSIVE_INVARIANT),
             Map.entry(CONFIGURATION_PACKAGE + "CommonPasswordsLoader#load", STARTUP),
             Map.entry(CONFIGURATION_PACKAGE + "CommonPasswordsLoader#validate", STARTUP),

@@ -42,6 +42,11 @@ class UserRegistrationController {
              "code":"EMAIL_ALREADY_REGISTERED","requestId":"3f1c9a52-7d0e-4b57-9a38-52c1e4d8a601",
              "errors":[{"field":"email","code":"EMAIL_ALREADY_REGISTERED","message":"Ese correo ya tiene una cuenta."}]}""";
 
+    private static final String EJEMPLO_403 = """
+            {"type":"about:blank","title":"Registro no permitido","status":403,
+             "detail":"No es posible crear una cuenta con este correo.","instance":"/api/v1/users",
+             "code":"SIGNUP_NOT_ALLOWED","requestId":"3f1c9a52-7d0e-4b57-9a38-52c1e4d8a601"}""";
+
     private static final String EJEMPLO_422 = """
             {"type":"about:blank","title":"Datos no válidos","status":422,
              "detail":"Revisa los campos marcados.","instance":"/api/v1/users",
@@ -113,6 +118,12 @@ class UserRegistrationController {
                 content = @Content(mediaType = "application/problem+json",
                         schema = @Schema(implementation = ProblemDetail.class),
                         examples = @ExampleObject(name = "correoRepetido", value = EJEMPLO_409))),
+        @ApiResponse(responseCode = "403", description = "SIGNUP_NOT_ALLOWED: el entorno restringe el registro a una "
+                + "lista de correos permitidos (SIGNUP_ALLOWLIST) y el correo no está en ella. Se responde después de los "
+                + "422 de forma y antes de las demás reglas; no crea ni consulta nada. Sin la lista no se emite",
+                content = @Content(mediaType = "application/problem+json",
+                        schema = @Schema(implementation = ProblemDetail.class),
+                        examples = @ExampleObject(name = "registroNoPermitido", value = EJEMPLO_403))),
         @ApiResponse(responseCode = "422", description = "VALIDATION_FAILED con errors[].code: FIRST_NAME_REQUIRED, "
                 + "FIRST_NAME_TOO_LONG, FIRST_NAME_INVALID_CHARACTERS, LAST_NAME_REQUIRED, LAST_NAME_TOO_LONG, "
                 + "LAST_NAME_INVALID_CHARACTERS, BIRTH_DATE_REQUIRED, "
