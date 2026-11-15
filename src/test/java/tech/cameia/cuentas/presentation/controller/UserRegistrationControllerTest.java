@@ -44,6 +44,7 @@ import tech.cameia.cuentas.domain.exception.InvalidPersonNameException;
 import tech.cameia.cuentas.domain.exception.InvalidPhoneNumberException;
 import tech.cameia.cuentas.domain.model.PersonName;
 import tech.cameia.cuentas.domain.exception.InvalidBirthDateException.Reason;
+import tech.cameia.cuentas.domain.exception.SignupNotAllowedException;
 import tech.cameia.cuentas.domain.exception.WeakPasswordException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.BirthDate;
@@ -145,6 +146,36 @@ class UserRegistrationControllerTest {
                 .andExpect(jsonPath("$.errors[0].field").value("email"))
                 .andExpect(jsonPath("$.errors[0].code").value("EMAIL_ALREADY_REGISTERED"))
                 .andExpect(jsonPath("$.errors[0].message").value("Ese correo ya tiene una cuenta."));
+    }
+
+    @Test
+    @DisplayName("Un correo fuera de la lista responde 403 SIGNUP_NOT_ALLOWED sin lista errors (CM-360)")
+    void register_shouldReturn403SignupNotAllowed_whenEmailIsNotInAllowlist() throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class))).thenThrow(new SignupNotAllowedException());
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).header("X-Request-Id", "req-360")
+                        .content(cuerpoValido()))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Registro no permitido"))
+                .andExpect(jsonPath("$.detail").value("No es posible crear una cuenta con este correo."))
+                .andExpect(jsonPath("$.code").value("SIGNUP_NOT_ALLOWED"))
+                .andExpect(jsonPath("$.requestId").value("req-360"))
+                .andExpect(jsonPath("$.errors").doesNotExist())
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("ana@cameia.tech"))));
+    }
+
+    @Test
+    @DisplayName("Un correo mal escrito responde 422 EMAIL_INVALID_FORMAT antes que la lista (CM-360, REQ-LRP-14)")
+    void register_shouldReturn422BeforeAllowlist_whenEmailIsMalformed() throws Exception {
+        when(servicio.register(any(RegisterUserCommand.class))).thenThrow(new SignupNotAllowedException());
+        String cuerpo = cuerpoValido().replace("ana@cameia.tech", "no-es-correo");
+
+        mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errors[?(@.field=='email')].code").value(contains("EMAIL_INVALID_FORMAT")));
+        verify(servicio, never()).register(any(RegisterUserCommand.class));
     }
 
     @Test
