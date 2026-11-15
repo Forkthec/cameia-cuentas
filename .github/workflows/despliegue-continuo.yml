@@ -134,6 +134,13 @@ jobs:
       # Spring abre 10 por instancia si no se le indica otra cosa; con varios servicios
       # encendidos se agotan y lo que arranca después no puede conectarse. Con 2 como máximo
       # y 1 cuando no hay tráfico caben todos los servicios y los procesos programados.
+      #
+      # SIGNUP_ALLOWLIST (solo preproduccion): correos que pueden registrarse, separados
+      # por punto y coma (la coma separa las variables de --set-env-vars). Cada entrada es
+      # un correo base, que admite sus subdirecciones con +, o un dominio. Preproduccion
+      # usa datos del equipo y no debe abrir cuentas a terceros. El valor vive en la
+      # variable de GitHub SIGNUP_ALLOWLIST_STAGING y no en este archivo porque el
+      # repositorio es publico. Produccion no la recibe: sin ella el registro sigue abierto.
       - name: Desplegar a Cloud Run
         run: |
           gcloud run deploy "${{ env.SERVICE }}" \
@@ -149,7 +156,7 @@ jobs:
             --network="${{ env.VPC_NETWORK }}" \
             --subnet="${{ env.VPC_SUBNET }}" \
             --vpc-egress=all-traffic \
-            --set-env-vars="SPRING_PROFILES_ACTIVE=prod,DB_HOST=10.20.0.3,DB_PORT=5432,DB_NAME=cameia_cuentas,DB_USERNAME=cameia_cuentas,FIREBASE_PROJECT_ID=${{ vars.GCP_PROJECT_ID }},SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=2,SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=1" \
+            --set-env-vars="SPRING_PROFILES_ACTIVE=prod,DB_HOST=10.20.0.3,DB_PORT=5432,DB_NAME=cameia_cuentas,DB_USERNAME=cameia_cuentas,FIREBASE_PROJECT_ID=${{ vars.GCP_PROJECT_ID }},SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=2,SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=1,SIGNUP_ALLOWLIST=${{ vars.SIGNUP_ALLOWLIST_STAGING }}" \
             --set-secrets="DB_PASSWORD=cloudsql-staging-cuentas-password:latest,SPRING_RABBITMQ_ADDRESSES=rabbitmq-amqps-url:latest"
 
       - name: URL del servicio desplegado
