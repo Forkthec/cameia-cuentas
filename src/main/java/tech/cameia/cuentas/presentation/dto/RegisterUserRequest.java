@@ -36,6 +36,10 @@ import tech.cameia.cuentas.domain.model.SingleLineText;
  *                    opcional
  * @param pronoun pronombres con los que pide que se le trate; obligatorio: {@code HE},
  *                {@code SHE} o {@code THEY}
+ * @param dataAuthorization autorización para tratar los datos personales; solo vale el booleano {@code true}.
+ *                          Se recibe como {@code Object} para que {@code "true"}, {@code 1} o {@code false}
+ *                          se rechacen con el mensaje del contrato y no con un error de lectura del cuerpo
+ * @param policyVersion versión de la política que la persona vio y aceptó, por ejemplo {@code 2026-11-v1}
  */
 public record RegisterUserRequest(
 
@@ -83,7 +87,18 @@ public record RegisterUserRequest(
                 requiredMode = RequiredMode.REQUIRED)
         @NotBlank(message = "Selecciona una opción.")
         @DomainRule(DomainRule.Rule.PRONOUN)
-        String pronoun) {
+        String pronoun,
+
+        @Schema(description = "Autorización para tratar los datos personales. Solo se acepta el booleano true",
+                implementation = Boolean.class, example = "true", requiredMode = RequiredMode.REQUIRED)
+        @ExplicitConsent
+        Object dataAuthorization,
+
+        @Schema(description = "Versión de la política de tratamiento de datos que la persona aceptó; debe ser la "
+                + "vigente", example = "2026-11-v1", maxLength = 20, requiredMode = RequiredMode.REQUIRED)
+        @NotBlank(message = "Recarga la página y vuelve a aceptar la política.")
+        @CurrentPolicyVersion
+        String policyVersion) {
 
     /**
      * Normaliza los textos antes de que se validen.
@@ -97,6 +112,7 @@ public record RegisterUserRequest(
         firstName = SingleLineText.normalizeName(firstName);
         lastName = SingleLineText.normalizeName(lastName);
         email = SingleLineText.normalize(email);
+        policyVersion = SingleLineText.normalize(policyVersion);
     }
 
     /**
@@ -120,6 +136,6 @@ public record RegisterUserRequest(
         String declaredPhoneNumber =
                 trimmedPhoneNumber == null || trimmedPhoneNumber.isEmpty() ? null : trimmedPhoneNumber;
         return new RegisterUserCommand(firstName, lastName, parsedBirthDate, email, password, declaredPhoneNumber,
-                Pronoun.of(pronoun), requestId);
+                Pronoun.of(pronoun), policyVersion, requestId);
     }
 }

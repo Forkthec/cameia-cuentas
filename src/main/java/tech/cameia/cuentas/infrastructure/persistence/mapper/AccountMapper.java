@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.BirthDate;
 import tech.cameia.cuentas.domain.model.PhoneNumber;
+import tech.cameia.cuentas.domain.model.PolicyAcceptance;
 import tech.cameia.cuentas.infrastructure.persistence.entity.AccountEntity;
 
 /**
@@ -31,7 +32,9 @@ public class AccountMapper {
                 account.getBirthDate().map(BirthDate::value).orElse(null),
                 account.getPhoneNumber().map(PhoneNumber::value).orElse(null),
                 account.getPronoun().orElse(null),
-                account.getStatus());
+                account.getStatus(),
+                account.getPolicyAcceptance().version(),
+                account.getPolicyAcceptance().acceptedAt());
     }
 
     /**
@@ -49,6 +52,7 @@ public class AccountMapper {
                 entity.getFechaNacimiento() == null ? null : new BirthDate(entity.getFechaNacimiento()),
                 entity.getTelefono() == null ? null : new PhoneNumber(entity.getTelefono()),
                 entity.getPronombres(),
+                new PolicyAcceptance(entity.getPoliticaVersion(), entity.getPoliticaAceptadaEn()),
                 entity.getEstado(),
                 entity.getVersion());
     }

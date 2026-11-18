@@ -73,7 +73,7 @@ class CurrentAccountEndToEndTest {
         register("""
                 {"firstName":"María José","lastName":"Gómez-Ruiz","birthDate":"12/04/1995",
                  "email":"maria@cameia.tech","password":"frase secreta larga",
-                 "phoneNumber":"+573001234567","pronoun":"SHE"}""");
+                 "phoneNumber":"+573001234567","pronoun":"SHE","dataAuthorization":true,"policyVersion":"2026-11-v1"}""");
         String uid = jdbc.queryForObject("SELECT firebase_uid FROM microcuentas.cuenta", String.class);
 
         ResponseEntity<String> response = getMe(uid, "");
@@ -89,8 +89,24 @@ class CurrentAccountEndToEndTest {
         assertThat(body.get("pronoun").asString()).isEqualTo("SHE");
         assertThat(body.get("status").asString()).isEqualTo("PENDING_VERIFICATION");
         assertThat(body.get("plan").asString()).isEqualTo("FREE");
-        assertThat(body.size()).isEqualTo(8);
+        assertThat(body.size()).isEqualTo(9);
         assertThat(response.getBody()).doesNotContain("maria@cameia.tech").doesNotContain(uid);
+    }
+
+    @Test
+    @DisplayName("Tras el registro devuelve la versión aceptada, su fecha y la versión vigente")
+    void me_shouldReturnPolicyAcceptance_afterRegistration() throws Exception {
+        register("""
+                {"firstName":"María José","lastName":"Gómez-Ruiz","birthDate":"12/04/1995",
+                 "email":"politica@cameia.tech","password":"frase secreta larga",
+                 "phoneNumber":"+573001234567","pronoun":"SHE","dataAuthorization":true,"policyVersion":"2026-11-v1"}""");
+        String uid = jdbc.queryForObject("SELECT firebase_uid FROM microcuentas.cuenta", String.class);
+
+        JsonNode aceptacion = mapper.readTree(getMe(uid, "").getBody()).get("policyAcceptance");
+
+        assertThat(aceptacion.get("acceptedVersion").asString()).isEqualTo("2026-11-v1");
+        assertThat(aceptacion.get("acceptedAt").asString()).endsWith("Z");
+        assertThat(aceptacion.get("currentVersion").asString()).isEqualTo("2026-11-v1");
     }
 
     @Test
@@ -216,8 +232,9 @@ class CurrentAccountEndToEndTest {
         boolean anonymized = "ANONYMIZED".equals(status);
         jdbc.update("""
                 INSERT INTO microcuentas.cuenta
-                    (id, firebase_uid, nombre, apellido, fecha_nacimiento, pronombres, estado, fecha_eliminacion)
-                VALUES (?, ?, ?, ?, CAST(? AS date), ?, ?, CASE WHEN ? THEN now() END)""",
+                    (id, firebase_uid, nombre, apellido, fecha_nacimiento, pronombres, estado, fecha_eliminacion,
+                     politica_version, politica_aceptada_en)
+                VALUES (?, ?, ?, ?, CAST(? AS date), ?, ?, CASE WHEN ? THEN now() END, '2026-11-v1', now())""",
                 id, uid, firstName, lastName, birthDate, anonymized ? null : "THEY", status, anonymized);
         return id;
     }

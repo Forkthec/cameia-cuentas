@@ -15,6 +15,7 @@ import tech.cameia.cuentas.domain.event.AccountDeleted;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
+import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.infrastructure.persistence.InMemoryAccountRepository;
 import tech.cameia.cuentas.infrastructure.persistence.InMemoryOutboxRepository;
 
@@ -32,7 +33,7 @@ class PendingAccountDeletionServiceTest {
     @Test
     @DisplayName("Si borró la fila, guarda un evento de cuenta eliminada con el uid y la hora del reloj")
     void deletePending_shouldRecordEvent_whenRowDeleted() {
-        accounts.save(Account.register(UID, "Ana", "Pérez", new BirthDate(LocalDate.of(1995, 4, 12)), null, null));
+        accounts.save(Account.register(UID, "Ana", "Pérez", new BirthDate(LocalDate.of(1995, 4, 12)), null, null, PolicyAcceptanceFixture.ACCEPTED));
 
         boolean deleted = service.deletePending(UID);
 
@@ -59,7 +60,7 @@ class PendingAccountDeletionServiceTest {
     @DisplayName("Una cuenta que ya no está pendiente no se borra ni genera evento")
     void deletePending_shouldNotDeleteNorRecord_whenAccountIsActive() {
         accounts.save(Account.rebuild(UUID.randomUUID(), UID, "Ana", "Pérez",
-                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, AccountStatus.ACTIVE));
+                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, PolicyAcceptanceFixture.ACCEPTED, AccountStatus.ACTIVE));
 
         boolean deleted = service.deletePending(UID);
 

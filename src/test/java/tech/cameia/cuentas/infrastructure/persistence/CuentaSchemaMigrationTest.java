@@ -106,13 +106,58 @@ class CuentaSchemaMigrationTest {
 	}
 
 	/**
+	 * Comprueba que la migración agrega las dos columnas de la aceptación de la política,
+	 * obligatorias y con el tamaño que valida el dominio, y su restricción de no vacío.
+	 */
+	@Test
+	void schema_shouldHavePolicyColumns_whenMigrated() {
+		List<java.util.Map<String, Object>> columnas = jdbcTemplate.queryForList("""
+				SELECT column_name, data_type, character_maximum_length, is_nullable
+				  FROM information_schema.columns
+				 WHERE table_schema = 'microcuentas' AND table_name = 'cuenta'
+				   AND column_name IN ('politica_version', 'politica_aceptada_en')
+				 ORDER BY column_name
+				""");
+
+		assertThat(columnas).hasSize(2);
+		assertThat(columnas.get(0)).containsEntry("column_name", "politica_aceptada_en")
+				.containsEntry("data_type", "timestamp with time zone")
+				.containsEntry("is_nullable", "NO");
+		assertThat(columnas.get(1)).containsEntry("column_name", "politica_version")
+				.containsEntry("data_type", "character varying")
+				.containsEntry("character_maximum_length", 20)
+				.containsEntry("is_nullable", "NO");
+		Integer restricciones = jdbcTemplate.queryForObject("""
+				SELECT count(*) FROM pg_constraint
+				 WHERE conrelid = 'microcuentas.cuenta'::regclass
+				   AND conname = 'ck_cuenta_politica_version_no_vacia'
+				""", Integer.class);
+		assertThat(restricciones).isEqualTo(1);
+	}
+
+	/**
+	 * Verifica que la base rechaza una versión de política formada solo por espacios.
+	 */
+	@Test
+	void insert_shouldFail_whenPolicyVersionIsBlank() {
+		assertThatThrownBy(() -> jdbcTemplate.update("""
+				INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido,
+				                                 politica_version, politica_aceptada_en)
+				VALUES (gen_random_uuid(), 'uid-politica-vacia', 'Ana', 'Perez', '   ', now())
+				"""))
+				.isInstanceOf(DataIntegrityViolationException.class)
+				.hasMessageContaining("ck_cuenta_politica_version_no_vacia");
+	}
+
+	/**
 	 * Verifica que un teléfono sin formato E.164 no llega a guardarse.
 	 */
 	@Test
 	void telefonoFueraDeE164EsRechazado() {
 		assertThatThrownBy(() -> jdbcTemplate.update("""
-				INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido, telefono)
-				VALUES (gen_random_uuid(), 'uid-telefono', 'Ana', 'Perez', '3001234567')
+				INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido, telefono,
+				                                 politica_version, politica_aceptada_en)
+				VALUES (gen_random_uuid(), 'uid-telefono', 'Ana', 'Perez', '3001234567', '2026-11-v1', now())
 				""")).isInstanceOf(DataIntegrityViolationException.class);
 	}
 
@@ -161,8 +206,9 @@ class CuentaSchemaMigrationTest {
 	 */
 	private void insertarCuentaConPronombre(String firebaseUid, String pronombre) {
 		jdbcTemplate.update("""
-				INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido, pronombres)
-				VALUES (gen_random_uuid(), ?, 'Ana', 'Perez', ?)
+				INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido, pronombres,
+				                                 politica_version, politica_aceptada_en)
+				VALUES (gen_random_uuid(), ?, 'Ana', 'Perez', ?, '2026-11-v1', now())
 				""", firebaseUid, pronombre);
 	}
 
@@ -176,14 +222,16 @@ class CuentaSchemaMigrationTest {
 	private void insertarCuenta(String firebaseUid, String estado) {
 		if (estado == null) {
 			jdbcTemplate.update("""
-					INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido)
-					VALUES (gen_random_uuid(), ?, 'Ana', 'Perez')
+					INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido,
+					                                 politica_version, politica_aceptada_en)
+					VALUES (gen_random_uuid(), ?, 'Ana', 'Perez', '2026-11-v1', now())
 					""", firebaseUid);
 			return;
 		}
 		jdbcTemplate.update("""
-				INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido, estado)
-				VALUES (gen_random_uuid(), ?, 'Ana', 'Perez', ?)
+				INSERT INTO microcuentas.cuenta (id, firebase_uid, nombre, apellido, estado,
+				                                 politica_version, politica_aceptada_en)
+				VALUES (gen_random_uuid(), ?, 'Ana', 'Perez', ?, '2026-11-v1', now())
 				""", firebaseUid, estado);
 	}
 }

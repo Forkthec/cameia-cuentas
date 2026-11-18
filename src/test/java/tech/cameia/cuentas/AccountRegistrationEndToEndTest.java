@@ -14,12 +14,15 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -53,6 +56,7 @@ import tech.cameia.cuentas.infrastructure.client.InMemoryFirebaseUserDirectory;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate
 @Testcontainers(disabledWithoutDocker = true)
+@ExtendWith(OutputCaptureExtension.class)
 class AccountRegistrationEndToEndTest {
 
     @Container
@@ -94,6 +98,26 @@ class AccountRegistrationEndToEndTest {
 
         assertThat(activacion.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(estadoGuardado()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    @DisplayName("Guarda la versión de la política y su fecha en la misma fila de la cuenta")
+    void register_shouldStorePolicyAcceptanceInSameRow() {
+        ResponseEntity<String> registro = registrar(cuerpoValido());
+
+        assertThat(registro.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        Map<String, Object> fila = jdbcTemplate.queryForMap(
+                "SELECT politica_version, politica_aceptada_en FROM microcuentas.cuenta");
+        assertThat(fila.get("politica_version")).isEqualTo("2026-11-v1");
+        assertThat(fila.get("politica_aceptada_en")).isNotNull();
+    }
+
+    @Test
+    @DisplayName("No escribe la versión de la política en el log")
+    void register_shouldNotLogPolicyVersion(CapturedOutput salida) {
+        registrar(cuerpoValido());
+
+        assertThat(salida.getAll()).doesNotContain("2026-11-v1");
     }
 
     @Test
@@ -623,7 +647,7 @@ class AccountRegistrationEndToEndTest {
         return """
                 {"firstName":"Ana","lastName":"Pérez","birthDate":"12/04/1995",
                  "email":"ana@cameia.tech","password":"frase secreta larga",
-                 "phoneNumber":"+573001234567","pronoun":"SHE"}
+                 "phoneNumber":"+573001234567","pronoun":"SHE","dataAuthorization":true,"policyVersion":"2026-11-v1"}
                 """;
     }
 }

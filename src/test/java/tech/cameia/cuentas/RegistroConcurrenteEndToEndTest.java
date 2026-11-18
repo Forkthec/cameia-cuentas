@@ -130,7 +130,7 @@ class RegistroConcurrenteEndToEndTest {
         return """
                 {"firstName":"Ana","lastName":"Pérez","birthDate":"12/04/1995",
                  "email":"%s","password":"frase secreta larga",
-                 "phoneNumber":"+573001234567","pronoun":"SHE"}
+                 "phoneNumber":"+573001234567","pronoun":"SHE","dataAuthorization":true,"policyVersion":"2026-11-v1"}
                 """.formatted(correo);
     }
 }

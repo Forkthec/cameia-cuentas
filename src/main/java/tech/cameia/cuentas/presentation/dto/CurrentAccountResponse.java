@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.BirthDate;
+import tech.cameia.cuentas.domain.model.CurrentPolicy;
 import tech.cameia.cuentas.domain.model.PhoneNumber;
 
 /**
@@ -23,6 +24,7 @@ import tech.cameia.cuentas.domain.model.PhoneNumber;
  * @param pronoun pronombres declarados, o {@code null} si no los declaró
  * @param status estado de la cuenta
  * @param plan plan de la cuenta; siempre {@code FREE}
+ * @param policyAcceptance aceptación de la política de tratamiento de datos y versión vigente
  */
 public record CurrentAccountResponse(
         @Schema(description = "Identificador de la cuenta local", example = "3f0c2c1e-8a47-4d5b-9a63-5b1d6e2f7a10")
@@ -45,7 +47,9 @@ public record CurrentAccountResponse(
         String status,
         @Schema(description = "Plan de la cuenta; siempre FREE hasta que existan los planes de pago", example = "FREE",
                 allowableValues = {"FREE"})
-        String plan) {
+        String plan,
+        @Schema(description = "Aceptación de la política de tratamiento de datos")
+        PolicyAcceptanceResponse policyAcceptance) {
 
     /** Plan de toda cuenta mientras no existan los planes de pago. */
     private static final String FREE_PLAN = "FREE";
@@ -54,9 +58,10 @@ public record CurrentAccountResponse(
      * Construye la respuesta a partir de la cuenta leída.
      *
      * @param account cuenta de quien llama
+     * @param currentPolicy versión vigente de la política
      * @return respuesta lista para serializarse, con {@code null} en lo que la cuenta no tiene
      */
-    public static CurrentAccountResponse from(Account account) {
+    public static CurrentAccountResponse from(Account account, CurrentPolicy currentPolicy) {
         return new CurrentAccountResponse(
                 account.getId(),
                 account.getFirstName(),
@@ -65,6 +70,7 @@ public record CurrentAccountResponse(
                 account.getPhoneNumber().map(PhoneNumber::value).orElse(null),
                 account.getPronoun().map(Enum::name).orElse(null),
                 account.getStatus().name(),
-                FREE_PLAN);
+                FREE_PLAN,
+                PolicyAcceptanceResponse.from(account.getPolicyAcceptance(), currentPolicy));
     }
 }

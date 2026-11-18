@@ -4,7 +4,7 @@ Esta carpeta trae la colección de Postman del microservicio de Cuentas y el ent
 
 | Archivo | Contenido |
 |---|---|
-| `cameia-cuentas.postman_collection.json` | Colección v2.1: carpeta `Registro` (8 peticiones), carpeta `Firebase no disponible (manual)` (1 petición), carpeta `Eventos de cuenta (local)` (10 peticiones), carpeta `Mi cuenta` (12 peticiones), carpeta `Activación` (18 peticiones), carpeta `Cerrar sesión en todos los dispositivos` (12 peticiones) y carpeta `Errores de protocolo` (7 peticiones) |
+| `cameia-cuentas.postman_collection.json` | Colección v2.1: carpeta `Registro` (8 peticiones), carpeta `Firebase no disponible (manual)` (1 petición), carpeta `Eventos de cuenta (local)` (10 peticiones), carpeta `Mi cuenta` (12 peticiones), carpeta `Políticas` (12 peticiones), carpeta `Activación` (18 peticiones), carpeta `Cerrar sesión en todos los dispositivos` (12 peticiones) y carpeta `Errores de protocolo` (7 peticiones) |
 | `cameia-cuentas-base-de-datos-no-disponible.postman_collection.json` | Colección aparte con la carpeta `Base de datos no disponible (manual)` (2 peticiones). Se corre sola, con la base detenida; no se mezcla con la colección principal porque sus peticiones esperan una base caída y fallarían en una corrida normal |
 | `local.postman_environment.json` | Entorno local: `baseUrl` (`http://localhost:8081`, el puerto de `SERVER_PORT`) y los datos del broker de compose (`rabbitManagementUrl`, `rabbitUser` y `rabbitPassword`, esta última vacía) y el emulador de Firebase Auth (`firebaseEmulatorUrl`, `http://localhost:9099`, y `firebaseProjectId`, `demo-cameia`). No lleva secretos |
 
@@ -50,7 +50,7 @@ Carpeta `Mi cuenta` (`GET /api/v1/users/me`): registra dos cuentas sintéticas y
 |---|---|---|
 | M-00 | Registro de la cuenta que se consultará | 201; guarda `meUid` |
 | M-00b | Registro de una segunda cuenta | 201; guarda `uidOtra` e `idOtra` |
-| M-01 | `GET /api/v1/users/me` con `X-User-Id: {{meUid}}` | 200 con exactamente `id`, `firstName`, `lastName`, `birthDate` (`1995-04-12`), `phoneNumber`, `pronoun`, `status` (`PENDING_VERIFICATION`) y `plan` (`FREE`); sin correo ni identificadores internos; encabezado `Cache-Control: no-store` |
+| M-01 | `GET /api/v1/users/me` con `X-User-Id: {{meUid}}` | 200 con exactamente `id`, `firstName`, `lastName`, `birthDate` (`1995-04-12`), `phoneNumber`, `pronoun`, `status` (`PENDING_VERIFICATION`), `plan` (`FREE`) y `policyAcceptance`; sin correo ni identificadores internos; encabezado `Cache-Control: no-store` |
 | M-02 | La misma consulta | 200 con `phoneNumber` presente y `null` (la cuenta se registró sin celular) |
 | M-03 | Consulta con `?firebase_uid={{uidOtra}}&id={{idOtra}}&uid={{uidOtra}}` | 200 con el `id` propio y nunca el de la otra cuenta |
 | M-04 | `X-User-Id` de una cuenta que no existe | 404 `ACCOUNT_NOT_FOUND` con «No encontramos una cuenta para este usuario.» |
@@ -62,6 +62,25 @@ Carpeta `Mi cuenta` (`GET /api/v1/users/me`): registra dos cuentas sintéticas y
 | M-09 | `GET /v3/api-docs` | 200 con `GET /api/v1/users/me` y sus respuestas 200, 400, 404, 406 y 500; exige `API_DOCUMENTATION_ENABLED=true` |
 
 La cuenta anterior al registro con fecha (sin fecha de nacimiento, que se devuelve con `birthDate: null`) no se puede crear por la API, así que no tiene petición aquí: la cubre `CurrentAccountEndToEndTest.getMe_shouldReturnBirthDateNull_whenLegacyAccountHasNoBirthDate`.
+
+Carpeta `Políticas` (`POST /api/v1/users` y `POST /api/v1/users/me/policy-acceptance`): comprueba la autorización de datos y la versión de la política en el registro y la ruta que registra la aceptación. Exige el entorno local con `policyVersion` igual a la versión vigente del servicio (`CAMEIA_POLICY_VERSION`, por defecto `2026-11-v1`). Cada registro usa un correo sintético nuevo y todas las peticiones comprueban que respondan en menos de 2 s.
+
+| # | Petición | Resultado esperado |
+|---|---|---|
+| P-01 | Registro sin `dataAuthorization` ni `policyVersion` | 422 `VALIDATION_FAILED` con un elemento por campo: `DATA_AUTHORIZATION_REQUIRED` y `POLICY_VERSION_REQUIRED`, con su mensaje literal |
+| P-02 | Registro con `dataAuthorization: false` | 422 con `DATA_AUTHORIZATION_REQUIRED` |
+| P-03 | Registro con `dataAuthorization: "true"` (texto) | 422 con `DATA_AUTHORIZATION_REQUIRED` |
+| P-04 | Registro con `policyVersion` en blanco | 422 con `POLICY_VERSION_REQUIRED` |
+| P-05 | Registro con una versión anterior (`2026-10-v1`) | 422 con `POLICY_VERSION_OUTDATED` |
+| P-06 | Registro válido con la versión vigente | 201 con la cuenta `PENDING_VERIFICATION`; guarda `polUid` |
+| P-07 | `GET /api/v1/users/me` de esa cuenta | 200 con `policyAcceptance` (versión aceptada igual a la vigente y fecha no nula); `Cache-Control: no-store` |
+| P-08 | `POST /api/v1/users/me/policy-acceptance` con la versión vigente | 200 con `acceptedVersion`, `acceptedAt` y `currentVersion`; guarda la fecha |
+| P-09 | La misma aceptación otra vez | 200 con la misma fecha de aceptación (idempotente) |
+| P-10 | Aceptar una versión anterior | 422 `POLICY_VERSION_OUTDATED` |
+| P-11 | Aceptar sin `X-User-Id` | 400 `IDENTITY_REQUIRED` |
+| P-12 | Aceptar con un usuario sin cuenta | 404 `ACCOUNT_NOT_FOUND` |
+
+La carpeta se corre con `--folder "Políticas"` y `--reporter-junit-export target/newman-politicas.xml`; no necesita el broker ni el emulador de Firebase.
 
 Carpeta `Activación` (`POST /api/v1/users/me/verification`): registra una cuenta sintética y la activa con la identidad y la verificación que pondría el Gateway. Las peticiones corren en el orden de la tabla: primero los rechazos con la cuenta aún pendiente y después la activación. Todas comprueban `code` y `detail` literales y que respondan en menos de 2 s.
 
@@ -140,6 +159,7 @@ npx newman run postman/cameia-cuentas.postman_collection.json -e postman/local.p
   npx newman run postman/cameia-cuentas.postman_collection.json -e postman/local.postman_environment.json --folder "Eventos de cuenta (local)" --env-var rabbitPassword=<la del .env> --reporters cli,junit --reporter-junit-export target/newman-eventos.xml
   ```
 
+- La carpeta de políticas se corre con `--folder "Políticas"` y `--reporter-junit-export target/newman-politicas.xml`; no necesita el broker.
 - La carpeta de la consulta se corre con `--folder "Mi cuenta"` y `--reporter-junit-export target/newman-mi-cuenta.xml`; no necesita el broker.
 - La carpeta de cierre de sesión se corre con `--folder "Cerrar sesión en todos los dispositivos"` y `--reporter-junit-export target/newman-logout.xml`; necesita el emulador de Firebase en `firebaseEmulatorUrl` y no necesita el broker.
 - La carpeta de errores de protocolo se corre con `--folder "Errores de protocolo"` y `--reporter-junit-export target/newman-protocolo.xml`; no necesita el broker ni el emulador de Firebase.

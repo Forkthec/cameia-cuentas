@@ -99,7 +99,7 @@ class AccountCreatedEventBrokerDownEndToEndTest {
         headers.setContentType(MediaType.APPLICATION_JSON);
         String body = """
                 {"firstName":"Ana","lastName":"Pérez","birthDate":"15/03/2008",
-                 "email":"ana.perez@ejemplo.test","password":"una frase muy larga 2026","pronoun":"SHE"}
+                 "email":"ana.perez@ejemplo.test","password":"una frase muy larga 2026","pronoun":"SHE","dataAuthorization":true,"policyVersion":"2026-11-v1"}
                 """;
 
         long start = System.nanoTime();

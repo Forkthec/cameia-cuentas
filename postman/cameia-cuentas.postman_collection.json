@@ -109,6 +109,18 @@
     {
       "key": "actId",
       "value": ""
+    },
+    {
+      "key": "polEmail",
+      "value": ""
+    },
+    {
+      "key": "polUid",
+      "value": ""
+    },
+    {
+      "key": "polAcceptedAt",
+      "value": ""
     }
   ],
   "item": [
@@ -160,7 +172,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{email}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{email}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -208,7 +220,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{email}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{email}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -261,7 +273,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{emailMayusculas}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{emailMayusculas}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -306,7 +318,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Luz\",\n  \"lastName\": \"Gómez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{email}}\",\n  \"password\": \"otra frase muy distinta\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"HE\"\n}",
+              "raw": "{\n  \"firstName\": \"Luz\",\n  \"lastName\": \"Gómez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{email}}\",\n  \"password\": \"otra frase muy distinta\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"HE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -354,7 +366,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{email}}\",\n  \"password\": \"123\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{email}}\",\n  \"password\": \"123\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -408,7 +420,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{emailActiva}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{emailActiva}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -501,7 +513,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{emailActiva}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{emailActiva}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -562,7 +574,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{emailCaido}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{emailCaido}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -808,7 +820,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"15/03/2008\",\n  \"email\": \"{{eventEmail}}\",\n  \"password\": \"una frase muy larga 2026\",\n  \"pronoun\": \"SHE\"\n}",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"15/03/2008\",\n  \"email\": \"{{eventEmail}}\",\n  \"password\": \"una frase muy larga 2026\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -940,7 +952,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"15/03/2008\",\n  \"email\": \"{{eventEmail}}\",\n  \"password\": \"una frase muy larga 2026\",\n  \"pronoun\": \"SHE\"\n}",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"15/03/2008\",\n  \"email\": \"{{eventEmail}}\",\n  \"password\": \"una frase muy larga 2026\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1057,7 +1069,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"15/03/2008\",\n  \"email\": \"{{hostileEmail}}\",\n  \"password\": \"una frase muy larga 2026\",\n  \"pronoun\": \"SHE\"\n}",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"15/03/2008\",\n  \"email\": \"{{hostileEmail}}\",\n  \"password\": \"una frase muy larga 2026\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1240,7 +1252,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{meEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"pronoun\": \"SHE\"\n}",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{meEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1295,7 +1307,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Beatriz\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{otraEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"pronoun\": \"SHE\"\n}",
+              "raw": "{\n  \"firstName\": \"Beatriz\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{otraEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1316,7 +1328,7 @@
                   "pm.test('Cache-Control no-store', () => pm.expect(pm.response.headers.get('Cache-Control')).to.eql('no-store'));",
                   "const cuerpo = pm.response.json();",
                   "pm.test('Exactamente los ocho campos de la historia', () =>",
-                  "    pm.expect(Object.keys(cuerpo).sort()).to.eql([\"birthDate\",\"firstName\",\"id\",\"lastName\",\"phoneNumber\",\"plan\",\"pronoun\",\"status\"]));",
+                  "    pm.expect(Object.keys(cuerpo).sort()).to.eql([\"birthDate\",\"firstName\",\"id\",\"lastName\",\"phoneNumber\",\"plan\",\"policyAcceptance\",\"pronoun\",\"status\"]));",
                   "pm.test('Datos registrados, estado pendiente y plan FREE', () => {",
                   "    pm.expect(cuerpo.firstName).to.eql('Ana');",
                   "    pm.expect(cuerpo.lastName).to.eql('Pérez');",
@@ -1724,6 +1736,693 @@
       ]
     },
     {
+      "name": "Políticas",
+      "description": "Autorización y versión de la política de tratamiento de datos en el registro, y la ruta POST /api/v1/users/me/policy-acceptance. Exige el entorno local con policyVersion igual a la versión vigente del servicio (CAMEIA_POLICY_VERSION).",
+      "item": [
+        {
+          "name": "P-01 — 422 registro sin autorización ni versión",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('polEmail', 'politica+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 422', () => pm.response.to.have.status(422));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('VALIDATION_FAILED con un elemento por campo', () => {",
+                  "    pm.expect(cuerpo.code).to.eql('VALIDATION_FAILED');",
+                  "    pm.expect(cuerpo.errors).to.have.lengthOf(2);",
+                  "});",
+                  "pm.test('dataAuthorization: DATA_AUTHORIZATION_REQUIRED con su mensaje literal', () => {",
+                  "    const e = cuerpo.errors.find((x) => x.field === 'dataAuthorization');",
+                  "    pm.expect(e.code).to.eql('DATA_AUTHORIZATION_REQUIRED');",
+                  "    pm.expect(e.message).to.eql('Acepta la política de tratamiento de datos para continuar.');",
+                  "});",
+                  "pm.test('policyVersion: POLICY_VERSION_REQUIRED con su mensaje literal', () => {",
+                  "    const e = cuerpo.errors.find((x) => x.field === 'policyVersion');",
+                  "    pm.expect(e.code).to.eql('POLICY_VERSION_REQUIRED');",
+                  "    pm.expect(e.message).to.eql('Recarga la página y vuelve a aceptar la política.');",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{polEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "P-02 — 422 registro con la autorización en false",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('polEmail', 'politica+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 422', () => pm.response.to.have.status(422));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('VALIDATION_FAILED con un elemento por campo', () => {",
+                  "    pm.expect(cuerpo.code).to.eql('VALIDATION_FAILED');",
+                  "    pm.expect(cuerpo.errors).to.have.lengthOf(1);",
+                  "});",
+                  "pm.test('dataAuthorization: DATA_AUTHORIZATION_REQUIRED con su mensaje literal', () => {",
+                  "    const e = cuerpo.errors.find((x) => x.field === 'dataAuthorization');",
+                  "    pm.expect(e.code).to.eql('DATA_AUTHORIZATION_REQUIRED');",
+                  "    pm.expect(e.message).to.eql('Acepta la política de tratamiento de datos para continuar.');",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{polEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": false,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "P-03 — 422 registro con la autorización como texto \"true\"",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('polEmail', 'politica+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 422', () => pm.response.to.have.status(422));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('VALIDATION_FAILED con un elemento por campo', () => {",
+                  "    pm.expect(cuerpo.code).to.eql('VALIDATION_FAILED');",
+                  "    pm.expect(cuerpo.errors).to.have.lengthOf(1);",
+                  "});",
+                  "pm.test('dataAuthorization: DATA_AUTHORIZATION_REQUIRED con su mensaje literal', () => {",
+                  "    const e = cuerpo.errors.find((x) => x.field === 'dataAuthorization');",
+                  "    pm.expect(e.code).to.eql('DATA_AUTHORIZATION_REQUIRED');",
+                  "    pm.expect(e.message).to.eql('Acepta la política de tratamiento de datos para continuar.');",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{polEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": \"true\",\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "P-04 — 422 registro con la versión en blanco",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('polEmail', 'politica+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 422', () => pm.response.to.have.status(422));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('VALIDATION_FAILED con un elemento por campo', () => {",
+                  "    pm.expect(cuerpo.code).to.eql('VALIDATION_FAILED');",
+                  "    pm.expect(cuerpo.errors).to.have.lengthOf(1);",
+                  "});",
+                  "pm.test('policyVersion: POLICY_VERSION_REQUIRED con su mensaje literal', () => {",
+                  "    const e = cuerpo.errors.find((x) => x.field === 'policyVersion');",
+                  "    pm.expect(e.code).to.eql('POLICY_VERSION_REQUIRED');",
+                  "    pm.expect(e.message).to.eql('Recarga la página y vuelve a aceptar la política.');",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{polEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"   \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "P-05 — 422 registro con una versión anterior",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('polEmail', 'politica+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 422', () => pm.response.to.have.status(422));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('VALIDATION_FAILED con un elemento por campo', () => {",
+                  "    pm.expect(cuerpo.code).to.eql('VALIDATION_FAILED');",
+                  "    pm.expect(cuerpo.errors).to.have.lengthOf(1);",
+                  "});",
+                  "pm.test('policyVersion: POLICY_VERSION_OUTDATED con su mensaje literal', () => {",
+                  "    const e = cuerpo.errors.find((x) => x.field === 'policyVersion');",
+                  "    pm.expect(e.code).to.eql('POLICY_VERSION_OUTDATED');",
+                  "    pm.expect(e.message).to.eql('La política cambió. Recarga la página y vuelve a aceptarla.');",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{polEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"2026-10-v1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "P-06 — 201 registro válido con la política vigente",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('polEmail', 'politica+' + Date.now() + '-' + pm.info.iteration + '@ejemplo.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('polUid', pm.response.json().firebaseUid);",
+                  "pm.test('Cuenta pendiente de verificación', () => pm.expect(pm.response.json().status).to.eql('PENDING_VERIFICATION'));",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{polEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"phoneNumber\": \"+573001234567\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "P-07 — 200 mi cuenta trae la política aceptada en el registro",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "const aceptacion = pm.response.json().policyAcceptance;",
+                  "pm.test('La versión aceptada es la vigente y la fecha no es nula', () => {",
+                  "    pm.expect(aceptacion.acceptedVersion).to.eql(pm.environment.get('policyVersion'));",
+                  "    pm.expect(aceptacion.acceptedVersion).to.eql(aceptacion.currentVersion);",
+                  "    pm.expect(aceptacion.acceptedAt).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.test('No se guarda en cachés', () => pm.expect(pm.response.headers.get('Cache-Control')).to.eql('no-store'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{polUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "P-08 — 200 acepta la política vigente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('Devuelve la versión aceptada, su fecha y la vigente', () => {",
+                  "    pm.expect(cuerpo.acceptedVersion).to.eql(pm.environment.get('policyVersion'));",
+                  "    pm.expect(cuerpo.currentVersion).to.eql(pm.environment.get('policyVersion'));",
+                  "    pm.expect(cuerpo.acceptedAt).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.test('No se guarda en cachés', () => pm.expect(pm.response.headers.get('Cache-Control')).to.eql('no-store'));",
+                  "pm.collectionVariables.set('polAcceptedAt', cuerpo.acceptedAt);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{polUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/policy-acceptance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "policy-acceptance"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "P-09 — 200 repetir la aceptación conserva la fecha",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Misma fecha que la primera aceptación', () =>",
+                  "    pm.expect(pm.response.json().acceptedAt).to.eql(pm.collectionVariables.get('polAcceptedAt')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{polUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/policy-acceptance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "policy-acceptance"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "P-10 — 422 aceptar una versión anterior",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 422', () => pm.response.to.have.status(422));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('VALIDATION_FAILED con un elemento por campo', () => {",
+                  "    pm.expect(cuerpo.code).to.eql('VALIDATION_FAILED');",
+                  "    pm.expect(cuerpo.errors).to.have.lengthOf(1);",
+                  "});",
+                  "pm.test('policyVersion: POLICY_VERSION_OUTDATED con su mensaje literal', () => {",
+                  "    const e = cuerpo.errors.find((x) => x.field === 'policyVersion');",
+                  "    pm.expect(e.code).to.eql('POLICY_VERSION_OUTDATED');",
+                  "    pm.expect(e.message).to.eql('La política cambió. Recarga la página y vuelve a aceptarla.');",
+                  "});",
+                  "pm.test('Responde en menos de 2 s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "{{polUid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/policy-acceptance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "policy-acceptance"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"policyVersion\": \"2026-10-v1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "P-11 — 400 aceptar sin X-User-Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));",
+                  "pm.test('IDENTITY_REQUIRED', () => pm.expect(pm.response.json().code).to.eql('IDENTITY_REQUIRED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/policy-acceptance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "policy-acceptance"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "P-12 — 404 aceptar con un usuario sin cuenta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 404', () => pm.response.to.have.status(404));",
+                  "pm.test('ACCOUNT_NOT_FOUND', () => pm.expect(pm.response.json().code).to.eql('ACCOUNT_NOT_FOUND'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "uid-sin-cuenta-politica"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/policy-acceptance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "policy-acceptance"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Activación",
       "description": "POST /api/v1/users/me/verification: la cuenta se activa solo cuando el Gateway afirma la verificación con X-User-Email-Verified: true. Las peticiones corren en este orden: primero los rechazos con la cuenta aún pendiente, después la activación y la repetición. Los 403 ACCOUNT_DISABLED y los 409 ACCOUNT_CONFLICT no se pueden provocar por HTTP sin tocar la base y quedan en las pruebas automáticas. A-11 exige API_DOCUMENTATION_ENABLED=true.",
       "item": [
@@ -1773,7 +2472,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{actEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"pronoun\": \"SHE\"\n}",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{actEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2587,7 +3286,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{logoutEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"pronoun\": \"SHE\"\n}",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Pérez\",\n  \"birthDate\": \"12/04/1995\",\n  \"email\": \"{{logoutEmail}}\",\n  \"password\": \"frase secreta larga\",\n  \"pronoun\": \"SHE\",\n  \"dataAuthorization\": true,\n  \"policyVersion\": \"{{policyVersion}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

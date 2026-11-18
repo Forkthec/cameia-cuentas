@@ -15,14 +15,17 @@ import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.exception.DependencyUnavailableException;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.model.BirthDate;
+import tech.cameia.cuentas.domain.model.CurrentPolicy;
 import tech.cameia.cuentas.domain.model.DirectoryUser;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.PersonName;
 import tech.cameia.cuentas.domain.model.PhoneNumber;
+import tech.cameia.cuentas.domain.model.PolicyAcceptance;
 import tech.cameia.cuentas.domain.model.Pronoun;
 import tech.cameia.cuentas.domain.model.RawPassword;
 import tech.cameia.cuentas.domain.policy.AgePolicy;
 import tech.cameia.cuentas.domain.policy.PasswordPolicy;
+import tech.cameia.cuentas.domain.policy.SignupAllowlistPolicy;
 import tech.cameia.cuentas.domain.port.AccountRepository;
 import tech.cameia.cuentas.domain.port.FirebaseUserDirectory;
 
@@ -61,6 +64,8 @@ public class RegisterUserService {
     private final OutboxRelayService relay;
     private final AgePolicy politicaDeEdad;
     private final PasswordPolicy politicaDeContrasenia;
+    private final CurrentPolicy politicaVigente;
+    private final SignupAllowlistPolicy listaPermitida;
     private final Clock clock;
 
     /**
@@ -72,12 +77,15 @@ public class RegisterUserService {
      * @param relay publica el evento guardado, una vez confirmada la transacción
      * @param politicaDeEdad reglas de fecha de nacimiento
      * @param politicaDeContrasenia reglas de contraseña
+     * @param politicaVigente versión vigente de la política de tratamiento de datos
+     * @param listaPermitida lista de correos que pueden registrarse; vacía, deja el registro abierto
      */
     @Autowired
     public RegisterUserService(FirebaseUserDirectory directorio, AccountRepository repositorio,
             AccountRecordingService accountRecorder, OutboxRelayService relay, AgePolicy politicaDeEdad,
-            PasswordPolicy politicaDeContrasenia) {
-        this(directorio, repositorio, accountRecorder, relay, politicaDeEdad, politicaDeContrasenia, Clock.systemUTC());
+            PasswordPolicy politicaDeContrasenia, CurrentPolicy politicaVigente, SignupAllowlistPolicy listaPermitida) {
+        this(directorio, repositorio, accountRecorder, relay, politicaDeEdad, politicaDeContrasenia,
+                politicaVigente, listaPermitida, Clock.systemUTC());
     }
 
     /**
@@ -89,17 +97,22 @@ public class RegisterUserService {
      * @param relay publica el evento guardado, una vez confirmada la transacción
      * @param politicaDeEdad reglas de fecha de nacimiento
      * @param politicaDeContrasenia reglas de contraseña
-     * @param clock reloj con el que se mide la antigüedad de una credencial
+     * @param politicaVigente versión vigente de la política de tratamiento de datos
+     * @param listaPermitida lista de correos que pueden registrarse; vacía, deja el registro abierto
+     * @param clock reloj con el que se mide la antigüedad de una credencial y se fija la fecha de aceptación
      */
     public RegisterUserService(FirebaseUserDirectory directorio, AccountRepository repositorio,
             AccountRecordingService accountRecorder, OutboxRelayService relay, AgePolicy politicaDeEdad,
-            PasswordPolicy politicaDeContrasenia, Clock clock) {
+            PasswordPolicy politicaDeContrasenia, CurrentPolicy politicaVigente, SignupAllowlistPolicy listaPermitida,
+            Clock clock) {
         this.directorio = directorio;
         this.repositorio = repositorio;
         this.accountRecorder = accountRecorder;
         this.relay = relay;
         this.politicaDeEdad = politicaDeEdad;
         this.politicaDeContrasenia = politicaDeContrasenia;
+        this.politicaVigente = politicaVigente;
+        this.listaPermitida = listaPermitida;
         this.clock = clock;
     }
 
@@ -109,6 +122,8 @@ public class RegisterUserService {
      * @param command datos del formulario de registro
      * @return la cuenta y si esta llamada la creó; si el correo ya tenía una cuenta pendiente de
      *         verificar, es esa cuenta, sin cambios, y los demás datos del formulario se ignoran
+     * @throws tech.cameia.cuentas.domain.exception.SignupNotAllowedException si el correo no está en la
+     *         lista de correos permitidos; se comprueba antes que las demás reglas y sin consultar Firebase
      * @throws tech.cameia.cuentas.domain.exception.InvalidBirthDateException si la fecha
      *         de nacimiento no permite registrarse
      * @throws tech.cameia.cuentas.domain.exception.InvalidPersonNameException si el nombre o
@@ -117,6 +132,8 @@ public class RegisterUserService {
      *         no es un número válido para el país de su indicativo
      * @throws tech.cameia.cuentas.domain.exception.WeakPasswordException si la contraseña
      *         no cumple la política
+     * @throws tech.cameia.cuentas.domain.exception.PolicyVersionOutdatedException si la versión de la
+     *         política no es la vigente; se comprueba antes de crear ninguna credencial
      * @throws EmailAlreadyRegisteredException si el correo ya tiene una cuenta activa,
      *         bloqueada o anonimizada, una credencial deshabilitada, o una credencial sin cuenta local
      * @throws tech.cameia.cuentas.domain.exception.DependencyUnavailableException si Firebase
@@ -136,11 +153,15 @@ public class RegisterUserService {
 
     /** Datos del formulario ya validados; agrupa los valores para no pasar más de tres parámetros. */
     private record ValidRegistration(EmailAddress email, RawPassword password, BirthDate birthDate,
-            PhoneNumber phoneNumber, PersonName firstName, PersonName lastName, Pronoun pronoun, String requestId) { }
+            PhoneNumber phoneNumber, PersonName firstName, PersonName lastName, Pronoun pronoun,
+            PolicyAcceptance policyAcceptance, String requestId) { }
 
     /** Aplica las reglas del dominio a los datos del formulario antes de tocar ningún sistema externo. */
     private ValidRegistration validar(RegisterUserCommand command) {
         EmailAddress email = new EmailAddress(command.email());
+        // Antes que las demás reglas (CM-360, D-3): quien no está en la lista no recibe pistas de ellas ni de si el
+        // correo ya existe, y no se consulta ni se crea nada en Firebase.
+        listaPermitida.verify(email);
         RawPassword password = new RawPassword(command.password());
         BirthDate birthDate = new BirthDate(command.birthDate());
         PhoneNumber phoneNumber = command.phoneNumber() == null
@@ -151,8 +172,12 @@ public class RegisterUserService {
 
         politicaDeEdad.verify(birthDate);
         politicaDeContrasenia.verify(password);
+        // La versión se vuelve a comprobar aquí, antes de crear la credencial, para que ningún llamador que no pase
+        // por el borde HTTP pueda dejar una credencial sin cuenta por una versión que no es la vigente.
+        politicaVigente.requireCurrent(command.policyVersion());
+        PolicyAcceptance aceptacion = new PolicyAcceptance(command.policyVersion(), clock.instant());
         return new ValidRegistration(email, password, birthDate, phoneNumber, firstName, lastName,
-                command.pronoun(), command.requestId());
+                command.pronoun(), aceptacion, command.requestId());
     }
 
     /**
@@ -212,7 +237,7 @@ public class RegisterUserService {
 
             Account cuenta = Account.register(firebaseUid, registro.firstName().value(),
                     registro.lastName().value(), registro.birthDate(), registro.phoneNumber(),
-                    registro.pronoun());
+                    registro.pronoun(), registro.policyAcceptance());
             // La fila de la cuenta y el evento cuenta.creada se guardan en una sola transacción; un fallo aquí sigue
             // compensando la credencial.
             RecordedAccount guardada = accountRecorder.recordNewAccount(cuenta, registro.email(), registro.requestId());

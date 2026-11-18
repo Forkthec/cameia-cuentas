@@ -54,6 +54,7 @@ import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.IdentityRequiredException;
 import tech.cameia.cuentas.domain.exception.InvalidFieldException;
 import tech.cameia.cuentas.domain.exception.InvalidPronounException;
+import tech.cameia.cuentas.domain.exception.SignupNotAllowedException;
 import tools.jackson.databind.exc.MismatchedInputException;
 
 /**
@@ -143,7 +144,9 @@ class BusinessExceptionHandler {
             Map.entry("email.NotBlank", ErrorCode.EMAIL_REQUIRED),
             Map.entry("email.CodePointSize", ErrorCode.EMAIL_TOO_LONG),
             Map.entry("password.NotBlank", ErrorCode.PASSWORD_REQUIRED),
-            Map.entry("pronoun.NotBlank", ErrorCode.PRONOUN_REQUIRED));
+            Map.entry("pronoun.NotBlank", ErrorCode.PRONOUN_REQUIRED),
+            Map.entry("dataAuthorization.ExplicitConsent", ErrorCode.DATA_AUTHORIZATION_REQUIRED),
+            Map.entry("policyVersion.NotBlank", ErrorCode.POLICY_VERSION_REQUIRED));
 
     /**
      * Un campo rechazado dentro de la lista {@code errors}.
@@ -209,6 +212,20 @@ class BusinessExceptionHandler {
     @ExceptionHandler(EmailNotVerifiedException.class)
     ProblemDetail correoSinVerificar(EmailNotVerifiedException error) {
         return rechazo(HttpStatus.FORBIDDEN, "Correo sin verificar", error.getMessage(), error.getErrorCode());
+    }
+
+    /**
+     * Correo fuera de la lista de correos permitidos para registrarse (CM-360).
+     *
+     * <p>Sin lista {@code errors}: no es un campo que la persona pueda corregir, y el mensaje no revela que existe
+     * una lista ni quién está en ella.</p>
+     *
+     * @param error excepción de negocio
+     * @return {@code 403 Forbidden}
+     */
+    @ExceptionHandler(SignupNotAllowedException.class)
+    ProblemDetail registroNoPermitido(SignupNotAllowedException error) {
+        return rechazo(HttpStatus.FORBIDDEN, "Registro no permitido", error.getMessage(), error.getErrorCode());
     }
 
     /**

@@ -33,6 +33,7 @@ import tech.cameia.cuentas.domain.exception.IdentityRequiredException;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.BirthDate;
+import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.presentation.advice.ProblemDetailTestSupport;
 
 /**
@@ -175,6 +176,6 @@ class AccountActivationControllerTest {
 
     private Account cuenta(AccountStatus estado) {
         return Account.rebuild(UUID.randomUUID(), "uid-firebase", "Ana", "Pérez",
-                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, estado);
+                new BirthDate(LocalDate.of(1995, 4, 12)), null, null, PolicyAcceptanceFixture.ACCEPTED, estado);
     }
 }

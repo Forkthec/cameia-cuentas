@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import tech.cameia.cuentas.application.service.GetCurrentAccountService;
+import tech.cameia.cuentas.domain.model.CurrentPolicy;
 import tech.cameia.cuentas.presentation.dto.CurrentAccountResponse;
 
 /**
@@ -34,7 +35,9 @@ class CurrentAccountController {
 
     private static final String EJEMPLO_200 = """
             {"id":"3f0c2c1e-8a47-4d5b-9a63-5b1d6e2f7a10","firstName":"María José","lastName":"Gómez-Ruiz",
-             "birthDate":"1995-04-12","phoneNumber":"+573001234567","pronoun":"SHE","status":"ACTIVE","plan":"FREE"}""";
+             "birthDate":"1995-04-12","phoneNumber":"+573001234567","pronoun":"SHE","status":"ACTIVE","plan":"FREE",
+             "policyAcceptance":{"acceptedVersion":"2026-11-v1","acceptedAt":"2026-11-14T15:30:00Z",
+                                 "currentVersion":"2026-11-v1"}}""";
 
     private static final String EJEMPLO_400 = """
             {"type":"about:blank","title":"Petición incompleta","status":400,
@@ -72,14 +75,17 @@ class CurrentAccountController {
              "code":"DATABASE_UNAVAILABLE","requestId":"3f1c9a52-7d0e-4b57-9a38-52c1e4d8a601"}""";
 
     private final GetCurrentAccountService service;
+    private final CurrentPolicy currentPolicy;
 
     /**
      * Crea el controlador.
      *
      * @param service caso de uso que lee la cuenta de quien llama
+     * @param currentPolicy versión vigente de la política, para decir si la aceptada sigue vigente
      */
-    CurrentAccountController(GetCurrentAccountService service) {
+    CurrentAccountController(GetCurrentAccountService service, CurrentPolicy currentPolicy) {
         this.service = service;
+        this.currentPolicy = currentPolicy;
     }
 
     /**
@@ -91,7 +97,7 @@ class CurrentAccountController {
     @Operation(summary = "Consulta la cuenta de quien llama",
             description = "Lee la cuenta por el identificador que propaga el Gateway; cualquier parámetro de la "
                     + "consulta se ignora. Devuelve nombres, apellidos, fecha de nacimiento, celular, pronombres, estado "
-                    + "y plan; nunca el correo ni la contraseña. Los campos sin valor van presentes con null.")
+                    + "y plan, y la aceptación de la política de tratamiento de datos; nunca el correo ni la contraseña. Los campos sin valor van presentes con null.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Datos de la cuenta de quien llama",
                 headers = @Header(name = "Cache-Control", description = "Siempre no-store: la respuesta lleva datos "
@@ -135,6 +141,6 @@ class CurrentAccountController {
             @RequestHeader("X-User-Id") String firebaseUid) {
         // Nombre, fecha de nacimiento y celular: ningún navegador ni proxy compartido debe conservar la respuesta.
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(CurrentAccountResponse.from(service.find(firebaseUid)));
+                .body(CurrentAccountResponse.from(service.find(firebaseUid), currentPolicy));
     }
 }

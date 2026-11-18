@@ -42,12 +42,18 @@ class UserRegistrationController {
              "code":"EMAIL_ALREADY_REGISTERED","requestId":"3f1c9a52-7d0e-4b57-9a38-52c1e4d8a601",
              "errors":[{"field":"email","code":"EMAIL_ALREADY_REGISTERED","message":"Ese correo ya tiene una cuenta."}]}""";
 
+    private static final String EJEMPLO_403 = """
+            {"type":"about:blank","title":"Registro no permitido","status":403,
+             "detail":"No es posible crear una cuenta con este correo.","instance":"/api/v1/users",
+             "code":"SIGNUP_NOT_ALLOWED","requestId":"3f1c9a52-7d0e-4b57-9a38-52c1e4d8a601"}""";
+
     private static final String EJEMPLO_422 = """
             {"type":"about:blank","title":"Datos no válidos","status":422,
              "detail":"Revisa los campos marcados.","instance":"/api/v1/users",
              "code":"VALIDATION_FAILED","requestId":"3f1c9a52-7d0e-4b57-9a38-52c1e4d8a601",
              "errors":[{"field":"email","code":"EMAIL_INVALID_FORMAT","message":"Ingresa un correo electrónico válido."},
-                       {"field":"password","code":"PASSWORD_TOO_SHORT","message":"La contraseña debe tener al menos 12 caracteres."}]}""";
+                       {"field":"password","code":"PASSWORD_TOO_SHORT","message":"La contraseña debe tener al menos 12 caracteres."},
+                       {"field":"dataAuthorization","code":"DATA_AUTHORIZATION_REQUIRED","message":"Acepta la política de tratamiento de datos para continuar."}]}""";
 
     private static final String EJEMPLO_406 = """
             {"type":"about:blank","title":"Tipo de respuesta no admitido","status":406,
@@ -112,13 +118,20 @@ class UserRegistrationController {
                 content = @Content(mediaType = "application/problem+json",
                         schema = @Schema(implementation = ProblemDetail.class),
                         examples = @ExampleObject(name = "correoRepetido", value = EJEMPLO_409))),
+        @ApiResponse(responseCode = "403", description = "SIGNUP_NOT_ALLOWED: el entorno restringe el registro a una "
+                + "lista de correos permitidos (SIGNUP_ALLOWLIST) y el correo no está en ella. Se responde después de los "
+                + "422 de forma y antes de las demás reglas; no crea ni consulta nada. Sin la lista no se emite",
+                content = @Content(mediaType = "application/problem+json",
+                        schema = @Schema(implementation = ProblemDetail.class),
+                        examples = @ExampleObject(name = "registroNoPermitido", value = EJEMPLO_403))),
         @ApiResponse(responseCode = "422", description = "VALIDATION_FAILED con errors[].code: FIRST_NAME_REQUIRED, "
                 + "FIRST_NAME_TOO_LONG, FIRST_NAME_INVALID_CHARACTERS, LAST_NAME_REQUIRED, LAST_NAME_TOO_LONG, "
                 + "LAST_NAME_INVALID_CHARACTERS, BIRTH_DATE_REQUIRED, "
                 + "BIRTH_DATE_INVALID_FORMAT, BIRTH_DATE_IN_THE_FUTURE, BIRTH_DATE_UNDERAGE, BIRTH_DATE_OUT_OF_RANGE, "
                 + "EMAIL_REQUIRED, EMAIL_TOO_LONG, EMAIL_INVALID_FORMAT, PASSWORD_REQUIRED, PASSWORD_TOO_SHORT, "
                 + "PASSWORD_TOO_LONG, PASSWORD_TOO_COMMON, "
-                + "PRONOUN_REQUIRED, PRONOUN_INVALID_VALUE, PHONE_NUMBER_INVALID_FORMAT; o REQUEST_BODY_INVALID_FORMAT sin "
+                + "PRONOUN_REQUIRED, PRONOUN_INVALID_VALUE, PHONE_NUMBER_INVALID_FORMAT, DATA_AUTHORIZATION_REQUIRED, "
+                + "POLICY_VERSION_REQUIRED, POLICY_VERSION_OUTDATED; o REQUEST_BODY_INVALID_FORMAT sin "
                 + "errors cuando el cuerpo no se puede interpretar",
                 content = @Content(mediaType = "application/problem+json",
                         schema = @Schema(implementation = ProblemDetail.class),

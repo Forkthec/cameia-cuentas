@@ -57,6 +57,7 @@ import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.exception.EmailAlreadyRegisteredException;
 import tech.cameia.cuentas.domain.model.EmailAddress;
 import tech.cameia.cuentas.domain.model.Pronoun;
+import tech.cameia.cuentas.presentation.dto.CurrentPolicyVersion;
 import tech.cameia.cuentas.presentation.dto.DomainRule;
 import tech.cameia.cuentas.presentation.dto.RegisterUserRequest;
 import tools.jackson.core.exc.StreamReadException;
@@ -88,9 +89,11 @@ class BusinessExceptionHandlerTest {
             // Las restricciones de un record se propagan al campo privado del componente.
             for (Annotation anotacion : RegisterUserRequest.class.getDeclaredField(componente.getName())
                     .getAnnotations()) {
-                // Una regla de forma del dominio trae su código en la excepción del dominio.
+                // Una regla de forma del dominio y la versión vigente de la política traen su código en la
+                // excepción del dominio que lanzan.
                 if (anotacion.annotationType().isAnnotationPresent(Constraint.class)
-                        && !(anotacion instanceof DomainRule)) {
+                        && !(anotacion instanceof DomainRule)
+                        && !(anotacion instanceof CurrentPolicyVersion)) {
                     restricciones.add(componente.getName() + "." + anotacion.annotationType().getSimpleName());
                 }
             }

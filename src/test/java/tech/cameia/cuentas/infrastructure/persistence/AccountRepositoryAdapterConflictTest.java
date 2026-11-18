@@ -22,6 +22,7 @@ import tech.cameia.cuentas.domain.exception.ErrorCode;
 import tech.cameia.cuentas.domain.model.Account;
 import tech.cameia.cuentas.domain.model.AccountStatus;
 import tech.cameia.cuentas.domain.model.Pronoun;
+import tech.cameia.cuentas.domain.model.PolicyAcceptanceFixture;
 import tech.cameia.cuentas.infrastructure.persistence.entity.AccountEntity;
 import tech.cameia.cuentas.infrastructure.persistence.mapper.AccountMapper;
 import tech.cameia.cuentas.infrastructure.persistence.repository.AccountJpaRepository;
@@ -38,7 +39,7 @@ class AccountRepositoryAdapterConflictTest {
 
     private Account cuenta() {
         return Account.rebuild(UUID.randomUUID(), UID, "Ana", "Pérez", null, null,
-                Pronoun.SHE, AccountStatus.PENDING_VERIFICATION);
+                Pronoun.SHE, PolicyAcceptanceFixture.ACCEPTED, AccountStatus.PENDING_VERIFICATION);
     }
 
     private void rowExists() {
@@ -64,6 +65,7 @@ class AccountRepositoryAdapterConflictTest {
         ReflectionTestUtils.setField(actual, "version", 4L);
         when(jpa.findByFirebaseUid(UID)).thenReturn(Optional.of(actual));
         Account leidaConVersionVieja = Account.rebuild(UUID.randomUUID(), UID, "Ana", "Pérez", null, null, Pronoun.SHE,
+                PolicyAcceptanceFixture.ACCEPTED,
                 AccountStatus.PENDING_VERIFICATION, 3L);
 
         assertThatThrownBy(() -> adaptador.save(leidaConVersionVieja)).isInstanceOf(AccountConflictException.class);
@@ -79,6 +81,7 @@ class AccountRepositoryAdapterConflictTest {
         when(jpa.findByFirebaseUid(UID)).thenReturn(Optional.of(actual));
         when(jpa.save(any())).thenReturn(actual);
         Account leida = Account.rebuild(UUID.randomUUID(), UID, "Ana", "Pérez", null, null, Pronoun.SHE,
+                PolicyAcceptanceFixture.ACCEPTED,
                 AccountStatus.PENDING_VERIFICATION, 4L);
 
         assertThat(adaptador.save(leida).getVersion()).contains(4L);

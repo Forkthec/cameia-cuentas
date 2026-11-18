@@ -60,6 +60,8 @@ public class AccountRepositoryAdapter implements AccountRepository {
                 .map(existing -> {
                     rejectIfRowChanged(account, existing);
                     existing.setEstado(account.getStatus());
+                    existing.setAceptacionPolitica(account.getPolicyAcceptance().version(),
+                            account.getPolicyAcceptance().acceptedAt());
                     return existing;
                 })
                 .orElseGet(() -> mapeador.toEntity(account));
